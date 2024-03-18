@@ -7,7 +7,7 @@ This code in this repository was originally [part of Nixpkgs](https://github.com
 
 To see how it is used in Nixpkgs, see the [`check-by-name.yml` workflow](https://github.com/NixOS/nixpkgs/blob/master/.github/workflows/check-by-name.yml).
 
-@infinisil is the admin and main developer of this repository, while everybody in @NixOS/nixpkgs-check-by-name has write access.
+[@infinisil](https://github.com/infinisil) is the admin and main developer of this repository, while everybody in [@NixOS/nixpkgs-check-by-name](https://github.com/orgs/NixOS/teams/nixpkgs-check-by-name) has write access.
 
 ## Interface
 
