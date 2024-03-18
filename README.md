@@ -1,12 +1,13 @@
 # Nixpkgs pkgs/by-name checker
 
-This directory implements a program to check the [validity](#validity-checks) of the `pkgs/by-name` Nixpkgs directory.
+This directory implements a program to check the [validity](#validity-checks) of the [`pkgs/by-name` Nixpkgs directory](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name).
 This is part of the implementation of [RFC 140](https://github.com/NixOS/rfcs/pull/140).
 
-A [pinned version](./scripts/pinned-tool.json) of this tool is used by [this GitHub Actions workflow](../../../.github/workflows/check-by-name.yml).
-See [./scripts](./scripts/README.md#update-pinned-toolsh) for how to update the pinned version.
+This code in this repository was originally [part of Nixpkgs](https://github.com/NixOS/nixpkgs/commits/55bf02190ee57fcf83490fd7b6bf7834e28c9c86/pkgs/test/nixpkgs-check-by-name), but has since been [moved into this separate repository](https://github.com/NixOS/nixpkgs/issues/286559).
 
-The source of the tool being right inside Nixpkgs allows any Nixpkgs committer to make updates to it.
+To see how it is used in Nixpkgs, see the [`check-by-name.yml` workflow](https://github.com/NixOS/nixpkgs/blob/master/.github/workflows/check-by-name.yml).
+
+[@infinisil](https://github.com/infinisil) is the admin and main developer of this repository, while everybody in [@NixOS/nixpkgs-check-by-name](https://github.com/orgs/NixOS/teams/nixpkgs-check-by-name) has write access.
 
 ## Interface
 
@@ -90,7 +91,7 @@ Tests are declared in [`./tests`](./tests) as subdirectories imitating Nixpkgs w
     # ...
   }
   ```
-  allowing the simulation of package overrides to the real [`pkgs/top-level/all-packages.nix`](../../top-level/all-packages.nix`).
+  allowing the simulation of package overrides to the real [`pkgs/top-level/all-packages.nix`](https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/all-packages.nix).
   The default is an empty overlay.
 
 - `base` (optional):
