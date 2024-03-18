@@ -42,9 +42,11 @@ build // {
   shell = pkgs.mkShell {
     env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
     env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
+    env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
     inputsFrom = [ build ];
-    nativeBuildInputs = [
-      pkgs.npins
+    nativeBuildInputs = with pkgs; [
+      npins
+      rust-analyzer
     ];
   };
 
