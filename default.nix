@@ -1,17 +1,20 @@
+let
+  sources = import ./npins;
+in
 {
-  lib,
-  rustPlatform,
-  nix,
-  rustfmt,
-  clippy,
-  mkShell,
-  makeWrapper,
-  runCommand,
+  system ? builtins.currentSystem,
+  nixpkgs ? sources.nixpkgs,
 }:
 let
+  pkgs = import nixpkgs {
+    inherit system;
+    config = {};
+    overlays = [];
+  };
+
   runtimeExprPath = ./src/eval.nix;
-  nixpkgsLibPath = ../../../lib;
   testNixpkgsPath = ./tests/mock-nixpkgs.nix;
+  nixpkgsLibPath = nixpkgs + "/lib";
 
   # Needed to make Nix evaluation work inside nix builds
   initNix = ''
@@ -27,56 +30,34 @@ let
     nix-store --init
   '';
 
-  fs = lib.fileset;
+  build = pkgs.callPackage ./package.nix {
+    inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath;
+  };
 
-  package =
-    rustPlatform.buildRustPackage {
-      name = "nixpkgs-check-by-name";
-      src = fs.toSource {
-        root = ./.;
-        fileset = fs.unions [
-          ./Cargo.lock
-          ./Cargo.toml
-          ./src
-          ./tests
-        ];
-      };
-      cargoLock.lockFile = ./Cargo.lock;
-      nativeBuildInputs = [
-        nix
-        rustfmt
-        clippy
-        makeWrapper
-      ];
-      env.NIX_CHECK_BY_NAME_EXPR_PATH = "${runtimeExprPath}";
-      env.NIX_PATH = "test-nixpkgs=${testNixpkgsPath}:test-nixpkgs/lib=${nixpkgsLibPath}";
-      preCheck = initNix;
-      postCheck = ''
-        cargo fmt --check
-        cargo clippy -- -D warnings
-      '';
-      postInstall = ''
-        wrapProgram $out/bin/nixpkgs-check-by-name \
-          --set NIX_CHECK_BY_NAME_EXPR_PATH "$NIX_CHECK_BY_NAME_EXPR_PATH"
-      '';
-      passthru.shell = mkShell {
-        env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
-        env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
-        inputsFrom = [ package ];
-      };
-
-      # Tests the tool on the current Nixpkgs tree, this is a good sanity check
-      passthru.tests.nixpkgs = runCommand "test-nixpkgs-check-by-name" {
-        nativeBuildInputs = [
-          package
-          nix
-        ];
-        nixpkgsPath = lib.cleanSource ../../..;
-      } ''
-        ${initNix}
-        nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
-        touch $out
-      '';
-    };
 in
-package
+build // {
+
+  inherit build;
+
+  shell = pkgs.mkShell {
+    env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
+    env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
+    inputsFrom = [ build ];
+    nativeBuildInputs = [
+      pkgs.npins
+    ];
+  };
+
+  # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
+  checks.nixpkgs = pkgs.runCommand "test-nixpkgs-check-by-name" {
+    nativeBuildInputs = [
+      build
+      pkgs.nix
+    ];
+    nixpkgsPath = nixpkgs;
+  } ''
+    ${initNix}
+    nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
+    touch $out
+  '';
+}
