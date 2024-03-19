@@ -39,6 +39,9 @@ build // {
 
   inherit build;
 
+  # Used by CI and good for debugging
+  inherit pkgs;
+
   shell = pkgs.mkShell {
     env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
     env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
