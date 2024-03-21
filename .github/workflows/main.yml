@@ -13,4 +13,4 @@ jobs:
       - uses: cachix/install-nix-action@v26
 
       - name: build
-        run: nix-build -A build -A shell -A checks
+        run: nix-build -A ci
