@@ -62,7 +62,7 @@ build // {
     text =
       let
         commands = [
-          "npins update nixpkgs"
+          "npins update"
         ];
       in
       ''
