@@ -56,19 +56,22 @@ let
       ];
       text =
         let
-          commands = [
-            "npins update"
-            "cargo update"
-          ];
+          commands = {
+            "npins changes" = ''
+              npins update --directory "$REPO_ROOT/npins"'';
+            "cargo changes" = ''
+              cargo update --manifest-path "$REPO_ROOT/Cargo.toml"'';
+          };
         in
         ''
+          REPO_ROOT=$1
           echo "Run automated updates"
         ''
-        + pkgs.lib.concatMapStrings (command: ''
-          echo -e '<details><summary>${command}</summary>\n\n```'
+        + pkgs.lib.concatStrings (pkgs.lib.mapAttrsToList (title: command: ''
+          echo -e '<details><summary>${title}</summary>\n\n```'
           ${command} 2>&1
           echo -e '```\n</details>'
-        '') commands;
+        '') commands);
     };
 
     # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
