@@ -14,13 +14,20 @@ jobs:
 
       - name: update
         run: |
-          nix-build -A pkgs.npins
-          result/bin/npins update nixpkgs
+          nix-build -A autoPrUpdate
+          result/bin/auto-pr-update > body
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "Automated Nixpkgs update"
-          branch: auto-nixpkgs-update
-          title: "Automated Nixpkgs update"
-          body: "Update the pinned Nixpkgs automatically"
+          # To trigger CI for automated PRs, we use a separate machine account
+          # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
+          # and https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#push-pull-request-branches-to-a-fork
+          token: ${{ secrets.MACHINE_USER_PAT }}
+          push-to-fork: infinixbot/nixpkgs-check-by-name
+          committer: infinixbot <infinixbot@infinisil.com>
+          author: infinixbot <infinixbot@infinisil.com>
+          commit-message: "Automated update"
+          branch: auto-update
+          title: "Automated update"
+          body-path: body
