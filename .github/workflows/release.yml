@@ -14,3 +14,5 @@ jobs:
 
       - name: release
         run: scripts/release.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
