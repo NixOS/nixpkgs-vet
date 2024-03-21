@@ -14,8 +14,8 @@ jobs:
 
       - name: update
         run: |
-          nix-build -A pkgs.npins
-          result/bin/npins update nixpkgs
+          nix-build -A autoPrUpdate
+          result/bin/auto-pr-update > body
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
@@ -23,4 +23,4 @@ jobs:
           commit-message: "Automated Nixpkgs update"
           branch: auto-nixpkgs-update
           title: "Automated Nixpkgs update"
-          body: "Update the pinned Nixpkgs automatically"
+          body-path: body

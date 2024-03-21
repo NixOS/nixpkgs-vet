@@ -53,6 +53,28 @@ build // {
     ];
   };
 
+  # Run regularly by CI and turned into a PR
+  autoPrUpdate = pkgs.writeShellApplication {
+    name = "auto-pr-update";
+    runtimeInputs = with pkgs; [
+      npins
+    ];
+    text =
+      let
+        commands = [
+          "npins update nixpkgs"
+        ];
+      in
+      ''
+        echo "Run automated updates"
+      ''
+      + pkgs.lib.concatMapStrings (command: ''
+        echo -e '<details><summary>${command}</summary>\n\n```'
+        ${command} 2>&1
+        echo -e '```\n</details>'
+      '') commands;
+  };
+
   # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
   checks.nixpkgs = pkgs.runCommand "test-nixpkgs-check-by-name" {
     nativeBuildInputs = [
