@@ -9,12 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        path: repo
 
       - uses: cachix/install-nix-action@v26
 
       - name: update
         run: |
-          nix-build -A autoPrUpdate
+          nix-build repo -A autoPrUpdate
           result/bin/auto-pr-update > body
 
       - name: Create Pull Request
