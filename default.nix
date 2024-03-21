@@ -58,11 +58,13 @@ build // {
     name = "auto-pr-update";
     runtimeInputs = with pkgs; [
       npins
+      cargo
     ];
     text =
       let
         commands = [
           "npins update"
+          "cargo update"
         ];
       in
       ''
