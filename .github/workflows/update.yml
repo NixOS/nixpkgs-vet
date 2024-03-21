@@ -1,4 +1,4 @@
-name: Update Nixpkgs pin
+name: Automated update
 on:
   workflow_dispatch: # Allows triggering manually
   schedule:
