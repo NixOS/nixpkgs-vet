@@ -1,16 +1,16 @@
-name: CI
+name: CD
 on:
-  pull_request:
+  push:
     branches:
       - main
 
 jobs:
-  check:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: cachix/install-nix-action@v26
 
-      - name: build
-        run: nix-build -A build -A shell -A checks
+      - name: release
+        run: scripts/release.sh
