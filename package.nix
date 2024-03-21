@@ -13,9 +13,11 @@
 }:
 let
   fs = lib.fileset;
+  version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 in
 rustPlatform.buildRustPackage {
-  name = "nixpkgs-check-by-name";
+  pname = "nixpkgs-check-by-name";
+  inherit version;
   src = fs.toSource {
     root = ./.;
     fileset = fs.unions [
