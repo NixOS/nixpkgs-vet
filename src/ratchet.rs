@@ -3,7 +3,7 @@
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::nixpkgs_problem::{NixpkgsProblem, RatchetError, RatchetErrorKind};
 use crate::validation::{self, Validation, Validation::Success};
 use relative_path::RelativePathBuf;
 use std::collections::HashMap;
@@ -153,32 +153,16 @@ impl ToNixpkgsProblem for UsesByName {
         optional_from: Option<()>,
         (to, file): &Self::ToContext,
     ) -> NixpkgsProblem {
-        if let Some(()) = optional_from {
-            if to.empty_arg {
-                NixpkgsProblem::MovedOutOfByNameEmptyArg {
-                    package_name: name.to_owned(),
-                    call_package_path: to.relative_path.clone(),
-                    file: file.to_owned(),
-                }
-            } else {
-                NixpkgsProblem::MovedOutOfByNameNonEmptyArg {
-                    package_name: name.to_owned(),
-                    call_package_path: to.relative_path.clone(),
-                    file: file.to_owned(),
-                }
-            }
-        } else if to.empty_arg {
-            NixpkgsProblem::NewPackageNotUsingByNameEmptyArg {
-                package_name: name.to_owned(),
-                call_package_path: to.relative_path.clone(),
-                file: file.to_owned(),
-            }
-        } else {
-            NixpkgsProblem::NewPackageNotUsingByNameNonEmptyArg {
-                package_name: name.to_owned(),
-                call_package_path: to.relative_path.clone(),
-                file: file.to_owned(),
-            }
-        }
+        NixpkgsProblem::RatchetProblem(RatchetError {
+            package_name: name.to_owned(),
+            call_package_path: to.relative_path.clone(),
+            file: file.to_owned(),
+            kind: match (optional_from, to.empty_arg) {
+                (Some(()), true) => RatchetErrorKind::MovedOutOfByNameEmptyArg,
+                (Some(()), false) => RatchetErrorKind::MovedOutOfByNameNonEmptyArg,
+                (None, true) => RatchetErrorKind::NewPackageNotUsingByNameEmptyArg,
+                (None, false) => RatchetErrorKind::NewPackageNotUsingByNameNonEmptyArg,
+            },
+        })
     }
 }

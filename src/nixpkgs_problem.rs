@@ -115,32 +115,29 @@ pub enum NixpkgsProblem {
         text: String,
         io_error: String,
     },
-    MovedOutOfByNameEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    MovedOutOfByNameNonEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    NewPackageNotUsingByNameEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    NewPackageNotUsingByNameNonEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
+    RatchetProblem(RatchetError),
     InternalCallPackageUsed {
         attr_name: String,
     },
     CannotDetermineAttributeLocation {
         attr_name: String,
     },
+}
+
+#[derive(Clone)]
+pub struct RatchetError {
+    pub package_name: String,
+    pub call_package_path: Option<RelativePathBuf>,
+    pub file: RelativePathBuf,
+    pub kind: RatchetErrorKind,
+}
+
+#[derive(Clone)]
+pub enum RatchetErrorKind {
+    MovedOutOfByNameEmptyArg,
+    MovedOutOfByNameNonEmptyArg,
+    NewPackageNotUsingByNameEmptyArg,
+    NewPackageNotUsingByNameNonEmptyArg,
 }
 
 impl fmt::Display for NixpkgsProblem {
@@ -319,23 +316,12 @@ impl fmt::Display for NixpkgsProblem {
                     f,
                     "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
                 ),
-            NixpkgsProblem::MovedOutOfByNameEmptyArg { package_name, call_package_path, file } => {
-                let call_package_arg =
-                    if let Some(path) = &call_package_path {
-                        format!("./{path}")
-                    } else {
-                        "...".into()
-                    };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
-                      Please move the package back and remove the manual `callPackage`.
-                    ",
-                )
-            },
-            NixpkgsProblem::MovedOutOfByNameNonEmptyArg { package_name, call_package_path, file } => {
+            NixpkgsProblem::RatchetProblem(RatchetError {
+                package_name,
+                call_package_path,
+                file,
+                kind,
+            }) => {
                 let call_package_arg =
                     if let Some(path) = &call_package_path {
                         format!("./{}", path)
@@ -343,51 +329,51 @@ impl fmt::Display for NixpkgsProblem {
                         "...".into()
                     };
                 let relative_package_file = structure::relative_file_for_package(package_name);
-                // This can happen if users mistakenly assume that for custom arguments,
-                // pkgs/by-name can't be used.
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ ... }}` in {file}.
-                      While the manual `callPackage` is still needed, it's not necessary to move the package files.
-                    ",
-                )
-            },
-            NixpkgsProblem::NewPackageNotUsingByNameEmptyArg { package_name, call_package_path, file } => {
-                let call_package_arg =
-                    if let Some(path) = &call_package_path {
-                        format!("./{}", path)
-                    } else {
-                        "...".into()
-                    };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
-                      Please define it in {relative_package_file} instead.
-                      See `pkgs/by-name/README.md` for more details.
-                      Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
-                    ",
-                )
-            },
-            NixpkgsProblem::NewPackageNotUsingByNameNonEmptyArg { package_name, call_package_path, file } => {
-                let call_package_arg =
-                    if let Some(path) = &call_package_path {
-                        format!("./{}", path)
-                    } else {
-                        "...".into()
-                    };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
-                      Please define it in {relative_package_file} instead.
-                      See `pkgs/by-name/README.md` for more details.
-                      Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.
-                    ",
-                )
+
+                match kind {
+                    RatchetErrorKind::MovedOutOfByNameEmptyArg => {
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
+                              Please move the package back and remove the manual `callPackage`.
+                            ",
+                        )
+                    },
+                    RatchetErrorKind::MovedOutOfByNameNonEmptyArg => {
+                        // This can happen if users mistakenly assume that for custom arguments,
+                        // pkgs/by-name can't be used.
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ ... }}` in {file}.
+                              While the manual `callPackage` is still needed, it's not necessary to move the package files.
+                            ",
+                        )
+                    },
+                    RatchetErrorKind::NewPackageNotUsingByNameEmptyArg => {
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+                              Please define it in {relative_package_file} instead.
+                              See `pkgs/by-name/README.md` for more details.
+                              Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
+                            ",
+                        )
+                    },
+                    RatchetErrorKind::NewPackageNotUsingByNameNonEmptyArg => {
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+                              Please define it in {relative_package_file} instead.
+                              See `pkgs/by-name/README.md` for more details.
+                              Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.
+                            ",
+                        )
+                    },
+                }
             },
             NixpkgsProblem::InternalCallPackageUsed { attr_name } =>
                 write!(
