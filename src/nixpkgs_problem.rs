@@ -41,7 +41,6 @@ pub enum NixpkgsProblem {
         relative_package_dir: RelativePathBuf,
     },
     UndefinedAttr {
-        relative_package_file: RelativePathBuf,
         package_name: String,
     },
     EmptyArgument {
@@ -80,7 +79,6 @@ pub enum NixpkgsProblem {
         definition: String,
     },
     NonDerivation {
-        relative_package_file: RelativePathBuf,
         package_name: String,
     },
     OutsideSymlink {
@@ -188,11 +186,13 @@ impl fmt::Display for NixpkgsProblem {
                     f,
                     "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
                 ),
-            NixpkgsProblem::UndefinedAttr { relative_package_file, package_name } =>
+            NixpkgsProblem::UndefinedAttr {  package_name } => {
+                let relative_package_file = structure::relative_file_for_package(package_name);
                 write!(
                     f,
                     "pkgs.{package_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
-                ),
+                )
+            }
             NixpkgsProblem::EmptyArgument { package_name, file, line, column, definition } => {
                 let relative_package_dir = structure::relative_dir_for_package(package_name);
                 let relative_package_file = structure::relative_file_for_package(package_name);
@@ -280,11 +280,13 @@ impl fmt::Display for NixpkgsProblem {
                     ",
                 )
             }
-            NixpkgsProblem::NonDerivation { relative_package_file, package_name } =>
+            NixpkgsProblem::NonDerivation { package_name } => {
+                let relative_package_file = structure::relative_file_for_package(package_name);
                 write!(
                     f,
                     "pkgs.{package_name}: This attribute defined by {relative_package_file} is not a derivation",
-                ),
+                )
+            }
             NixpkgsProblem::OutsideSymlink { relative_package_dir, subpath } =>
                 write!(
                     f,

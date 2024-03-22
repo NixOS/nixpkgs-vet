@@ -213,8 +213,6 @@ fn by_name(
     use ratchet::RatchetState::*;
     use ByNameAttribute::*;
 
-    let relative_package_file = structure::relative_file_for_package(attribute_name);
-
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.
     // This match decides whether the attribute `foo` is defined accordingly
     // and whether a legacy manual definition could be removed
@@ -224,7 +222,6 @@ fn by_name(
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
             NixpkgsProblem::UndefinedAttr {
-                relative_package_file: relative_package_file.to_owned(),
                 package_name: attribute_name.to_owned(),
             }
             .into()
@@ -242,7 +239,6 @@ fn by_name(
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
             NixpkgsProblem::NonDerivation {
-                relative_package_file: relative_package_file.to_owned(),
                 package_name: attribute_name.to_owned(),
             }
             .into()
@@ -262,7 +258,6 @@ fn by_name(
                 Success(())
             } else {
                 NixpkgsProblem::NonDerivation {
-                    relative_package_file: relative_package_file.to_owned(),
                     package_name: attribute_name.to_owned(),
                 }
                 .into()
@@ -312,7 +307,6 @@ fn by_name(
 
                         by_name_override(
                             attribute_name,
-                            relative_package_file,
                             is_semantic_call_package,
                             optional_syntactic_call_package,
                             definition,
@@ -350,7 +344,6 @@ fn by_name(
 /// all-packages.nix
 fn by_name_override(
     attribute_name: &str,
-    expected_package_file: RelativePathBuf,
     is_semantic_call_package: bool,
     optional_syntactic_call_package: Option<CallPackageArgumentInfo>,
     definition: String,
@@ -381,6 +374,8 @@ fn by_name_override(
         // Something like `<attr> = pkgs.callPackage ...`
         (true, Some(syntactic_call_package)) => {
             if let Some(actual_package_file) = syntactic_call_package.relative_path {
+                let expected_package_file = structure::relative_file_for_package(attribute_name);
+
                 if actual_package_file != expected_package_file {
                     // Wrong path
                     NixpkgsProblem::WrongCallPackagePath {
