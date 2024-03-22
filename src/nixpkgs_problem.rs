@@ -28,7 +28,7 @@ pub enum NixpkgsProblem {
     },
     InvalidPackageName {
         relative_package_dir: RelativePathBuf,
-        package_name: String,
+        invalid_package_name: String,
     },
     IncorrectShard {
         relative_package_dir: RelativePathBuf,
@@ -166,10 +166,10 @@ impl fmt::Display for NixpkgsProblem {
                     f,
                     "{relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
                 ),
-            NixpkgsProblem::InvalidPackageName { relative_package_dir, package_name } =>
+            NixpkgsProblem::InvalidPackageName { relative_package_dir, invalid_package_name } =>
                 write!(
                     f,
-                    "{relative_package_dir}: Invalid package directory name \"{package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
+                    "{relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
                 ),
             NixpkgsProblem::IncorrectShard { relative_package_dir, correct_relative_package_dir } =>
                 write!(

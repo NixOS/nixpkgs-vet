@@ -134,7 +134,7 @@ fn check_package(
         let result = if !package_name_valid {
             NixpkgsProblem::InvalidPackageName {
                 relative_package_dir: relative_package_dir.clone(),
-                package_name: package_name.clone(),
+                invalid_package_name: package_name.clone(),
             }
             .into()
         } else {
