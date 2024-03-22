@@ -19,7 +19,7 @@ pub enum NixpkgsProblem {
         shard_name: String,
     },
     PackageNonDir {
-        relative_package_dir: RelativePathBuf,
+        package_name: String,
     },
     CaseSensitiveDuplicate {
         relative_shard_path: RelativePathBuf,
@@ -156,11 +156,13 @@ impl fmt::Display for NixpkgsProblem {
                     f,
                     "{relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
                 ),
-            NixpkgsProblem::PackageNonDir { relative_package_dir } =>
+            NixpkgsProblem::PackageNonDir { package_name } => {
+                let relative_package_dir = structure::relative_dir_for_package(package_name);
                 write!(
                     f,
                     "{relative_package_dir}: This path is a file, but it should be a directory.",
-                ),
+                )
+            }
             NixpkgsProblem::CaseSensitiveDuplicate { relative_shard_path, first, second } =>
                 write!(
                     f,

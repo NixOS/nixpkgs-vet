@@ -126,7 +126,7 @@ fn check_package(
 
     Ok(if !package_path.is_dir() {
         NixpkgsProblem::PackageNonDir {
-            relative_package_dir: relative_package_dir.clone(),
+            package_name: package_name.clone(),
         }
         .into()
     } else {
