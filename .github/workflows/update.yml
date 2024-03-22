@@ -26,6 +26,7 @@ jobs:
           # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
           # and https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#push-pull-request-branches-to-a-fork
           token: ${{ secrets.MACHINE_USER_PAT }}
+          path: repo
           push-to-fork: infinixbot/nixpkgs-check-by-name
           committer: infinixbot <infinixbot@infinisil.com>
           author: infinixbot <infinixbot@infinisil.com>
