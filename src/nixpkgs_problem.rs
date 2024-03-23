@@ -79,31 +79,7 @@ pub enum NixpkgsProblem {
         subpath: RelativePathBuf,
         io_error: String,
     },
-    PathInterpolation {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-    },
-    SearchPath {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-    },
-    OutsidePathReference {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-    },
-    UnresolvablePathReference {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-        io_error: String,
-    },
+    NixFileProblem(NixFileError),
     RatchetProblem(RatchetError),
     InternalCallPackageUsed {
         attr_name: String,
@@ -124,6 +100,23 @@ pub enum ShardErrorKind {
     ShardNonDir,
     InvalidShardName,
     CaseSensitiveDuplicate { first: OsString, second: OsString },
+}
+
+#[derive(Clone)]
+pub struct NixFileError {
+    pub relative_package_dir: RelativePathBuf,
+    pub subpath: RelativePathBuf,
+    pub line: usize,
+    pub text: String,
+    pub kind: NixFileErrorKind,
+}
+
+#[derive(Clone)]
+pub enum NixFileErrorKind {
+    PathInterpolation,
+    SearchPath,
+    OutsidePathReference,
+    UnresolvablePathReference { io_error: String },
 }
 
 #[derive(Clone)]
@@ -306,26 +299,36 @@ impl fmt::Display for NixpkgsProblem {
                     f,
                     "{relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
                 ),
-            NixpkgsProblem::PathInterpolation { relative_package_dir, subpath, line, text } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
-                ),
-            NixpkgsProblem::SearchPath { relative_package_dir, subpath, line, text } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
-                ),
-            NixpkgsProblem::OutsidePathReference { relative_package_dir, subpath, line, text } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.",
-                ),
-            NixpkgsProblem::UnresolvablePathReference { relative_package_dir, subpath, line, text, io_error } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
-                ),
+            NixpkgsProblem::NixFileProblem(NixFileError {
+                relative_package_dir,
+                subpath,
+                line,
+                text,
+                kind
+            }) => {
+                match kind {
+                    NixFileErrorKind::PathInterpolation =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
+                        ),
+                    NixFileErrorKind::SearchPath =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
+                        ),
+                    NixFileErrorKind::OutsidePathReference =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.",
+                        ),
+                    NixFileErrorKind::UnresolvablePathReference { io_error } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
+                        ),
+                }
+            },
             NixpkgsProblem::RatchetProblem(RatchetError {
                 package_name,
                 call_package_path,
