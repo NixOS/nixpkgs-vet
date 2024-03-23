@@ -1,4 +1,6 @@
 use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::nixpkgs_problem::ShardError;
+use crate::nixpkgs_problem::ShardErrorKind;
 use crate::references;
 use crate::utils;
 use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
@@ -47,25 +49,25 @@ pub fn check_structure(
         .map(|shard_entry| -> validation::Result<_> {
             let shard_path = shard_entry.path();
             let shard_name = shard_entry.file_name().to_string_lossy().into_owned();
-            let relative_shard_path = relative_dir_for_shard(&shard_name);
 
             Ok(if shard_name == "README.md" {
                 // README.md is allowed to be a file and not checked
 
                 Success(vec![])
             } else if !shard_path.is_dir() {
-                NixpkgsProblem::ShardNonDir {
-                    relative_shard_path: relative_shard_path.clone(),
-                }
+                NixpkgsProblem::ShardProblem(ShardError {
+                    shard_name: shard_name.clone(),
+                    kind: ShardErrorKind::ShardNonDir,
+                })
                 .into()
                 // we can't check for any other errors if it's a file, since there's no subdirectories to check
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
-                    NixpkgsProblem::InvalidShardName {
-                        relative_shard_path: relative_shard_path.clone(),
+                    NixpkgsProblem::ShardProblem(ShardError {
                         shard_name: shard_name.clone(),
-                    }
+                        kind: ShardErrorKind::InvalidShardName,
+                    })
                     .into()
                 } else {
                     Success(())
@@ -80,11 +82,13 @@ pub fn check_structure(
                         l.file_name().to_ascii_lowercase() == r.file_name().to_ascii_lowercase()
                     })
                     .map(|(l, r)| {
-                        NixpkgsProblem::CaseSensitiveDuplicate {
-                            relative_shard_path: relative_shard_path.clone(),
-                            first: l.file_name(),
-                            second: r.file_name(),
-                        }
+                        NixpkgsProblem::ShardProblem(ShardError {
+                            shard_name: shard_name.clone(),
+                            kind: ShardErrorKind::CaseSensitiveDuplicate {
+                                first: l.file_name(),
+                                second: r.file_name(),
+                            },
+                        })
                         .into()
                     });
 

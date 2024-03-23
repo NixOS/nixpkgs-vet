@@ -11,20 +11,9 @@ use std::fmt;
 /// location
 #[derive(Clone)]
 pub enum NixpkgsProblem {
-    ShardNonDir {
-        relative_shard_path: RelativePathBuf,
-    },
-    InvalidShardName {
-        relative_shard_path: RelativePathBuf,
-        shard_name: String,
-    },
+    ShardProblem(ShardError),
     PackageNonDir {
         package_name: String,
-    },
-    CaseSensitiveDuplicate {
-        relative_shard_path: RelativePathBuf,
-        first: OsString,
-        second: OsString,
     },
     InvalidPackageName {
         relative_package_dir: RelativePathBuf,
@@ -125,6 +114,19 @@ pub enum NixpkgsProblem {
 }
 
 #[derive(Clone)]
+pub struct ShardError {
+    pub shard_name: String,
+    pub kind: ShardErrorKind,
+}
+
+#[derive(Clone)]
+pub enum ShardErrorKind {
+    ShardNonDir,
+    InvalidShardName,
+    CaseSensitiveDuplicate { first: OsString, second: OsString },
+}
+
+#[derive(Clone)]
 pub struct RatchetError {
     pub package_name: String,
     pub call_package_path: Option<RelativePathBuf>,
@@ -143,16 +145,29 @@ pub enum RatchetErrorKind {
 impl fmt::Display for NixpkgsProblem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NixpkgsProblem::ShardNonDir { relative_shard_path } =>
-                write!(
-                    f,
-                    "{relative_shard_path}: This is a file, but it should be a directory.",
-                ),
-            NixpkgsProblem::InvalidShardName { relative_shard_path, shard_name } =>
-                write!(
-                    f,
-                    "{relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
-                ),
+            NixpkgsProblem::ShardProblem(ShardError {
+                shard_name,
+                kind,
+            }) => {
+                let relative_shard_path = structure::relative_dir_for_shard(&shard_name);
+                match kind {
+                    ShardErrorKind::ShardNonDir =>
+                        write!(
+                            f,
+                            "{relative_shard_path}: This is a file, but it should be a directory.",
+                        ),
+                    ShardErrorKind::InvalidShardName =>
+                        write!(
+                            f,
+                            "{relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
+                        ),
+                    ShardErrorKind::CaseSensitiveDuplicate { first, second } =>
+                        write!(
+                            f,
+                            "{relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
+                        ),
+                }
+            }
             NixpkgsProblem::PackageNonDir { package_name } => {
                 let relative_package_dir = structure::relative_dir_for_package(package_name);
                 write!(
@@ -160,11 +175,6 @@ impl fmt::Display for NixpkgsProblem {
                     "{relative_package_dir}: This path is a file, but it should be a directory.",
                 )
             }
-            NixpkgsProblem::CaseSensitiveDuplicate { relative_shard_path, first, second } =>
-                write!(
-                    f,
-                    "{relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
-                ),
             NixpkgsProblem::InvalidPackageName { relative_package_dir, invalid_package_name } =>
                 write!(
                     f,
