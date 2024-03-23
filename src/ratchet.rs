@@ -159,9 +159,9 @@ impl ToNixpkgsProblem for UsesByName {
             file: file.to_owned(),
             kind: match (optional_from, to.empty_arg) {
                 (Some(()), true) => RatchetErrorKind::MovedOutOfByNameEmptyArg,
-                (Some(()), false) => RatchetErrorKind::MovedOutOfByNameNonEmptyArg,
+                (Some(()), false) => RatchetErrorKind::MovedOutOfByName,
                 (None, true) => RatchetErrorKind::NewPackageNotUsingByNameEmptyArg,
-                (None, false) => RatchetErrorKind::NewPackageNotUsingByNameNonEmptyArg,
+                (None, false) => RatchetErrorKind::NewPackageNotUsingByName,
             },
         })
     }

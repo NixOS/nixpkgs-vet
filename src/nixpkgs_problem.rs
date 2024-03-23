@@ -136,10 +136,10 @@ pub struct RatchetError {
 
 #[derive(Clone)]
 pub enum RatchetErrorKind {
+    MovedOutOfByName,
     MovedOutOfByNameEmptyArg,
-    MovedOutOfByNameNonEmptyArg,
+    NewPackageNotUsingByName,
     NewPackageNotUsingByNameEmptyArg,
-    NewPackageNotUsingByNameNonEmptyArg,
 }
 
 impl fmt::Display for NixpkgsProblem {
@@ -149,7 +149,7 @@ impl fmt::Display for NixpkgsProblem {
                 shard_name,
                 kind,
             }) => {
-                let relative_shard_path = structure::relative_dir_for_shard(&shard_name);
+                let relative_shard_path = structure::relative_dir_for_shard(shard_name);
                 match kind {
                     ShardErrorKind::ShardNonDir =>
                         write!(
@@ -349,7 +349,7 @@ impl fmt::Display for NixpkgsProblem {
                               Please move the package back and remove the manual `callPackage`.
                             ",
                         ),
-                    RatchetErrorKind::MovedOutOfByNameNonEmptyArg =>
+                    RatchetErrorKind::MovedOutOfByName =>
                         // This can happen if users mistakenly assume that for custom arguments,
                         // pkgs/by-name can't be used.
                         writedoc!(
@@ -369,7 +369,7 @@ impl fmt::Display for NixpkgsProblem {
                               Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
                             ",
                         ),
-                    RatchetErrorKind::NewPackageNotUsingByNameNonEmptyArg =>
+                    RatchetErrorKind::NewPackageNotUsingByName =>
                         writedoc!(
                             f,
                             "
