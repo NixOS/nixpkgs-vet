@@ -331,16 +331,15 @@ impl fmt::Display for NixpkgsProblem {
                 let relative_package_file = structure::relative_file_for_package(package_name);
 
                 match kind {
-                    RatchetErrorKind::MovedOutOfByNameEmptyArg => {
+                    RatchetErrorKind::MovedOutOfByNameEmptyArg =>
                         writedoc!(
                             f,
                             "
                             - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
                               Please move the package back and remove the manual `callPackage`.
                             ",
-                        )
-                    },
-                    RatchetErrorKind::MovedOutOfByNameNonEmptyArg => {
+                        ),
+                    RatchetErrorKind::MovedOutOfByNameNonEmptyArg =>
                         // This can happen if users mistakenly assume that for custom arguments,
                         // pkgs/by-name can't be used.
                         writedoc!(
@@ -349,9 +348,8 @@ impl fmt::Display for NixpkgsProblem {
                             - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ ... }}` in {file}.
                               While the manual `callPackage` is still needed, it's not necessary to move the package files.
                             ",
-                        )
-                    },
-                    RatchetErrorKind::NewPackageNotUsingByNameEmptyArg => {
+                        ),
+                    RatchetErrorKind::NewPackageNotUsingByNameEmptyArg =>
                         writedoc!(
                             f,
                             "
@@ -360,9 +358,8 @@ impl fmt::Display for NixpkgsProblem {
                               See `pkgs/by-name/README.md` for more details.
                               Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
                             ",
-                        )
-                    },
-                    RatchetErrorKind::NewPackageNotUsingByNameNonEmptyArg => {
+                        ),
+                    RatchetErrorKind::NewPackageNotUsingByNameNonEmptyArg =>
                         writedoc!(
                             f,
                             "
@@ -371,8 +368,7 @@ impl fmt::Display for NixpkgsProblem {
                               See `pkgs/by-name/README.md` for more details.
                               Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.
                             ",
-                        )
-                    },
+                        ),
                 }
             },
             NixpkgsProblem::InternalCallPackageUsed { attr_name } =>
