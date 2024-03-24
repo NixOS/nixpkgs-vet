@@ -130,24 +130,7 @@ fn check_nix_file(
                 return Success(());
             };
 
-            use crate::nix_file::ResolvedPath;
-
-            let error_or_none = match nix_file.static_resolve_path(path, absolute_package_dir) {
-                ResolvedPath::Interpolated => Some(NixFileErrorKind::PathInterpolation),
-                ResolvedPath::SearchPath => Some(NixFileErrorKind::SearchPath),
-                ResolvedPath::Outside => Some(NixFileErrorKind::OutsidePathReference),
-                ResolvedPath::Unresolvable(e) => {
-                    Some(NixFileErrorKind::UnresolvablePathReference {
-                        io_error: e.to_string(),
-                    })
-                }
-                ResolvedPath::Within(..) => {
-                    // No need to handle the case of it being inside the directory, since we scan through the
-                    // entire directory recursively anyways
-                    None
-                }
-            };
-            if let Some(kind) = error_or_none {
+            let to_problem = |kind| {
                 NixpkgsProblem::NixFileProblem(NixFileError {
                     relative_package_dir: relative_package_dir.to_owned(),
                     subpath: subpath.to_owned(),
@@ -155,9 +138,27 @@ fn check_nix_file(
                     text: node.text().to_string(),
                     kind,
                 })
-                .into()
-            } else {
-                Success(())
+            };
+
+            use crate::nix_file::ResolvedPath;
+
+            match nix_file.static_resolve_path(path, absolute_package_dir) {
+                ResolvedPath::Interpolated => {
+                    to_problem(NixFileErrorKind::PathInterpolation).into()
+                }
+                ResolvedPath::SearchPath => to_problem(NixFileErrorKind::SearchPath).into(),
+                ResolvedPath::Outside => to_problem(NixFileErrorKind::OutsidePathReference).into(),
+                ResolvedPath::Unresolvable(e) => {
+                    to_problem(NixFileErrorKind::UnresolvablePathReference {
+                        io_error: e.to_string(),
+                    })
+                    .into()
+                }
+                ResolvedPath::Within(..) => {
+                    // No need to handle the case of it being inside the directory, since we scan through the
+                    // entire directory recursively anyways
+                    Success(())
+                }
             }
         }),
     ))
