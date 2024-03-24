@@ -29,13 +29,10 @@ pub enum NixpkgsProblem {
     PackageNixDir {
         relative_package_dir: RelativePathBuf,
     },
-    UndefinedAttr {
-        package_name: String,
-    },
+
+    ByNameProblem(ByNameError),
+
     ByNameOverrideProblem(ByNameOverrideError),
-    NonDerivation {
-        package_name: String,
-    },
     OutsideSymlink {
         relative_package_dir: RelativePathBuf,
         subpath: RelativePathBuf,
@@ -47,12 +44,6 @@ pub enum NixpkgsProblem {
     },
     NixFileProblem(NixFileError),
     RatchetProblem(RatchetError),
-    InternalCallPackageUsed {
-        attr_name: String,
-    },
-    CannotDetermineAttributeLocation {
-        attr_name: String,
-    },
 }
 
 #[derive(Clone)]
@@ -66,6 +57,20 @@ pub enum ShardErrorKind {
     ShardNonDir,
     InvalidShardName,
     CaseSensitiveDuplicate { first: OsString, second: OsString },
+}
+
+#[derive(Clone)]
+pub struct ByNameError {
+    pub attribute_name: String,
+    pub kind: ByNameErrorKind,
+}
+
+#[derive(Clone)]
+pub enum ByNameErrorKind {
+    UndefinedAttr,
+    NonDerivation,
+    InternalCallPackageUsed,
+    CannotDetermineAttributeLocation,
 }
 
 #[derive(Clone)]
@@ -176,12 +181,36 @@ impl fmt::Display for NixpkgsProblem {
                     f,
                     "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
                 ),
-            NixpkgsProblem::UndefinedAttr {  package_name } => {
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                write!(
-                    f,
-                    "pkgs.{package_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
-                )
+            NixpkgsProblem::ByNameProblem(ByNameError {
+                attribute_name,
+                kind,
+            }) => {
+                match kind {
+                    ByNameErrorKind::UndefinedAttr => {
+                        let relative_package_file = structure::relative_file_for_package(attribute_name);
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
+                        )
+                    }
+                    ByNameErrorKind::NonDerivation => {
+                        let relative_package_file = structure::relative_file_for_package(attribute_name);
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
+                        )
+                    }
+                    ByNameErrorKind::InternalCallPackageUsed =>
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
+                        ),
+                    ByNameErrorKind::CannotDetermineAttributeLocation =>
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
+                        ),
+                }
             }
             NixpkgsProblem::ByNameOverrideProblem(ByNameOverrideError {
                 package_name,
@@ -268,13 +297,6 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::NonDerivation { package_name } => {
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                write!(
-                    f,
-                    "pkgs.{package_name}: This attribute defined by {relative_package_file} is not a derivation",
-                )
-            }
             NixpkgsProblem::OutsideSymlink { relative_package_dir, subpath } =>
                 write!(
                     f,
@@ -370,16 +392,6 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::InternalCallPackageUsed { attr_name } =>
-                write!(
-                    f,
-                    "pkgs.{attr_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
-                ),
-            NixpkgsProblem::CannotDetermineAttributeLocation { attr_name } =>
-                write!(
-                    f,
-                    "pkgs.{attr_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
-                ),
        }
     }
 }

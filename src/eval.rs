@@ -1,4 +1,6 @@
 use crate::nix_file::CallPackageArgumentInfo;
+use crate::nixpkgs_problem::ByNameError;
+use crate::nixpkgs_problem::ByNameErrorKind;
 use crate::nixpkgs_problem::ByNameOverrideError;
 use crate::nixpkgs_problem::ByNameOverrideErrorKind;
 use crate::nixpkgs_problem::NixpkgsProblem;
@@ -215,6 +217,13 @@ fn by_name(
     use ratchet::RatchetState::*;
     use ByNameAttribute::*;
 
+    let to_problem = |kind| {
+        NixpkgsProblem::ByNameProblem(ByNameError {
+            attribute_name: attribute_name.to_owned(),
+            kind,
+        })
+    };
+
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.
     // This match decides whether the attribute `foo` is defined accordingly
     // and whether a legacy manual definition could be removed
@@ -223,10 +232,7 @@ fn by_name(
         Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
-            NixpkgsProblem::UndefinedAttr {
-                package_name: attribute_name.to_owned(),
-            }
-            .into()
+            to_problem(ByNameErrorKind::UndefinedAttr).into()
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -240,10 +246,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            NixpkgsProblem::NonDerivation {
-                package_name: attribute_name.to_owned(),
-            }
-            .into()
+            to_problem(ByNameErrorKind::NonDerivation).into()
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -259,10 +262,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                NixpkgsProblem::NonDerivation {
-                    package_name: attribute_name.to_owned(),
-                }
-                .into()
+                to_problem(ByNameErrorKind::NonDerivation).into()
             };
 
             // If the definition looks correct
@@ -274,10 +274,7 @@ fn by_name(
                     if let Some(_location) = location {
                         // Such an automatic definition should definitely not have a location
                         // Having one indicates that somebody is using `_internalCallByNamePackageFile`,
-                        NixpkgsProblem::InternalCallPackageUsed {
-                            attr_name: attribute_name.to_owned(),
-                        }
-                        .into()
+                        to_problem(ByNameErrorKind::InternalCallPackageUsed).into()
                     } else {
                         Success(Tight)
                     }
@@ -319,10 +316,7 @@ fn by_name(
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
                         // over, e.g. if it's defined in aliases.nix.
                         // We can't verify whether its of the expected `callPackage`, so error out
-                        NixpkgsProblem::CannotDetermineAttributeLocation {
-                            attr_name: attribute_name.to_owned(),
-                        }
-                        .into()
+                        to_problem(ByNameErrorKind::CannotDetermineAttributeLocation).into()
                     }
                 }
             };
