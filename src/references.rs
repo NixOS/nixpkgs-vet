@@ -1,4 +1,6 @@
-use crate::nixpkgs_problem::{NixFileError, NixFileErrorKind, NixpkgsProblem};
+use crate::nixpkgs_problem::{
+    NixFileError, NixFileErrorKind, NixpkgsProblem, PathError, PathErrorKind,
+};
 use crate::utils;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
@@ -47,6 +49,13 @@ fn check_path(
     subpath: &RelativePath,
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
+    let to_problem = |kind| {
+        NixpkgsProblem::PathProblem(PathError {
+            relative_package_dir: relative_package_dir.to_owned(),
+            subpath: subpath.to_owned(),
+            kind,
+        })
+    };
 
     Ok(if path.is_symlink() {
         // Check whether the symlink resolves to outside the package directory
@@ -55,20 +64,14 @@ fn check_path(
                 // No need to handle the case of it being inside the directory, since we scan through the
                 // entire directory recursively anyways
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
-                    NixpkgsProblem::OutsideSymlink {
-                        relative_package_dir: relative_package_dir.to_owned(),
-                        subpath: subpath.to_owned(),
-                    }
-                    .into()
+                    to_problem(PathErrorKind::OutsideSymlink).into()
                 } else {
                     Success(())
                 }
             }
-            Err(io_error) => NixpkgsProblem::UnresolvableSymlink {
-                relative_package_dir: relative_package_dir.to_owned(),
-                subpath: subpath.to_owned(),
+            Err(io_error) => to_problem(PathErrorKind::UnresolvableSymlink {
                 io_error: io_error.to_string(),
-            }
+            })
             .into(),
         }
     } else if path.is_dir() {

@@ -33,15 +33,7 @@ pub enum NixpkgsProblem {
     ByNameProblem(ByNameError),
 
     ByNameOverrideProblem(ByNameOverrideError),
-    OutsideSymlink {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-    },
-    UnresolvableSymlink {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        io_error: String,
-    },
+    PathProblem(PathError),
     NixFileProblem(NixFileError),
     RatchetProblem(RatchetError),
 }
@@ -93,6 +85,19 @@ pub enum ByNameOverrideErrorKind {
     },
     EmptyArgument,
     NonPath,
+}
+
+#[derive(Clone)]
+pub struct PathError {
+    pub relative_package_dir: RelativePathBuf,
+    pub subpath: RelativePathBuf,
+    pub kind: PathErrorKind,
+}
+
+#[derive(Clone)]
+pub enum PathErrorKind {
+    OutsideSymlink,
+    UnresolvableSymlink { io_error: String },
 }
 
 #[derive(Clone)]
@@ -297,16 +302,24 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::OutsideSymlink { relative_package_dir, subpath } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
-                ),
-            NixpkgsProblem::UnresolvableSymlink { relative_package_dir, subpath, io_error } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
-                ),
+            NixpkgsProblem::PathProblem(PathError {
+                relative_package_dir,
+                subpath,
+                kind,
+            }) => {
+                match kind {
+                    PathErrorKind::OutsideSymlink =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
+                        ),
+                    PathErrorKind::UnresolvableSymlink { io_error } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
+                        ),
+                }
+            },
             NixpkgsProblem::NixFileProblem(NixFileError {
                 relative_package_dir,
                 subpath,
