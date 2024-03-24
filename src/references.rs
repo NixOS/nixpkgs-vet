@@ -50,7 +50,7 @@ fn check_path(
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
     let to_problem = |kind| {
-        NixpkgsProblem::PathProblem(PathError {
+        NixpkgsProblem::Path(PathError {
             relative_package_dir: relative_package_dir.to_owned(),
             subpath: subpath.to_owned(),
             kind,
@@ -134,7 +134,7 @@ fn check_nix_file(
             };
 
             let to_problem = |kind| {
-                NixpkgsProblem::NixFileProblem(NixFileError {
+                NixpkgsProblem::NixFile(NixFileError {
                     relative_package_dir: relative_package_dir.to_owned(),
                     subpath: subpath.to_owned(),
                     line: nix_file.line_index.line(node.text_range().start().into()),

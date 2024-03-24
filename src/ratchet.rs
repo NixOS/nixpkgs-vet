@@ -153,7 +153,7 @@ impl ToNixpkgsProblem for UsesByName {
         optional_from: Option<()>,
         (to, file): &Self::ToContext,
     ) -> NixpkgsProblem {
-        NixpkgsProblem::RatchetProblem(RatchetError {
+        NixpkgsProblem::Ratchet(RatchetError {
             package_name: name.to_owned(),
             call_package_path: to.relative_path.clone(),
             file: file.to_owned(),

@@ -218,7 +218,7 @@ fn by_name(
     use ByNameAttribute::*;
 
     let to_problem = |kind| {
-        NixpkgsProblem::ByNameProblem(ByNameError {
+        NixpkgsProblem::ByName(ByNameError {
             attribute_name: attribute_name.to_owned(),
             kind,
         })
@@ -347,7 +347,7 @@ fn by_name_override(
     relative_location_file: RelativePathBuf,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
     let to_problem = |kind| {
-        NixpkgsProblem::ByNameOverrideProblem(ByNameOverrideError {
+        NixpkgsProblem::ByNameOverride(ByNameOverrideError {
             package_name: attribute_name.to_owned(),
             file: relative_location_file,
             line: location.line,

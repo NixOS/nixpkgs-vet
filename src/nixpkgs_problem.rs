@@ -11,31 +11,13 @@ use std::fmt;
 /// location
 #[derive(Clone)]
 pub enum NixpkgsProblem {
-    ShardProblem(ShardError),
-    PackageNonDir {
-        package_name: String,
-    },
-    InvalidPackageName {
-        relative_package_dir: RelativePathBuf,
-        invalid_package_name: String,
-    },
-    IncorrectShard {
-        relative_package_dir: RelativePathBuf,
-        correct_relative_package_dir: RelativePathBuf,
-    },
-    PackageNixNonExistent {
-        relative_package_dir: RelativePathBuf,
-    },
-    PackageNixDir {
-        relative_package_dir: RelativePathBuf,
-    },
-
-    ByNameProblem(ByNameError),
-
-    ByNameOverrideProblem(ByNameOverrideError),
-    PathProblem(PathError),
-    NixFileProblem(NixFileError),
-    RatchetProblem(RatchetError),
+    Shard(ShardError),
+    Package(PackageError),
+    ByName(ByNameError),
+    ByNameOverride(ByNameOverrideError),
+    Path(PathError),
+    NixFile(NixFileError),
+    Ratchet(RatchetError),
 }
 
 #[derive(Clone)]
@@ -49,6 +31,27 @@ pub enum ShardErrorKind {
     ShardNonDir,
     InvalidShardName,
     CaseSensitiveDuplicate { first: OsString, second: OsString },
+}
+
+#[derive(Clone)]
+pub struct PackageError {
+    pub relative_package_dir: RelativePathBuf,
+    pub kind: PackageErrorKind,
+}
+
+#[derive(Clone)]
+pub enum PackageErrorKind {
+    PackageNonDir {
+        package_name: String,
+    },
+    InvalidPackageName {
+        invalid_package_name: String,
+    },
+    IncorrectShard {
+        correct_relative_package_dir: RelativePathBuf,
+    },
+    PackageNixNonExistent,
+    PackageNixDir,
 }
 
 #[derive(Clone)]
@@ -136,7 +139,7 @@ pub enum RatchetErrorKind {
 impl fmt::Display for NixpkgsProblem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NixpkgsProblem::ShardProblem(ShardError {
+            NixpkgsProblem::Shard(ShardError {
                 shard_name,
                 kind,
             }) => {
@@ -159,34 +162,41 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             }
-            NixpkgsProblem::PackageNonDir { package_name } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                write!(
-                    f,
-                    "{relative_package_dir}: This path is a file, but it should be a directory.",
-                )
+            NixpkgsProblem::Package(PackageError {
+                relative_package_dir,
+                kind,
+            }) => {
+                match kind {
+                    PackageErrorKind::PackageNonDir { package_name } => {
+                        let relative_package_dir = structure::relative_dir_for_package(package_name);
+                        write!(
+                            f,
+                            "{relative_package_dir}: This path is a file, but it should be a directory.",
+                        )
+                    }
+                    PackageErrorKind::InvalidPackageName { invalid_package_name } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
+                        ),
+                    PackageErrorKind::IncorrectShard { correct_relative_package_dir } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
+                        ),
+                    PackageErrorKind::PackageNixNonExistent =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
+                        ),
+                    PackageErrorKind::PackageNixDir =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
+                        ),
+                }
             }
-            NixpkgsProblem::InvalidPackageName { relative_package_dir, invalid_package_name } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
-                ),
-            NixpkgsProblem::IncorrectShard { relative_package_dir, correct_relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
-                ),
-            NixpkgsProblem::PackageNixNonExistent { relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
-                ),
-            NixpkgsProblem::PackageNixDir { relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
-                ),
-            NixpkgsProblem::ByNameProblem(ByNameError {
+            NixpkgsProblem::ByName(ByNameError {
                 attribute_name,
                 kind,
             }) => {
@@ -217,7 +227,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             }
-            NixpkgsProblem::ByNameOverrideProblem(ByNameOverrideError {
+            NixpkgsProblem::ByNameOverride(ByNameOverrideError {
                 package_name,
                 file,
                 line,
@@ -302,7 +312,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::PathProblem(PathError {
+            NixpkgsProblem::Path(PathError {
                 relative_package_dir,
                 subpath,
                 kind,
@@ -320,7 +330,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::NixFileProblem(NixFileError {
+            NixpkgsProblem::NixFile(NixFileError {
                 relative_package_dir,
                 subpath,
                 line,
@@ -350,7 +360,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::RatchetProblem(RatchetError {
+            NixpkgsProblem::Ratchet(RatchetError {
                 package_name,
                 call_package_path,
                 file,
