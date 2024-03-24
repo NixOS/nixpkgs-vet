@@ -1,9 +1,7 @@
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::ByNameError;
-use crate::nixpkgs_problem::ByNameErrorKind;
-use crate::nixpkgs_problem::ByNameOverrideError;
-use crate::nixpkgs_problem::ByNameOverrideErrorKind;
-use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::nixpkgs_problem::{
+    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixpkgsProblem,
+};
 use crate::ratchet;
 use crate::ratchet::RatchetState::Loose;
 use crate::ratchet::RatchetState::Tight;

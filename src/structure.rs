@@ -1,8 +1,6 @@
-use crate::nixpkgs_problem::NixpkgsProblem;
-use crate::nixpkgs_problem::PackageError;
-use crate::nixpkgs_problem::PackageErrorKind;
-use crate::nixpkgs_problem::ShardError;
-use crate::nixpkgs_problem::ShardErrorKind;
+use crate::nixpkgs_problem::{
+    NixpkgsProblem, PackageError, PackageErrorKind, ShardError, ShardErrorKind,
+};
 use crate::references;
 use crate::utils;
 use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
