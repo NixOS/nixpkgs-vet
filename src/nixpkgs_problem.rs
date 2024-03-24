@@ -32,41 +32,7 @@ pub enum NixpkgsProblem {
     UndefinedAttr {
         package_name: String,
     },
-    EmptyArgument {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
-    NonToplevelCallPackage {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
-    NonPath {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
-    WrongCallPackagePath {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        actual_path: RelativePathBuf,
-        expected_path: RelativePathBuf,
-    },
-    NonSyntacticCallPackage {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
+    ByNameOverrideProblem(ByNameOverrideError),
     NonDerivation {
         package_name: String,
     },
@@ -100,6 +66,28 @@ pub enum ShardErrorKind {
     ShardNonDir,
     InvalidShardName,
     CaseSensitiveDuplicate { first: OsString, second: OsString },
+}
+
+#[derive(Clone)]
+pub struct ByNameOverrideError {
+    pub package_name: String,
+    pub file: RelativePathBuf,
+    pub line: usize,
+    pub column: usize,
+    pub definition: String,
+    pub kind: ByNameOverrideErrorKind,
+}
+
+#[derive(Clone)]
+pub enum ByNameOverrideErrorKind {
+    NonSyntacticCallPackage,
+    NonToplevelCallPackage,
+    WrongCallPackagePath {
+        actual_path: RelativePathBuf,
+        expected_path: RelativePathBuf,
+    },
+    EmptyArgument,
+    NonPath,
 }
 
 #[derive(Clone)]
@@ -195,93 +183,91 @@ impl fmt::Display for NixpkgsProblem {
                     "pkgs.{package_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
                 )
             }
-            NixpkgsProblem::EmptyArgument { package_name, file, line, column, definition } => {
+            NixpkgsProblem::ByNameOverrideProblem(ByNameOverrideError {
+                package_name,
+                file,
+                line,
+                column,
+                definition,
+                kind,
+            }) => {
                 let relative_package_dir = structure::relative_dir_for_package(package_name);
                 let relative_package_file = structure::relative_file_for_package(package_name);
                 let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                match kind {
+                    ByNameOverrideErrorKind::NonSyntacticCallPackage =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                      However, in this PR, the second argument is empty. See the definition in {file}:{line}:
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
 
-                    {indented_definition}
+                              However, in this PR, it isn't defined that way. See the definition in {file}:{line}
 
-                      Such a definition is provided automatically and therefore not necessary. Please remove it.
-                    ",
-                )
-            }
-            NixpkgsProblem::NonToplevelCallPackage { package_name, file, line, column, definition } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+                            {indented_definition}
+                            ",
+                        ),
+                    ByNameOverrideErrorKind::NonToplevelCallPackage =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
 
-                      However, in this PR, a different `callPackage` is used. See the definition in {file}:{line}:
+                              However, in this PR, a different `callPackage` is used. See the definition in {file}:{line}:
 
-                    {indented_definition}
-                    ",
-                )
-            }
-            NixpkgsProblem::NonPath { package_name, file, line, column, definition } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+                            {indented_definition}
+                            ",
+                        ),
+                    ByNameOverrideErrorKind::WrongCallPackagePath { actual_path, expected_path } => {
+                        let expected_path_expr = create_path_expr(file, expected_path);
+                        let actual_path_expr = create_path_expr(file, actual_path);
+                        writedoc! {
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 
-                      However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
+                              However, in this PR, the first `callPackage` argument is the wrong path. See the definition in {file}:{line}:
 
-                    {indented_definition}
-                    ",
-                )
-            }
-            NixpkgsProblem::WrongCallPackagePath { package_name, file, line, actual_path, expected_path } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let expected_path_expr = create_path_expr(file, expected_path);
-                let actual_path_expr = create_path_expr(file, actual_path);
-                writedoc! {
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+                                {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
+                            ",
+                        }
+                    }
+                    ByNameOverrideErrorKind::EmptyArgument =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                        {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
 
-                      However, in this PR, the first `callPackage` argument is the wrong path. See the definition in {file}:{line}:
+                              However, in this PR, the second argument is empty. See the definition in {file}:{line}:
 
-                        {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
-                    ",
+                            {indented_definition}
+
+                              Such a definition is provided automatically and therefore not necessary. Please remove it.
+                            ",
+                        ),
+                    ByNameOverrideErrorKind::NonPath =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+
+                              However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
+
+                            {indented_definition}
+                            ",
+                        ),
                 }
-            }
-            NixpkgsProblem::NonSyntacticCallPackage { package_name, file, line, column, definition } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
-
-                      However, in this PR, it isn't defined that way. See the definition in {file}:{line}
-
-                    {indented_definition}
-                    ",
-                )
-            }
+            },
             NixpkgsProblem::NonDerivation { package_name } => {
                 let relative_package_file = structure::relative_file_for_package(package_name);
                 write!(

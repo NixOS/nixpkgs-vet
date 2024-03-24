@@ -1,4 +1,6 @@
 use crate::nix_file::CallPackageArgumentInfo;
+use crate::nixpkgs_problem::ByNameOverrideError;
+use crate::nixpkgs_problem::ByNameOverrideErrorKind;
 use crate::nixpkgs_problem::NixpkgsProblem;
 use crate::ratchet;
 use crate::ratchet::RatchetState::Loose;
@@ -350,27 +352,24 @@ fn by_name_override(
     location: Location,
     relative_location_file: RelativePathBuf,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
+    let to_problem = |kind| -> NixpkgsProblem {
+        NixpkgsProblem::ByNameOverrideProblem(ByNameOverrideError {
+            package_name: attribute_name.to_owned(),
+            file: relative_location_file,
+            line: location.line,
+            column: location.column,
+            definition,
+            kind,
+        })
+    };
+
     // At this point, we completed two different checks for whether it's a
     // `callPackage`
     match (is_semantic_call_package, optional_syntactic_call_package) {
         // Something like `<attr> = foo`
-        (_, None) => NixpkgsProblem::NonSyntacticCallPackage {
-            package_name: attribute_name.to_owned(),
-            file: relative_location_file,
-            line: location.line,
-            column: location.column,
-            definition,
-        }
-        .into(),
+        (_, None) => to_problem(ByNameOverrideErrorKind::NonSyntacticCallPackage).into(),
         // Something like `<attr> = pythonPackages.callPackage ...`
-        (false, Some(_)) => NixpkgsProblem::NonToplevelCallPackage {
-            package_name: attribute_name.to_owned(),
-            file: relative_location_file,
-            line: location.line,
-            column: location.column,
-            definition,
-        }
-        .into(),
+        (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
         // Something like `<attr> = pkgs.callPackage ...`
         (true, Some(syntactic_call_package)) => {
             if let Some(actual_package_file) = syntactic_call_package.relative_path {
@@ -378,26 +377,17 @@ fn by_name_override(
 
                 if actual_package_file != expected_package_file {
                     // Wrong path
-                    NixpkgsProblem::WrongCallPackagePath {
-                        package_name: attribute_name.to_owned(),
-                        file: relative_location_file,
-                        line: location.line,
+                    to_problem(ByNameOverrideErrorKind::WrongCallPackagePath {
                         actual_path: actual_package_file,
                         expected_path: expected_package_file,
-                    }
+                    })
                     .into()
                 } else {
                     // Manual definitions with empty arguments are not allowed
                     // anymore, but existing ones should continue to be allowed
                     let manual_definition_ratchet = if syntactic_call_package.empty_arg {
                         // This is the state to migrate away from
-                        Loose(NixpkgsProblem::EmptyArgument {
-                            package_name: attribute_name.to_owned(),
-                            file: relative_location_file,
-                            line: location.line,
-                            column: location.column,
-                            definition,
-                        })
+                        Loose(to_problem(ByNameOverrideErrorKind::EmptyArgument))
                     } else {
                         // This is the state to migrate to
                         Tight
@@ -407,14 +397,7 @@ fn by_name_override(
                 }
             } else {
                 // No path
-                NixpkgsProblem::NonPath {
-                    package_name: attribute_name.to_owned(),
-                    file: relative_location_file,
-                    line: location.line,
-                    column: location.column,
-                    definition,
-                }
-                .into()
+                to_problem(ByNameOverrideErrorKind::NonPath).into()
             }
         }
     }
