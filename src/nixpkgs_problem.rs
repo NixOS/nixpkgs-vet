@@ -20,6 +20,7 @@ pub enum NixpkgsProblem {
     TopLevelPackage(TopLevelPackageError),
 }
 
+/// A file structure error involving a shard (e.g. `fo` is the shard in the path `pkgs/by-name/fo/foo/package.nix`)
 #[derive(Clone)]
 pub struct ShardError {
     pub shard_name: String,
@@ -33,6 +34,7 @@ pub enum ShardErrorKind {
     CaseSensitiveDuplicate { first: OsString, second: OsString },
 }
 
+/// A file structure error involving the package name and/or path.
 #[derive(Clone)]
 pub struct PackageError {
     pub relative_package_dir: RelativePathBuf,
@@ -54,6 +56,8 @@ pub enum PackageErrorKind {
     PackageNixDir,
 }
 
+/// An error related to checks involving by-name attributes. For example, attribute `foo` in
+/// `pkgs/by-name/fo/foo/package.nix`.
 #[derive(Clone)]
 pub struct ByNameError {
     pub attribute_name: String,
@@ -68,6 +72,8 @@ pub enum ByNameErrorKind {
     CannotDetermineAttributeLocation,
 }
 
+/// An error related to packages in `pkgs/by-name` that are manually overridden, e.g. in
+/// all-packages.nix
 #[derive(Clone)]
 pub struct ByNameOverrideError {
     pub package_name: String,
@@ -90,6 +96,8 @@ pub enum ByNameOverrideErrorKind {
     NonPath,
 }
 
+/// An error that results from checks that verify a specific path does not reference outside the
+/// package directory.
 #[derive(Clone)]
 pub struct PathError {
     pub relative_package_dir: RelativePathBuf,
@@ -103,6 +111,8 @@ pub enum PathErrorKind {
     UnresolvableSymlink { io_error: String },
 }
 
+/// An error that results from checks that verify a nix file that contains a path expression does
+/// not reference outside the package.
 #[derive(Clone)]
 pub struct NixFileError {
     pub relative_package_dir: RelativePathBuf,
@@ -120,7 +130,8 @@ pub enum NixFileErrorKind {
     UnresolvablePathReference { io_error: String },
 }
 
-/// An error related to the introduction/move of a top-level package not using `pkgs/by-name`, but it should
+/// An error related to the introduction/move of a top-level package not using `pkgs/by-name`, but
+/// it should.
 #[derive(Clone)]
 pub struct TopLevelPackageError {
     pub package_name: String,
