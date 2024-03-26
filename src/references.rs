@@ -49,12 +49,13 @@ fn check_path(
     subpath: &RelativePath,
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
-    let to_problem = |kind| {
+    let to_validation = |kind| -> validation::Validation<()> {
         NixpkgsProblem::Path(PathError {
             relative_package_dir: relative_package_dir.to_owned(),
             subpath: subpath.to_owned(),
             kind,
         })
+        .into()
     };
 
     Ok(if path.is_symlink() {
@@ -64,15 +65,14 @@ fn check_path(
                 // No need to handle the case of it being inside the directory, since we scan through the
                 // entire directory recursively anyways
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
-                    to_problem(PathErrorKind::OutsideSymlink).into()
+                    to_validation(PathErrorKind::OutsideSymlink)
                 } else {
                     Success(())
                 }
             }
-            Err(io_error) => to_problem(PathErrorKind::UnresolvableSymlink {
+            Err(io_error) => to_validation(PathErrorKind::UnresolvableSymlink {
                 io_error: io_error.to_string(),
-            })
-            .into(),
+            }),
         }
     } else if path.is_dir() {
         // Recursively check each entry
@@ -136,7 +136,7 @@ fn check_nix_file(
                 return Success(());
             };
 
-            let to_problem = |kind| {
+            let to_validation = |kind| -> validation::Validation<()> {
                 NixpkgsProblem::NixFile(NixFileError {
                     relative_package_dir: relative_package_dir.to_owned(),
                     subpath: subpath.to_owned(),
@@ -144,21 +144,19 @@ fn check_nix_file(
                     text,
                     kind,
                 })
+                .into()
             };
 
             use crate::nix_file::ResolvedPath;
 
             match nix_file.static_resolve_path(path, absolute_package_dir) {
-                ResolvedPath::Interpolated => {
-                    to_problem(NixFileErrorKind::PathInterpolation).into()
-                }
-                ResolvedPath::SearchPath => to_problem(NixFileErrorKind::SearchPath).into(),
-                ResolvedPath::Outside => to_problem(NixFileErrorKind::OutsidePathReference).into(),
+                ResolvedPath::Interpolated => to_validation(NixFileErrorKind::PathInterpolation),
+                ResolvedPath::SearchPath => to_validation(NixFileErrorKind::SearchPath),
+                ResolvedPath::Outside => to_validation(NixFileErrorKind::OutsidePathReference),
                 ResolvedPath::Unresolvable(e) => {
-                    to_problem(NixFileErrorKind::UnresolvablePathReference {
+                    to_validation(NixFileErrorKind::UnresolvablePathReference {
                         io_error: e.to_string(),
                     })
-                    .into()
                 }
                 ResolvedPath::Within(..) => {
                     // No need to handle the case of it being inside the directory, since we scan through the

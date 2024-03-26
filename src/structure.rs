@@ -128,25 +128,25 @@ fn check_package(
     let relative_package_dir =
         RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}/{package_name}"));
 
-    let to_problem = |kind| {
+    let to_validation = |kind| -> validation::Validation<()> {
         NixpkgsProblem::Package(PackageError {
             relative_package_dir: relative_package_dir.clone(),
             kind,
         })
+        .into()
     };
 
     Ok(if !package_path.is_dir() {
-        to_problem(PackageErrorKind::PackageNonDir {
+        to_validation(PackageErrorKind::PackageNonDir {
             package_name: package_name.clone(),
         })
-        .into()
+        .map(|_| package_name)
     } else {
         let package_name_valid = PACKAGE_NAME_REGEX.is_match(&package_name);
         let result = if !package_name_valid {
-            to_problem(PackageErrorKind::InvalidPackageName {
+            to_validation(PackageErrorKind::InvalidPackageName {
                 invalid_package_name: package_name.clone(),
             })
-            .into()
         } else {
             Success(())
         };
@@ -156,10 +156,9 @@ fn check_package(
             // Only show this error if we have a valid shard and package name
             // Because if one of those is wrong, you should fix that first
             if shard_name_valid && package_name_valid {
-                to_problem(PackageErrorKind::IncorrectShard {
+                to_validation(PackageErrorKind::IncorrectShard {
                     correct_relative_package_dir: correct_relative_package_dir.clone(),
                 })
-                .into()
             } else {
                 Success(())
             }
@@ -169,9 +168,9 @@ fn check_package(
 
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
         let result = result.and(if !package_nix_path.exists() {
-            to_problem(PackageErrorKind::PackageNixNonExistent).into()
+            to_validation(PackageErrorKind::PackageNixNonExistent)
         } else if package_nix_path.is_dir() {
-            to_problem(PackageErrorKind::PackageNixDir).into()
+            to_validation(PackageErrorKind::PackageNixDir)
         } else {
             Success(())
         });
@@ -182,6 +181,6 @@ fn check_package(
             &relative_package_dir.to_path(path),
         )?);
 
-        result.map(|_| package_name.clone())
+        result.map(|_| package_name)
     })
 }

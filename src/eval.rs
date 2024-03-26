@@ -2,9 +2,8 @@ use crate::nix_file::CallPackageArgumentInfo;
 use crate::nixpkgs_problem::{
     ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixpkgsProblem,
 };
-use crate::ratchet;
-use crate::ratchet::RatchetState::Loose;
-use crate::ratchet::RatchetState::Tight;
+use crate::ratchet::RatchetState::{Loose, Tight};
+use crate::ratchet::{self, ManualDefinition, RatchetState};
 use crate::structure;
 use crate::utils;
 use crate::validation::ResultIteratorExt as _;
@@ -215,11 +214,12 @@ fn by_name(
     use ratchet::RatchetState::*;
     use ByNameAttribute::*;
 
-    let to_problem = |kind| {
+    let to_validation = |kind| -> validation::Validation<RatchetState<ManualDefinition>> {
         NixpkgsProblem::ByName(ByNameError {
             attribute_name: attribute_name.to_owned(),
             kind,
         })
+        .into()
     };
 
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.
@@ -230,7 +230,7 @@ fn by_name(
         Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
-            to_problem(ByNameErrorKind::UndefinedAttr).into()
+            to_validation(ByNameErrorKind::UndefinedAttr)
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -244,7 +244,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            to_problem(ByNameErrorKind::NonDerivation).into()
+            to_validation(ByNameErrorKind::NonDerivation)
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -260,7 +260,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                to_problem(ByNameErrorKind::NonDerivation).into()
+                to_validation(ByNameErrorKind::NonDerivation).map(|_| ())
             };
 
             // If the definition looks correct
@@ -272,7 +272,7 @@ fn by_name(
                     if let Some(_location) = location {
                         // Such an automatic definition should definitely not have a location
                         // Having one indicates that somebody is using `_internalCallByNamePackageFile`,
-                        to_problem(ByNameErrorKind::InternalCallPackageUsed).into()
+                        to_validation(ByNameErrorKind::InternalCallPackageUsed)
                     } else {
                         Success(Tight)
                     }
@@ -314,7 +314,7 @@ fn by_name(
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
                         // over, e.g. if it's defined in aliases.nix.
                         // We can't verify whether its of the expected `callPackage`, so error out
-                        to_problem(ByNameErrorKind::CannotDetermineAttributeLocation).into()
+                        to_validation(ByNameErrorKind::CannotDetermineAttributeLocation)
                     }
                 }
             };
