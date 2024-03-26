@@ -1,4 +1,6 @@
-use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::nixpkgs_problem::{
+    NixFileError, NixFileErrorKind, NixpkgsProblem, PathError, PathErrorKind,
+};
 use crate::utils;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
@@ -47,6 +49,14 @@ fn check_path(
     subpath: &RelativePath,
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
+    let to_validation = |kind| -> validation::Validation<()> {
+        NixpkgsProblem::Path(PathError {
+            relative_package_dir: relative_package_dir.to_owned(),
+            subpath: subpath.to_owned(),
+            kind,
+        })
+        .into()
+    };
 
     Ok(if path.is_symlink() {
         // Check whether the symlink resolves to outside the package directory
@@ -55,21 +65,14 @@ fn check_path(
                 // No need to handle the case of it being inside the directory, since we scan through the
                 // entire directory recursively anyways
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
-                    NixpkgsProblem::OutsideSymlink {
-                        relative_package_dir: relative_package_dir.to_owned(),
-                        subpath: subpath.to_owned(),
-                    }
-                    .into()
+                    to_validation(PathErrorKind::OutsideSymlink)
                 } else {
                     Success(())
                 }
             }
-            Err(io_error) => NixpkgsProblem::UnresolvableSymlink {
-                relative_package_dir: relative_package_dir.to_owned(),
-                subpath: subpath.to_owned(),
+            Err(io_error) => to_validation(PathErrorKind::UnresolvableSymlink {
                 io_error: io_error.to_string(),
-            }
-            .into(),
+            }),
         }
     } else if path.is_dir() {
         // Recursively check each entry
@@ -125,46 +128,36 @@ fn check_nix_file(
 
     Ok(validation::sequence_(
         nix_file.syntax_root.syntax().descendants().map(|node| {
-            let text = node.text().to_string();
             let line = nix_file.line_index.line(node.text_range().start().into());
+            let text = node.text().to_string();
 
             // We're only interested in Path expressions
             let Some(path) = rnix::ast::Path::cast(node) else {
                 return Success(());
             };
 
+            let to_validation = |kind| -> validation::Validation<()> {
+                NixpkgsProblem::NixFile(NixFileError {
+                    relative_package_dir: relative_package_dir.to_owned(),
+                    subpath: subpath.to_owned(),
+                    line,
+                    text,
+                    kind,
+                })
+                .into()
+            };
+
             use crate::nix_file::ResolvedPath;
 
             match nix_file.static_resolve_path(path, absolute_package_dir) {
-                ResolvedPath::Interpolated => NixpkgsProblem::PathInterpolation {
-                    relative_package_dir: relative_package_dir.to_owned(),
-                    subpath: subpath.to_owned(),
-                    line,
-                    text,
+                ResolvedPath::Interpolated => to_validation(NixFileErrorKind::PathInterpolation),
+                ResolvedPath::SearchPath => to_validation(NixFileErrorKind::SearchPath),
+                ResolvedPath::Outside => to_validation(NixFileErrorKind::OutsidePathReference),
+                ResolvedPath::Unresolvable(e) => {
+                    to_validation(NixFileErrorKind::UnresolvablePathReference {
+                        io_error: e.to_string(),
+                    })
                 }
-                .into(),
-                ResolvedPath::SearchPath => NixpkgsProblem::SearchPath {
-                    relative_package_dir: relative_package_dir.to_owned(),
-                    subpath: subpath.to_owned(),
-                    line,
-                    text,
-                }
-                .into(),
-                ResolvedPath::Outside => NixpkgsProblem::OutsidePathReference {
-                    relative_package_dir: relative_package_dir.to_owned(),
-                    subpath: subpath.to_owned(),
-                    line,
-                    text,
-                }
-                .into(),
-                ResolvedPath::Unresolvable(e) => NixpkgsProblem::UnresolvablePathReference {
-                    relative_package_dir: relative_package_dir.to_owned(),
-                    subpath: subpath.to_owned(),
-                    line,
-                    text,
-                    io_error: e.to_string(),
-                }
-                .into(),
                 ResolvedPath::Within(..) => {
                     // No need to handle the case of it being inside the directory, since we scan through the
                     // entire directory recursively anyways

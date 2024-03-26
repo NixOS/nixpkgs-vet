@@ -1,4 +1,6 @@
-use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::nixpkgs_problem::{
+    NixpkgsProblem, PackageError, PackageErrorKind, ShardError, ShardErrorKind,
+};
 use crate::references;
 use crate::utils;
 use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
@@ -47,25 +49,25 @@ pub fn check_structure(
         .map(|shard_entry| -> validation::Result<_> {
             let shard_path = shard_entry.path();
             let shard_name = shard_entry.file_name().to_string_lossy().into_owned();
-            let relative_shard_path = relative_dir_for_shard(&shard_name);
 
             Ok(if shard_name == "README.md" {
                 // README.md is allowed to be a file and not checked
 
                 Success(vec![])
             } else if !shard_path.is_dir() {
-                NixpkgsProblem::ShardNonDir {
-                    relative_shard_path: relative_shard_path.clone(),
-                }
+                NixpkgsProblem::Shard(ShardError {
+                    shard_name: shard_name.clone(),
+                    kind: ShardErrorKind::ShardNonDir,
+                })
                 .into()
                 // we can't check for any other errors if it's a file, since there's no subdirectories to check
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
-                    NixpkgsProblem::InvalidShardName {
-                        relative_shard_path: relative_shard_path.clone(),
+                    NixpkgsProblem::Shard(ShardError {
                         shard_name: shard_name.clone(),
-                    }
+                        kind: ShardErrorKind::InvalidShardName,
+                    })
                     .into()
                 } else {
                     Success(())
@@ -80,11 +82,13 @@ pub fn check_structure(
                         l.file_name().to_ascii_lowercase() == r.file_name().to_ascii_lowercase()
                     })
                     .map(|(l, r)| {
-                        NixpkgsProblem::CaseSensitiveDuplicate {
-                            relative_shard_path: relative_shard_path.clone(),
-                            first: l.file_name(),
-                            second: r.file_name(),
-                        }
+                        NixpkgsProblem::Shard(ShardError {
+                            shard_name: shard_name.clone(),
+                            kind: ShardErrorKind::CaseSensitiveDuplicate {
+                                first: l.file_name(),
+                                second: r.file_name(),
+                            },
+                        })
                         .into()
                     });
 
@@ -124,19 +128,25 @@ fn check_package(
     let relative_package_dir =
         RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}/{package_name}"));
 
-    Ok(if !package_path.is_dir() {
-        NixpkgsProblem::PackageNonDir {
+    let to_validation = |kind| -> validation::Validation<()> {
+        NixpkgsProblem::Package(PackageError {
             relative_package_dir: relative_package_dir.clone(),
-        }
+            kind,
+        })
         .into()
+    };
+
+    Ok(if !package_path.is_dir() {
+        to_validation(PackageErrorKind::PackageNonDir {
+            package_name: package_name.clone(),
+        })
+        .map(|_| package_name)
     } else {
         let package_name_valid = PACKAGE_NAME_REGEX.is_match(&package_name);
         let result = if !package_name_valid {
-            NixpkgsProblem::InvalidPackageName {
-                relative_package_dir: relative_package_dir.clone(),
-                package_name: package_name.clone(),
-            }
-            .into()
+            to_validation(PackageErrorKind::InvalidPackageName {
+                invalid_package_name: package_name.clone(),
+            })
         } else {
             Success(())
         };
@@ -146,11 +156,9 @@ fn check_package(
             // Only show this error if we have a valid shard and package name
             // Because if one of those is wrong, you should fix that first
             if shard_name_valid && package_name_valid {
-                NixpkgsProblem::IncorrectShard {
-                    relative_package_dir: relative_package_dir.clone(),
+                to_validation(PackageErrorKind::IncorrectShard {
                     correct_relative_package_dir: correct_relative_package_dir.clone(),
-                }
-                .into()
+                })
             } else {
                 Success(())
             }
@@ -160,15 +168,9 @@ fn check_package(
 
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
         let result = result.and(if !package_nix_path.exists() {
-            NixpkgsProblem::PackageNixNonExistent {
-                relative_package_dir: relative_package_dir.clone(),
-            }
-            .into()
+            to_validation(PackageErrorKind::PackageNixNonExistent)
         } else if package_nix_path.is_dir() {
-            NixpkgsProblem::PackageNixDir {
-                relative_package_dir: relative_package_dir.clone(),
-            }
-            .into()
+            to_validation(PackageErrorKind::PackageNixDir)
         } else {
             Success(())
         });
@@ -179,6 +181,6 @@ fn check_package(
             &relative_package_dir.to_path(path),
         )?);
 
-        result.map(|_| package_name.clone())
+        result.map(|_| package_name)
     })
 }

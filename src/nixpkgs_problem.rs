@@ -11,327 +11,367 @@ use std::fmt;
 /// location
 #[derive(Clone)]
 pub enum NixpkgsProblem {
-    ShardNonDir {
-        relative_shard_path: RelativePathBuf,
-    },
-    InvalidShardName {
-        relative_shard_path: RelativePathBuf,
-        shard_name: String,
-    },
+    Shard(ShardError),
+    Package(PackageError),
+    ByName(ByNameError),
+    ByNameOverride(ByNameOverrideError),
+    Path(PathError),
+    NixFile(NixFileError),
+    TopLevelPackage(TopLevelPackageError),
+}
+
+/// A file structure error involving a shard (e.g. `fo` is the shard in the path `pkgs/by-name/fo/foo/package.nix`)
+#[derive(Clone)]
+pub struct ShardError {
+    pub shard_name: String,
+    pub kind: ShardErrorKind,
+}
+
+#[derive(Clone)]
+pub enum ShardErrorKind {
+    ShardNonDir,
+    InvalidShardName,
+    CaseSensitiveDuplicate { first: OsString, second: OsString },
+}
+
+/// A file structure error involving the package name and/or path.
+#[derive(Clone)]
+pub struct PackageError {
+    pub relative_package_dir: RelativePathBuf,
+    pub kind: PackageErrorKind,
+}
+
+#[derive(Clone)]
+pub enum PackageErrorKind {
     PackageNonDir {
-        relative_package_dir: RelativePathBuf,
-    },
-    CaseSensitiveDuplicate {
-        relative_shard_path: RelativePathBuf,
-        first: OsString,
-        second: OsString,
+        package_name: String,
     },
     InvalidPackageName {
-        relative_package_dir: RelativePathBuf,
-        package_name: String,
+        invalid_package_name: String,
     },
     IncorrectShard {
-        relative_package_dir: RelativePathBuf,
         correct_relative_package_dir: RelativePathBuf,
     },
-    PackageNixNonExistent {
-        relative_package_dir: RelativePathBuf,
-    },
-    PackageNixDir {
-        relative_package_dir: RelativePathBuf,
-    },
-    UndefinedAttr {
-        relative_package_file: RelativePathBuf,
-        package_name: String,
-    },
-    EmptyArgument {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
-    NonToplevelCallPackage {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
-    NonPath {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
+    PackageNixNonExistent,
+    PackageNixDir,
+}
+
+/// An error related to checks involving by-name attributes. For example, attribute `foo` in
+/// `pkgs/by-name/fo/foo/package.nix`.
+#[derive(Clone)]
+pub struct ByNameError {
+    pub attribute_name: String,
+    pub kind: ByNameErrorKind,
+}
+
+#[derive(Clone)]
+pub enum ByNameErrorKind {
+    UndefinedAttr,
+    NonDerivation,
+    InternalCallPackageUsed,
+    CannotDetermineAttributeLocation,
+}
+
+/// An error related to packages in `pkgs/by-name` that are manually overridden, e.g. in
+/// all-packages.nix
+#[derive(Clone)]
+pub struct ByNameOverrideError {
+    pub package_name: String,
+    pub file: RelativePathBuf,
+    pub line: usize,
+    pub column: usize,
+    pub definition: String,
+    pub kind: ByNameOverrideErrorKind,
+}
+
+#[derive(Clone)]
+pub enum ByNameOverrideErrorKind {
+    NonSyntacticCallPackage,
+    NonToplevelCallPackage,
     WrongCallPackagePath {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
         actual_path: RelativePathBuf,
         expected_path: RelativePathBuf,
     },
-    NonSyntacticCallPackage {
-        package_name: String,
-        file: RelativePathBuf,
-        line: usize,
-        column: usize,
-        definition: String,
-    },
-    NonDerivation {
-        relative_package_file: RelativePathBuf,
-        package_name: String,
-    },
-    OutsideSymlink {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-    },
-    UnresolvableSymlink {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        io_error: String,
-    },
-    PathInterpolation {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-    },
-    SearchPath {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-    },
-    OutsidePathReference {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-    },
-    UnresolvablePathReference {
-        relative_package_dir: RelativePathBuf,
-        subpath: RelativePathBuf,
-        line: usize,
-        text: String,
-        io_error: String,
-    },
-    MovedOutOfByNameEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    MovedOutOfByNameNonEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    NewPackageNotUsingByNameEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    NewPackageNotUsingByNameNonEmptyArg {
-        package_name: String,
-        call_package_path: Option<RelativePathBuf>,
-        file: RelativePathBuf,
-    },
-    InternalCallPackageUsed {
-        attr_name: String,
-    },
-    CannotDetermineAttributeLocation {
-        attr_name: String,
-    },
+    EmptyArgument,
+    NonPath,
+}
+
+/// An error that results from checks that verify a specific path does not reference outside the
+/// package directory.
+#[derive(Clone)]
+pub struct PathError {
+    pub relative_package_dir: RelativePathBuf,
+    pub subpath: RelativePathBuf,
+    pub kind: PathErrorKind,
+}
+
+#[derive(Clone)]
+pub enum PathErrorKind {
+    OutsideSymlink,
+    UnresolvableSymlink { io_error: String },
+}
+
+/// An error that results from checks that verify a nix file that contains a path expression does
+/// not reference outside the package.
+#[derive(Clone)]
+pub struct NixFileError {
+    pub relative_package_dir: RelativePathBuf,
+    pub subpath: RelativePathBuf,
+    pub line: usize,
+    pub text: String,
+    pub kind: NixFileErrorKind,
+}
+
+#[derive(Clone)]
+pub enum NixFileErrorKind {
+    PathInterpolation,
+    SearchPath,
+    OutsidePathReference,
+    UnresolvablePathReference { io_error: String },
+}
+
+/// An error related to the introduction/move of a top-level package not using `pkgs/by-name`, but
+/// it should.
+#[derive(Clone)]
+pub struct TopLevelPackageError {
+    pub package_name: String,
+    pub call_package_path: Option<RelativePathBuf>,
+    pub file: RelativePathBuf,
+    pub is_new: bool,
+    pub is_empty: bool,
 }
 
 impl fmt::Display for NixpkgsProblem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NixpkgsProblem::ShardNonDir { relative_shard_path } =>
-                write!(
-                    f,
-                    "{relative_shard_path}: This is a file, but it should be a directory.",
-                ),
-            NixpkgsProblem::InvalidShardName { relative_shard_path, shard_name } =>
-                write!(
-                    f,
-                    "{relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
-                ),
-            NixpkgsProblem::PackageNonDir { relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: This path is a file, but it should be a directory.",
-                ),
-            NixpkgsProblem::CaseSensitiveDuplicate { relative_shard_path, first, second } =>
-                write!(
-                    f,
-                    "{relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
-                ),
-            NixpkgsProblem::InvalidPackageName { relative_package_dir, package_name } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Invalid package directory name \"{package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
-                ),
-            NixpkgsProblem::IncorrectShard { relative_package_dir, correct_relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
-                ),
-            NixpkgsProblem::PackageNixNonExistent { relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
-                ),
-            NixpkgsProblem::PackageNixDir { relative_package_dir } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
-                ),
-            NixpkgsProblem::UndefinedAttr { relative_package_file, package_name } =>
-                write!(
-                    f,
-                    "pkgs.{package_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
-                ),
-            NixpkgsProblem::EmptyArgument { package_name, file, line, column, definition } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
-
-                      However, in this PR, the second argument is empty. See the definition in {file}:{line}:
-
-                    {indented_definition}
-
-                      Such a definition is provided automatically and therefore not necessary. Please remove it.
-                    ",
-                )
-            }
-            NixpkgsProblem::NonToplevelCallPackage { package_name, file, line, column, definition } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
-
-                      However, in this PR, a different `callPackage` is used. See the definition in {file}:{line}:
-
-                    {indented_definition}
-                    ",
-                )
-            }
-            NixpkgsProblem::NonPath { package_name, file, line, column, definition } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
-
-                      However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
-
-                    {indented_definition}
-                    ",
-                )
-            }
-            NixpkgsProblem::WrongCallPackagePath { package_name, file, line, actual_path, expected_path } => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let expected_path_expr = create_path_expr(file, expected_path);
-                let actual_path_expr = create_path_expr(file, actual_path);
-                writedoc! {
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                        {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
-
-                      However, in this PR, the first `callPackage` argument is the wrong path. See the definition in {file}:{line}:
-
-                        {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
-                    ",
+            NixpkgsProblem::Shard(ShardError {
+                shard_name,
+                kind,
+            }) => {
+                let relative_shard_path = structure::relative_dir_for_shard(shard_name);
+                match kind {
+                    ShardErrorKind::ShardNonDir =>
+                        write!(
+                            f,
+                            "{relative_shard_path}: This is a file, but it should be a directory.",
+                        ),
+                    ShardErrorKind::InvalidShardName =>
+                        write!(
+                            f,
+                            "{relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
+                        ),
+                    ShardErrorKind::CaseSensitiveDuplicate { first, second } =>
+                        write!(
+                            f,
+                            "{relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
+                        ),
                 }
             }
-            NixpkgsProblem::NonSyntacticCallPackage { package_name, file, line, column, definition } => {
+            NixpkgsProblem::Package(PackageError {
+                relative_package_dir,
+                kind,
+            }) => {
+                match kind {
+                    PackageErrorKind::PackageNonDir { package_name } => {
+                        let relative_package_dir = structure::relative_dir_for_package(package_name);
+                        write!(
+                            f,
+                            "{relative_package_dir}: This path is a file, but it should be a directory.",
+                        )
+                    }
+                    PackageErrorKind::InvalidPackageName { invalid_package_name } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
+                        ),
+                    PackageErrorKind::IncorrectShard { correct_relative_package_dir } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
+                        ),
+                    PackageErrorKind::PackageNixNonExistent =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
+                        ),
+                    PackageErrorKind::PackageNixDir =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
+                        ),
+                }
+            }
+            NixpkgsProblem::ByName(ByNameError {
+                attribute_name,
+                kind,
+            }) => {
+                match kind {
+                    ByNameErrorKind::UndefinedAttr => {
+                        let relative_package_file = structure::relative_file_for_package(attribute_name);
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
+                        )
+                    }
+                    ByNameErrorKind::NonDerivation => {
+                        let relative_package_file = structure::relative_file_for_package(attribute_name);
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
+                        )
+                    }
+                    ByNameErrorKind::InternalCallPackageUsed =>
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
+                        ),
+                    ByNameErrorKind::CannotDetermineAttributeLocation =>
+                        write!(
+                            f,
+                            "pkgs.{attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
+                        ),
+                }
+            }
+            NixpkgsProblem::ByNameOverride(ByNameOverrideError {
+                package_name,
+                file,
+                line,
+                column,
+                definition,
+                kind,
+            }) => {
                 let relative_package_dir = structure::relative_dir_for_package(package_name);
                 let relative_package_file = structure::relative_file_for_package(package_name);
                 let indented_definition = indent_definition(*column, definition.clone());
-                writedoc!(
-                    f,
-                    "
-                    - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                        {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                match kind {
+                    ByNameOverrideErrorKind::NonSyntacticCallPackage =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                      However, in this PR, it isn't defined that way. See the definition in {file}:{line}
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
 
-                    {indented_definition}
-                    ",
-                )
-            }
-            NixpkgsProblem::NonDerivation { relative_package_file, package_name } =>
-                write!(
-                    f,
-                    "pkgs.{package_name}: This attribute defined by {relative_package_file} is not a derivation",
-                ),
-            NixpkgsProblem::OutsideSymlink { relative_package_dir, subpath } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
-                ),
-            NixpkgsProblem::UnresolvableSymlink { relative_package_dir, subpath, io_error } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
-                ),
-            NixpkgsProblem::PathInterpolation { relative_package_dir, subpath, line, text } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
-                ),
-            NixpkgsProblem::SearchPath { relative_package_dir, subpath, line, text } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
-                ),
-            NixpkgsProblem::OutsidePathReference { relative_package_dir, subpath, line, text } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.",
-                ),
-            NixpkgsProblem::UnresolvablePathReference { relative_package_dir, subpath, line, text, io_error } =>
-                write!(
-                    f,
-                    "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
-                ),
-            NixpkgsProblem::MovedOutOfByNameEmptyArg { package_name, call_package_path, file } => {
-                let call_package_arg =
-                    if let Some(path) = &call_package_path {
-                        format!("./{path}")
-                    } else {
-                        "...".into()
-                    };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
-                      Please move the package back and remove the manual `callPackage`.
-                    ",
-                )
+                              However, in this PR, it isn't defined that way. See the definition in {file}:{line}
+
+                            {indented_definition}
+                            ",
+                        ),
+                    ByNameOverrideErrorKind::NonToplevelCallPackage =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+
+                              However, in this PR, a different `callPackage` is used. See the definition in {file}:{line}:
+
+                            {indented_definition}
+                            ",
+                        ),
+                    ByNameOverrideErrorKind::WrongCallPackagePath { actual_path, expected_path } => {
+                        let expected_path_expr = create_path_expr(file, expected_path);
+                        let actual_path_expr = create_path_expr(file, actual_path);
+                        writedoc! {
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+
+                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
+
+                              However, in this PR, the first `callPackage` argument is the wrong path. See the definition in {file}:{line}:
+
+                                {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
+                            ",
+                        }
+                    }
+                    ByNameOverrideErrorKind::EmptyArgument =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+
+                              However, in this PR, the second argument is empty. See the definition in {file}:{line}:
+
+                            {indented_definition}
+
+                              Such a definition is provided automatically and therefore not necessary. Please remove it.
+                            ",
+                        ),
+                    ByNameOverrideErrorKind::NonPath =>
+                        writedoc!(
+                            f,
+                            "
+                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+
+                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+
+                              However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
+
+                            {indented_definition}
+                            ",
+                        ),
+                }
             },
-            NixpkgsProblem::MovedOutOfByNameNonEmptyArg { package_name, call_package_path, file } => {
+            NixpkgsProblem::Path(PathError {
+                relative_package_dir,
+                subpath,
+                kind,
+            }) => {
+                match kind {
+                    PathErrorKind::OutsideSymlink =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
+                        ),
+                    PathErrorKind::UnresolvableSymlink { io_error } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
+                        ),
+                }
+            },
+            NixpkgsProblem::NixFile(NixFileError {
+                relative_package_dir,
+                subpath,
+                line,
+                text,
+                kind
+            }) => {
+                match kind {
+                    NixFileErrorKind::PathInterpolation =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
+                        ),
+                    NixFileErrorKind::SearchPath =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
+                        ),
+                    NixFileErrorKind::OutsidePathReference =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.",
+                        ),
+                    NixFileErrorKind::UnresolvablePathReference { io_error } =>
+                        write!(
+                            f,
+                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
+                        ),
+                }
+            },
+            NixpkgsProblem::TopLevelPackage(TopLevelPackageError {
+                package_name,
+                call_package_path,
+                file,
+                is_new,
+                is_empty,
+            }) => {
                 let call_package_arg =
                     if let Some(path) = &call_package_path {
                         format!("./{}", path)
@@ -339,62 +379,48 @@ impl fmt::Display for NixpkgsProblem {
                         "...".into()
                     };
                 let relative_package_file = structure::relative_file_for_package(package_name);
-                // This can happen if users mistakenly assume that for custom arguments,
-                // pkgs/by-name can't be used.
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ ... }}` in {file}.
-                      While the manual `callPackage` is still needed, it's not necessary to move the package files.
-                    ",
-                )
+
+                match (is_new, is_empty) {
+                    (false, true) =>
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
+                              Please move the package back and remove the manual `callPackage`.
+                            ",
+                        ),
+                    (false, false) =>
+                        // This can happen if users mistakenly assume that for custom arguments,
+                        // pkgs/by-name can't be used.
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ ... }}` in {file}.
+                              While the manual `callPackage` is still needed, it's not necessary to move the package files.
+                            ",
+                        ),
+                    (true, true) =>
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+                              Please define it in {relative_package_file} instead.
+                              See `pkgs/by-name/README.md` for more details.
+                              Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
+                            ",
+                        ),
+                    (true, false) =>
+                        writedoc!(
+                            f,
+                            "
+                            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+                              Please define it in {relative_package_file} instead.
+                              See `pkgs/by-name/README.md` for more details.
+                              Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.
+                            ",
+                        ),
+                }
             },
-            NixpkgsProblem::NewPackageNotUsingByNameEmptyArg { package_name, call_package_path, file } => {
-                let call_package_arg =
-                    if let Some(path) = &call_package_path {
-                        format!("./{}", path)
-                    } else {
-                        "...".into()
-                    };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
-                      Please define it in {relative_package_file} instead.
-                      See `pkgs/by-name/README.md` for more details.
-                      Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
-                    ",
-                )
-            },
-            NixpkgsProblem::NewPackageNotUsingByNameNonEmptyArg { package_name, call_package_path, file } => {
-                let call_package_arg =
-                    if let Some(path) = &call_package_path {
-                        format!("./{}", path)
-                    } else {
-                        "...".into()
-                    };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-                writedoc!(
-                    f,
-                    "
-                    - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
-                      Please define it in {relative_package_file} instead.
-                      See `pkgs/by-name/README.md` for more details.
-                      Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.
-                    ",
-                )
-            },
-            NixpkgsProblem::InternalCallPackageUsed { attr_name } =>
-                write!(
-                    f,
-                    "pkgs.{attr_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
-                ),
-            NixpkgsProblem::CannotDetermineAttributeLocation { attr_name } =>
-                write!(
-                    f,
-                    "pkgs.{attr_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
-                ),
        }
     }
 }

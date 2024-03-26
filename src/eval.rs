@@ -1,8 +1,9 @@
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::NixpkgsProblem;
-use crate::ratchet;
-use crate::ratchet::RatchetState::Loose;
-use crate::ratchet::RatchetState::Tight;
+use crate::nixpkgs_problem::{
+    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixpkgsProblem,
+};
+use crate::ratchet::RatchetState::{Loose, Tight};
+use crate::ratchet::{self, ManualDefinition, RatchetState};
 use crate::structure;
 use crate::utils;
 use crate::validation::ResultIteratorExt as _;
@@ -213,7 +214,13 @@ fn by_name(
     use ratchet::RatchetState::*;
     use ByNameAttribute::*;
 
-    let relative_package_file = structure::relative_file_for_package(attribute_name);
+    let to_validation = |kind| -> validation::Validation<RatchetState<ManualDefinition>> {
+        NixpkgsProblem::ByName(ByNameError {
+            attribute_name: attribute_name.to_owned(),
+            kind,
+        })
+        .into()
+    };
 
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.
     // This match decides whether the attribute `foo` is defined accordingly
@@ -223,11 +230,7 @@ fn by_name(
         Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
-            NixpkgsProblem::UndefinedAttr {
-                relative_package_file: relative_package_file.to_owned(),
-                package_name: attribute_name.to_owned(),
-            }
-            .into()
+            to_validation(ByNameErrorKind::UndefinedAttr)
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -241,11 +244,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            NixpkgsProblem::NonDerivation {
-                relative_package_file: relative_package_file.to_owned(),
-                package_name: attribute_name.to_owned(),
-            }
-            .into()
+            to_validation(ByNameErrorKind::NonDerivation)
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -261,11 +260,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                NixpkgsProblem::NonDerivation {
-                    relative_package_file: relative_package_file.to_owned(),
-                    package_name: attribute_name.to_owned(),
-                }
-                .into()
+                to_validation(ByNameErrorKind::NonDerivation).map(|_| ())
             };
 
             // If the definition looks correct
@@ -277,10 +272,7 @@ fn by_name(
                     if let Some(_location) = location {
                         // Such an automatic definition should definitely not have a location
                         // Having one indicates that somebody is using `_internalCallByNamePackageFile`,
-                        NixpkgsProblem::InternalCallPackageUsed {
-                            attr_name: attribute_name.to_owned(),
-                        }
-                        .into()
+                        to_validation(ByNameErrorKind::InternalCallPackageUsed)
                     } else {
                         Success(Tight)
                     }
@@ -312,7 +304,6 @@ fn by_name(
 
                         by_name_override(
                             attribute_name,
-                            relative_package_file,
                             is_semantic_call_package,
                             optional_syntactic_call_package,
                             definition,
@@ -323,10 +314,7 @@ fn by_name(
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
                         // over, e.g. if it's defined in aliases.nix.
                         // We can't verify whether its of the expected `callPackage`, so error out
-                        NixpkgsProblem::CannotDetermineAttributeLocation {
-                            attr_name: attribute_name.to_owned(),
-                        }
-                        .into()
+                        to_validation(ByNameErrorKind::CannotDetermineAttributeLocation)
                     }
                 }
             };
@@ -350,59 +338,48 @@ fn by_name(
 /// all-packages.nix
 fn by_name_override(
     attribute_name: &str,
-    expected_package_file: RelativePathBuf,
     is_semantic_call_package: bool,
     optional_syntactic_call_package: Option<CallPackageArgumentInfo>,
     definition: String,
     location: Location,
     relative_location_file: RelativePathBuf,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
+    let to_problem = |kind| {
+        NixpkgsProblem::ByNameOverride(ByNameOverrideError {
+            package_name: attribute_name.to_owned(),
+            file: relative_location_file,
+            line: location.line,
+            column: location.column,
+            definition,
+            kind,
+        })
+    };
+
     // At this point, we completed two different checks for whether it's a
     // `callPackage`
     match (is_semantic_call_package, optional_syntactic_call_package) {
         // Something like `<attr> = foo`
-        (_, None) => NixpkgsProblem::NonSyntacticCallPackage {
-            package_name: attribute_name.to_owned(),
-            file: relative_location_file,
-            line: location.line,
-            column: location.column,
-            definition,
-        }
-        .into(),
+        (_, None) => to_problem(ByNameOverrideErrorKind::NonSyntacticCallPackage).into(),
         // Something like `<attr> = pythonPackages.callPackage ...`
-        (false, Some(_)) => NixpkgsProblem::NonToplevelCallPackage {
-            package_name: attribute_name.to_owned(),
-            file: relative_location_file,
-            line: location.line,
-            column: location.column,
-            definition,
-        }
-        .into(),
+        (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
         // Something like `<attr> = pkgs.callPackage ...`
         (true, Some(syntactic_call_package)) => {
             if let Some(actual_package_file) = syntactic_call_package.relative_path {
+                let expected_package_file = structure::relative_file_for_package(attribute_name);
+
                 if actual_package_file != expected_package_file {
                     // Wrong path
-                    NixpkgsProblem::WrongCallPackagePath {
-                        package_name: attribute_name.to_owned(),
-                        file: relative_location_file,
-                        line: location.line,
+                    to_problem(ByNameOverrideErrorKind::WrongCallPackagePath {
                         actual_path: actual_package_file,
                         expected_path: expected_package_file,
-                    }
+                    })
                     .into()
                 } else {
                     // Manual definitions with empty arguments are not allowed
                     // anymore, but existing ones should continue to be allowed
                     let manual_definition_ratchet = if syntactic_call_package.empty_arg {
                         // This is the state to migrate away from
-                        Loose(NixpkgsProblem::EmptyArgument {
-                            package_name: attribute_name.to_owned(),
-                            file: relative_location_file,
-                            line: location.line,
-                            column: location.column,
-                            definition,
-                        })
+                        Loose(to_problem(ByNameOverrideErrorKind::EmptyArgument))
                     } else {
                         // This is the state to migrate to
                         Tight
@@ -412,14 +389,7 @@ fn by_name_override(
                 }
             } else {
                 // No path
-                NixpkgsProblem::NonPath {
-                    package_name: attribute_name.to_owned(),
-                    file: relative_location_file,
-                    line: location.line,
-                    column: location.column,
-                    definition,
-                }
-                .into()
+                to_problem(ByNameOverrideErrorKind::NonPath).into()
             }
         }
     }
