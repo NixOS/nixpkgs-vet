@@ -208,7 +208,7 @@ mod tests {
         let temp_nixpkgs = tempdir()?;
         let path = temp_nixpkgs.path();
 
-        if is_case_insensitive_fs(&path)? {
+        if is_case_insensitive_fs(path)? {
             eprintln!("We're on a case-insensitive filesystem, skipping case-sensitivity test");
             return Ok(());
         }
@@ -223,7 +223,7 @@ mod tests {
 
         test_nixpkgs(
             "case_sensitive",
-            &path,
+            path,
             "pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\".\nThis PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.\n",
         )?;
 
