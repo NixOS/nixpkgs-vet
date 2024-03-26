@@ -128,8 +128,11 @@ fn check_nix_file(
 
     Ok(validation::sequence_(
         nix_file.syntax_root.syntax().descendants().map(|node| {
+            let line = nix_file.line_index.line(node.text_range().start().into());
+            let text = node.text().to_string();
+
             // We're only interested in Path expressions
-            let Some(path) = rnix::ast::Path::cast(node.clone()) else {
+            let Some(path) = rnix::ast::Path::cast(node) else {
                 return Success(());
             };
 
@@ -137,8 +140,8 @@ fn check_nix_file(
                 NixpkgsProblem::NixFile(NixFileError {
                     relative_package_dir: relative_package_dir.to_owned(),
                     subpath: subpath.to_owned(),
-                    line: nix_file.line_index.line(node.text_range().start().into()),
-                    text: node.text().to_string(),
+                    line,
+                    text,
                     kind,
                 })
             };
