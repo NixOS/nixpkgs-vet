@@ -17,7 +17,7 @@ pub enum NixpkgsProblem {
     ByNameOverride(ByNameOverrideError),
     Path(PathError),
     NixFile(NixFileError),
-    Ratchet(RatchetError),
+    TopLevelPackage(TopLevelPackageError),
 }
 
 #[derive(Clone)]
@@ -120,8 +120,9 @@ pub enum NixFileErrorKind {
     UnresolvablePathReference { io_error: String },
 }
 
+/// An error related to the introduction/move of a top-level package not using `pkgs/by-name`, but it should
 #[derive(Clone)]
-pub struct RatchetError {
+pub struct TopLevelPackageError {
     pub package_name: String,
     pub call_package_path: Option<RelativePathBuf>,
     pub file: RelativePathBuf,
@@ -353,7 +354,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::Ratchet(RatchetError {
+            NixpkgsProblem::TopLevelPackage(TopLevelPackageError {
                 package_name,
                 call_package_path,
                 file,

@@ -3,7 +3,7 @@
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::{NixpkgsProblem, RatchetError};
+use crate::nixpkgs_problem::{NixpkgsProblem, TopLevelPackageError};
 use crate::validation::{self, Validation, Validation::Success};
 use relative_path::RelativePathBuf;
 use std::collections::HashMap;
@@ -153,7 +153,7 @@ impl ToNixpkgsProblem for UsesByName {
         optional_from: Option<()>,
         (to, file): &Self::ToContext,
     ) -> NixpkgsProblem {
-        NixpkgsProblem::Ratchet(RatchetError {
+        NixpkgsProblem::TopLevelPackage(TopLevelPackageError {
             package_name: name.to_owned(),
             call_package_path: to.relative_path.clone(),
             file: file.to_owned(),
