@@ -125,15 +125,8 @@ pub struct RatchetError {
     pub package_name: String,
     pub call_package_path: Option<RelativePathBuf>,
     pub file: RelativePathBuf,
-    pub kind: RatchetErrorKind,
-}
-
-#[derive(Clone)]
-pub enum RatchetErrorKind {
-    MovedOutOfByName,
-    MovedOutOfByNameEmptyArg,
-    NewPackageNotUsingByName,
-    NewPackageNotUsingByNameEmptyArg,
+    pub is_new: bool,
+    pub is_empty: bool,
 }
 
 impl fmt::Display for NixpkgsProblem {
@@ -364,7 +357,8 @@ impl fmt::Display for NixpkgsProblem {
                 package_name,
                 call_package_path,
                 file,
-                kind,
+                is_new,
+                is_empty,
             }) => {
                 let call_package_arg =
                     if let Some(path) = &call_package_path {
@@ -374,8 +368,8 @@ impl fmt::Display for NixpkgsProblem {
                     };
                 let relative_package_file = structure::relative_file_for_package(package_name);
 
-                match kind {
-                    RatchetErrorKind::MovedOutOfByNameEmptyArg =>
+                match (is_new, is_empty) {
+                    (false, true) =>
                         writedoc!(
                             f,
                             "
@@ -383,7 +377,7 @@ impl fmt::Display for NixpkgsProblem {
                               Please move the package back and remove the manual `callPackage`.
                             ",
                         ),
-                    RatchetErrorKind::MovedOutOfByName =>
+                    (false, false) =>
                         // This can happen if users mistakenly assume that for custom arguments,
                         // pkgs/by-name can't be used.
                         writedoc!(
@@ -393,7 +387,7 @@ impl fmt::Display for NixpkgsProblem {
                               While the manual `callPackage` is still needed, it's not necessary to move the package files.
                             ",
                         ),
-                    RatchetErrorKind::NewPackageNotUsingByNameEmptyArg =>
+                    (true, true) =>
                         writedoc!(
                             f,
                             "
@@ -403,7 +397,7 @@ impl fmt::Display for NixpkgsProblem {
                               Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
                             ",
                         ),
-                    RatchetErrorKind::NewPackageNotUsingByName =>
+                    (true, false) =>
                         writedoc!(
                             f,
                             "
