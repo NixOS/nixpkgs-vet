@@ -39,7 +39,8 @@ rustPlatform.buildRustPackage {
   preCheck = initNix;
   postCheck = ''
     cargo fmt --check
-    cargo clippy -- -D warnings
+    # --tests or --all-targets include tests for linting
+    cargo clippy --all-targets -- -D warnings
   '';
   postInstall = ''
     wrapProgram $out/bin/nixpkgs-check-by-name \
