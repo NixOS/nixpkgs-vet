@@ -2,7 +2,7 @@
 
     foo = callPackage ./pkgs/by-name/fo/foo/package.nix { /* ... */ };
 
-  However, in this PR, a different `callPackage` is used. See the definition in all-packages.nix:5:
+  However, in this PR, a different `callPackage` is used. See the definition in pkgs/top-level/all-packages.nix:5:
 
     foo = self.alt.callPackage ({ }: self.someDrv) { };
 

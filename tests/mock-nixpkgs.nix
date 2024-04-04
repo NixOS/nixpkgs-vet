@@ -81,8 +81,8 @@ let
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
   optionalAllPackagesOverlay =
-    if builtins.pathExists (root + "/all-packages.nix") then
-      [ (import (root + "/all-packages.nix")) ]
+    if builtins.pathExists (root + "/pkgs/top-level/all-packages.nix") then
+      [ (import (root + "/pkgs/top-level/all-packages.nix")) ]
     else
       [ ];
 

@@ -2,9 +2,9 @@
 
     noEval = callPackage ./pkgs/by-name/no/noEval/package.nix { /* ... */ };
 
-  However, in this PR, the second argument is empty. See the definition in all-packages.nix:9:
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:9:
 
-    noEval = self.callPackage ./pkgs/by-name/no/noEval/package.nix { };
+    noEval = self.callPackage ./../by-name/no/noEval/package.nix { };
 
   Such a definition is provided automatically and therefore not necessary. Please remove it.
 
@@ -12,9 +12,9 @@
 
     onlyMove = callPackage ./pkgs/by-name/on/onlyMove/package.nix { /* ... */ };
 
-  However, in this PR, the second argument is empty. See the definition in all-packages.nix:7:
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:7:
 
-    onlyMove = self.callPackage ./pkgs/by-name/on/onlyMove/package.nix { };
+    onlyMove = self.callPackage ./../by-name/on/onlyMove/package.nix { };
 
   Such a definition is provided automatically and therefore not necessary. Please remove it.
 

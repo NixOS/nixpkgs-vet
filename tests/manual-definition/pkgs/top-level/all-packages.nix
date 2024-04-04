@@ -4,7 +4,7 @@ self: super: {
   internalCallByName = self.callPackage ({ someDrv }: someDrv) { };
   nonDerivation = self.callPackage ({ someDrv }: someDrv) { };
 
-  onlyMove = self.callPackage ./pkgs/by-name/on/onlyMove/package.nix { };
+  onlyMove = self.callPackage ./../by-name/on/onlyMove/package.nix { };
 
-  noEval = self.callPackage ./pkgs/by-name/no/noEval/package.nix { };
+  noEval = self.callPackage ./../by-name/no/noEval/package.nix { };
 }

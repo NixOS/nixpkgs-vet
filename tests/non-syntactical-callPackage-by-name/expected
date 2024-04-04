@@ -2,7 +2,7 @@
 
     foo = callPackage ./pkgs/by-name/fo/foo/package.nix { /* ... */ };
 
-  However, in this PR, it isn't defined that way. See the definition in all-packages.nix:4
+  However, in this PR, it isn't defined that way. See the definition in pkgs/top-level/all-packages.nix:4
 
     foo = self.bar;
 

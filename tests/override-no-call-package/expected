@@ -2,7 +2,7 @@
 
     nonDerivation = callPackage ./pkgs/by-name/no/nonDerivation/package.nix { /* ... */ };
 
-  However, in this PR, it isn't defined that way. See the definition in all-packages.nix:2
+  However, in this PR, it isn't defined that way. See the definition in pkgs/top-level/all-packages.nix:2
 
     nonDerivation = self.someDrv;
 
