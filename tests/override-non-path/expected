@@ -1,8 +1,8 @@
 - Because pkgs/by-name/fo/foo exists, the attribute `pkgs.foo` must be defined like
 
-    foo = callPackage ./pkgs/by-name/fo/foo/package.nix { /* ... */ };
+    foo = callPackage ./../by-name/fo/foo/package.nix { /* ... */ };
 
-  However, in this PR, the first `callPackage` argument is not a path. See the definition in all-packages.nix:3:
+  However, in this PR, the first `callPackage` argument is not a path. See the definition in pkgs/top-level/all-packages.nix:3:
 
     foo = self.callPackage ({ someDrv, someFlag }: someDrv) { someFlag = true; };
 

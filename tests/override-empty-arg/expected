@@ -1,10 +1,10 @@
 - Because pkgs/by-name/no/nonDerivation exists, the attribute `pkgs.nonDerivation` must be defined like
 
-    nonDerivation = callPackage ./pkgs/by-name/no/nonDerivation/package.nix { /* ... */ };
+    nonDerivation = callPackage ./../by-name/no/nonDerivation/package.nix { /* ... */ };
 
-  However, in this PR, the second argument is empty. See the definition in all-packages.nix:2:
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:2:
 
-    nonDerivation = self.callPackage ./pkgs/by-name/no/nonDerivation/package.nix { };
+    nonDerivation = self.callPackage ./../by-name/no/nonDerivation/package.nix { };
 
   Such a definition is provided automatically and therefore not necessary. Please remove it.
 
