@@ -1,6 +1,6 @@
 - Because pkgs/by-name/fo/foo exists, the attribute `pkgs.foo` must be defined like
 
-    foo = callPackage ./pkgs/by-name/fo/foo/package.nix { /* ... */ };
+    foo = callPackage ./../by-name/fo/foo/package.nix { /* ... */ };
 
   However, in this PR, a different `callPackage` is used. See the definition in pkgs/top-level/all-packages.nix:5:
 

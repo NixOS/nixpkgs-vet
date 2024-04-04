@@ -77,6 +77,7 @@ pub enum ByNameErrorKind {
 #[derive(Clone)]
 pub struct ByNameOverrideError {
     pub package_name: String,
+    pub expected_package_path: RelativePathBuf,
     pub file: RelativePathBuf,
     pub line: usize,
     pub column: usize,
@@ -88,10 +89,7 @@ pub struct ByNameOverrideError {
 pub enum ByNameOverrideErrorKind {
     NonSyntacticCallPackage,
     NonToplevelCallPackage,
-    WrongCallPackagePath {
-        actual_path: RelativePathBuf,
-        expected_path: RelativePathBuf,
-    },
+    WrongCallPackagePath { actual_path: RelativePathBuf },
     EmptyArgument,
     NonPath,
 }
@@ -234,6 +232,7 @@ impl fmt::Display for NixpkgsProblem {
             }
             NixpkgsProblem::ByNameOverride(ByNameOverrideError {
                 package_name,
+                expected_package_path,
                 file,
                 line,
                 column,
@@ -241,40 +240,41 @@ impl fmt::Display for NixpkgsProblem {
                 kind,
             }) => {
                 let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let relative_package_file = structure::relative_file_for_package(package_name);
+                let expected_path_expr = create_path_expr(file, expected_package_path);
                 let indented_definition = indent_definition(*column, definition.clone());
 
                 match kind {
-                    ByNameOverrideErrorKind::NonSyntacticCallPackage =>
+                    ByNameOverrideErrorKind::NonSyntacticCallPackage => {
+
                         writedoc!(
                             f,
                             "
                             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 
                               However, in this PR, it isn't defined that way. See the definition in {file}:{line}
 
                             {indented_definition}
                             ",
-                        ),
+                        )
+                    }
                     ByNameOverrideErrorKind::NonToplevelCallPackage =>
                         writedoc!(
                             f,
                             "
                             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 
                               However, in this PR, a different `callPackage` is used. See the definition in {file}:{line}:
 
                             {indented_definition}
                             ",
                         ),
-                    ByNameOverrideErrorKind::WrongCallPackagePath { actual_path, expected_path } => {
-                        let expected_path_expr = create_path_expr(file, expected_path);
+                    ByNameOverrideErrorKind::WrongCallPackagePath { actual_path } => {
                         let actual_path_expr = create_path_expr(file, actual_path);
-                        writedoc! {
+                        writedoc!(
                             f,
                             "
                             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
@@ -285,7 +285,7 @@ impl fmt::Display for NixpkgsProblem {
 
                                 {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
                             ",
-                        }
+                        )
                     }
                     ByNameOverrideErrorKind::EmptyArgument =>
                         writedoc!(
@@ -293,7 +293,7 @@ impl fmt::Display for NixpkgsProblem {
                             "
                             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 
                               However, in this PR, the second argument is empty. See the definition in {file}:{line}:
 
@@ -308,7 +308,7 @@ impl fmt::Display for NixpkgsProblem {
                             "
                             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                                {package_name} = callPackage ./{relative_package_file} {{ /* ... */ }};
+                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 
                               However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
 

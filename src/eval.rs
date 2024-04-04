@@ -344,9 +344,12 @@ fn by_name_override(
     location: Location,
     relative_location_file: RelativePathBuf,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
+    let expected_package_path = structure::relative_file_for_package(attribute_name);
+
     let to_problem = |kind| {
         NixpkgsProblem::ByNameOverride(ByNameOverrideError {
             package_name: attribute_name.to_owned(),
+            expected_package_path: expected_package_path.to_owned(),
             file: relative_location_file,
             line: location.line,
             column: location.column,
@@ -364,14 +367,11 @@ fn by_name_override(
         (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
         // Something like `<attr> = pkgs.callPackage ...`
         (true, Some(syntactic_call_package)) => {
-            if let Some(actual_package_file) = syntactic_call_package.relative_path {
-                let expected_package_file = structure::relative_file_for_package(attribute_name);
-
-                if actual_package_file != expected_package_file {
+            if let Some(actual_package_path) = syntactic_call_package.relative_path {
+                if actual_package_path != expected_package_path {
                     // Wrong path
                     to_problem(ByNameOverrideErrorKind::WrongCallPackagePath {
-                        actual_path: actual_package_file,
-                        expected_path: expected_package_file,
+                        actual_path: actual_package_path,
                     })
                     .into()
                 } else {

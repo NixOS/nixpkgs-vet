@@ -1,6 +1,6 @@
 - Because pkgs/by-name/a/a exists, the attribute `pkgs.a` must be defined like
 
-    a = callPackage ./pkgs/by-name/a/a/package.nix { /* ... */ };
+    a = callPackage ./../by-name/a/a/package.nix { /* ... */ };
 
   However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:2:
 
@@ -15,7 +15,7 @@
 
 - Because pkgs/by-name/c/c exists, the attribute `pkgs.c` must be defined like
 
-    c = callPackage ./pkgs/by-name/c/c/package.nix { /* ... */ };
+    c = callPackage ./../by-name/c/c/package.nix { /* ... */ };
 
   However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:4:
 

@@ -1,6 +1,6 @@
 - Because pkgs/by-name/no/noEval exists, the attribute `pkgs.noEval` must be defined like
 
-    noEval = callPackage ./pkgs/by-name/no/noEval/package.nix { /* ... */ };
+    noEval = callPackage ./../by-name/no/noEval/package.nix { /* ... */ };
 
   However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:9:
 
@@ -10,7 +10,7 @@
 
 - Because pkgs/by-name/on/onlyMove exists, the attribute `pkgs.onlyMove` must be defined like
 
-    onlyMove = callPackage ./pkgs/by-name/on/onlyMove/package.nix { /* ... */ };
+    onlyMove = callPackage ./../by-name/on/onlyMove/package.nix { /* ... */ };
 
   However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:7:
 
