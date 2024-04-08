@@ -164,7 +164,9 @@ pub fn check_values(
         .with_context(|| format!("Failed to run command {command:?}"))?;
 
     if !result.status.success() {
-        anyhow::bail!("Failed to run command {command:?}");
+        anyhow::bail!(
+            "- Nix evaluation failed for some package in `pkgs/by-name`, see error above"
+        );
     }
     // Parse the resulting JSON value
     let attributes: Vec<(String, Attribute)> = serde_json::from_slice(&result.stdout)
