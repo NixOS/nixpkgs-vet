@@ -183,7 +183,7 @@ mod tests {
             }
 
             let expected_errors = fs::read_to_string(path.join("expected"))
-                .expect("No expected file for test {name}");
+                .with_context(|| format!("No expected file for test {name}"))?;
 
             test_nixpkgs(&name, &path, &expected_errors)?;
         }
