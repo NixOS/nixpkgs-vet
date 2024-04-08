@@ -103,7 +103,7 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: Vec<String>,
-    keep_nix_path: bool,
+    is_test: bool,
 ) -> validation::Result<ratchet::Nixpkgs> {
     // Write the list of packages we need to check into a temporary JSON file.
     // This can then get read by the Nix evaluation.
@@ -149,9 +149,10 @@ pub fn check_values(
         .arg("-I")
         .arg(nixpkgs_path);
 
-    // Clear NIX_PATH to be sure it doesn't influence the result
-    // But not when requested to keep it, used so that the tests can pass extra Nix files
-    if !keep_nix_path {
+    // Only do these actions if we're not running tests
+    if !is_test {
+        // Clear NIX_PATH to be sure it doesn't influence the result (during tests we need to have
+        // <mock-nixpkgs> available though
         command.env_remove("NIX_PATH");
     }
 
