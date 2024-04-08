@@ -1,0 +1,20 @@
+trace: This should be on stderr!
+error:
+       … while evaluating list element at index 3
+
+       … while evaluating list element at index 1
+
+       … while evaluating attribute 'ByName'
+
+         at src/eval.nix:82:5:
+
+           81|     inherit name;
+           82|     value.ByName =
+             |     ^
+           83|       if ! pkgs ? ${name} then
+
+       (stack trace truncated; use '--show-trace' to show the full trace)
+
+       error: This is an error!
+- Nix evaluation failed for some package in `pkgs/by-name`, see error above
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

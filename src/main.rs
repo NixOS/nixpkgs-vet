@@ -268,7 +268,12 @@ mod tests {
             Ok(writer)
         })?;
 
-        let actual_errors = String::from_utf8_lossy(&writer);
+        let expr_path = std::env::var("NIX_CHECK_BY_NAME_EXPR_PATH")
+            .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_EXPR_PATH")?;
+
+        // We end up with a small Nix trace that includes the absolute path to src/eval.nix
+        // on the output, which we need to relativise for the tests to succeed everywhere
+        let actual_errors = String::from_utf8_lossy(&writer).replace(&expr_path, "src/eval.nix");
 
         if actual_errors != expected_errors {
             panic!(

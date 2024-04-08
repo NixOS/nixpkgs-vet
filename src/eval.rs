@@ -1,6 +1,7 @@
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::nixpkgs_problem::{
-    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixpkgsProblem,
+    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixEvalError,
+    NixpkgsProblem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::ratchet::{self, ManualDefinition, RatchetState};
@@ -11,6 +12,7 @@ use crate::validation::{self, Validation::Success};
 use crate::NixFileStore;
 use relative_path::RelativePathBuf;
 use std::path::Path;
+use std::str::from_utf8;
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -127,15 +129,14 @@ pub fn check_values(
     // ones needed needed
     let mut command = process::Command::new("nix-instantiate");
     command
-        // Inherit stderr so that error messages always get shown
-        .stderr(process::Stdio::inherit())
+        // Capture stderr so that it can be printed later in case of failure
+        .stderr(process::Stdio::piped())
         .args([
             "--eval",
             "--json",
             "--strict",
             "--readonly-mode",
             "--restrict-eval",
-            "--show-trace",
         ])
         // Pass the path to the attrs_file as an argument and add it to the NIX_PATH so it can be
         // accessed in restrict-eval mode
@@ -154,6 +155,8 @@ pub fn check_values(
         // Clear NIX_PATH to be sure it doesn't influence the result (during tests we need to have
         // <mock-nixpkgs> available though
         command.env_remove("NIX_PATH");
+        // Show the full Nix error trace, but not in tests because the full trace is super impure
+        command.arg("--show-trace");
     }
 
     command.args(["-I", &expr_path]);
@@ -164,9 +167,9 @@ pub fn check_values(
         .with_context(|| format!("Failed to run command {command:?}"))?;
 
     if !result.status.success() {
-        anyhow::bail!(
-            "- Nix evaluation failed for some package in `pkgs/by-name`, see error above"
-        );
+        // Early return in case evaluation fails
+        let stderr = from_utf8(&result.stderr)?.to_owned();
+        return Ok(NixpkgsProblem::NixEval(NixEvalError { stderr }).into());
     }
     // Parse the resulting JSON value
     let attributes: Vec<(String, Attribute)> = serde_json::from_slice(&result.stdout)
