@@ -18,6 +18,7 @@ pub enum NixpkgsProblem {
     Path(PathError),
     NixFile(NixFileError),
     TopLevelPackage(TopLevelPackageError),
+    NixEval(NixEvalError),
 }
 
 /// A file structure error involving a shard (e.g. `fo` is the shard in the path `pkgs/by-name/fo/foo/package.nix`)
@@ -137,6 +138,12 @@ pub struct TopLevelPackageError {
     pub file: RelativePathBuf,
     pub is_new: bool,
     pub is_empty: bool,
+}
+
+/// A Nix evaluation error for some package in `pkgs/by-name`
+#[derive(Clone)]
+pub struct NixEvalError {
+    pub stderr: String,
 }
 
 impl fmt::Display for NixpkgsProblem {
@@ -420,6 +427,10 @@ impl fmt::Display for NixpkgsProblem {
                             ",
                         ),
                 }
+            },
+            NixpkgsProblem::NixEval(NixEvalError { stderr }) => {
+                f.write_str(stderr)?;
+                write!(f, "- Nix evaluation failed for some package in `pkgs/by-name`, see error above")
             },
        }
     }

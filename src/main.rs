@@ -63,9 +63,8 @@ fn main() -> ExitCode {
 /// # Arguments
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
-/// - `keep_nix_path`: Whether the value of the NIX_PATH environment variable should be kept for
-/// the evaluation stage, allowing its contents to be accessed.
-///   This is used to allow the tests to access e.g. the mock-nixpkgs.nix file
+/// - `is_test`: Whether we're running a test right now, which e.g. allows access to the
+///   <mock-nixpkgs> NIX_PATH entry
 /// - `error_writer`: An `io::Write` value to write validation errors to, if any.
 ///
 /// # Return value
@@ -75,12 +74,12 @@ fn main() -> ExitCode {
 pub fn process<W: io::Write>(
     base_nixpkgs: PathBuf,
     main_nixpkgs: PathBuf,
-    keep_nix_path: bool,
+    is_test: bool,
     error_writer: &mut W,
 ) -> anyhow::Result<bool> {
     // Very easy to parallelise this, since it's totally independent
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, keep_nix_path));
-    let main_result = check_nixpkgs(&main_nixpkgs, keep_nix_path)?;
+    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, is_test));
+    let main_result = check_nixpkgs(&main_nixpkgs, is_test)?;
 
     let base_result = match base_thread.join() {
         Ok(res) => res?,
@@ -141,10 +140,7 @@ pub fn process<W: io::Write>(
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-pub fn check_nixpkgs(
-    nixpkgs_path: &Path,
-    keep_nix_path: bool,
-) -> validation::Result<ratchet::Nixpkgs> {
+pub fn check_nixpkgs(nixpkgs_path: &Path, is_test: bool) -> validation::Result<ratchet::Nixpkgs> {
     let mut nix_file_store = NixFileStore::default();
 
     Ok({
@@ -161,7 +157,7 @@ pub fn check_nixpkgs(
         } else {
             check_structure(&nixpkgs_path, &mut nix_file_store)?.result_map(|package_names|
                 // Only if we could successfully parse the structure, we do the evaluation checks
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names, keep_nix_path))?
+                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names, is_test))?
         }
     })
 }
@@ -187,7 +183,7 @@ mod tests {
             }
 
             let expected_errors = fs::read_to_string(path.join("expected"))
-                .expect("No expected file for test {name}");
+                .with_context(|| format!("No expected file for test {name}"))?;
 
             test_nixpkgs(&name, &path, &expected_errors)?;
         }
@@ -272,7 +268,12 @@ mod tests {
             Ok(writer)
         })?;
 
-        let actual_errors = String::from_utf8_lossy(&writer);
+        let expr_path = std::env::var("NIX_CHECK_BY_NAME_EXPR_PATH")
+            .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_EXPR_PATH")?;
+
+        // We end up with a small Nix trace that includes the absolute path to src/eval.nix
+        // on the output, which we need to relativise for the tests to succeed everywhere
+        let actual_errors = String::from_utf8_lossy(&writer).replace(&expr_path, "src/eval.nix");
 
         if actual_errors != expected_errors {
             panic!(
