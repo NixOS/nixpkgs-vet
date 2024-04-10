@@ -86,6 +86,15 @@ let
               echo "</details>"
             '';
           };
+          githubActions = pkgs.writeShellApplication {
+            name = "update-github-actions";
+            runtimeInputs = with pkgs; [
+              dependabot-cli
+              jq
+              github-cli
+            ];
+            text = builtins.readFile ./scripts/update-github-actions.sh;
+          };
         };
       in
       pkgs.writeShellApplication {
