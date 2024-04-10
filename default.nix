@@ -11,6 +11,7 @@ let
     config = {};
     overlays = [];
   };
+  inherit (pkgs) lib;
 
   runtimeExprPath = ./src/eval.nix;
   testNixpkgsPath = ./tests/mock-nixpkgs.nix;
@@ -32,8 +33,12 @@ let
 
 
   results = {
-    build = pkgs.callPackage ./package.nix {
-      inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath;
+    # We're using this value as the root result. By default, derivations expose all of their
+    # internal attributes, which is very messy. We prevent this using lib.lazyDerivation
+    build = lib.lazyDerivation {
+      derivation = pkgs.callPackage ./package.nix {
+        inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath;
+      };
     };
 
     shell = pkgs.mkShell {
