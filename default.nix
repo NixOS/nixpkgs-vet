@@ -94,6 +94,7 @@ let
               dependabot-cli
               jq
               github-cli
+              coreutils
             ];
             text = builtins.readFile ./scripts/update-github-actions.sh;
           };
