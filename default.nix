@@ -31,13 +31,15 @@ let
     nix-store --init
   '';
 
+  # Determine version from Cargo.toml
+  version = (lib.importTOML ./Cargo.toml).package.version;
 
   results = {
     # We're using this value as the root result. By default, derivations expose all of their
     # internal attributes, which is very messy. We prevent this using lib.lazyDerivation
     build = lib.lazyDerivation {
       derivation = pkgs.callPackage ./package.nix {
-        inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath;
+        inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath version;
       };
     };
 
@@ -132,4 +134,6 @@ results.build // results // {
   # Built by CI
   ci = pkgs.linkFarm "ci" results;
 
+  # Used by CI to determine whether a new version should be released
+  inherit version;
 }
