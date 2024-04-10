@@ -53,31 +53,52 @@ let
     };
 
     # Run regularly by CI and turned into a PR
-    autoPrUpdate = pkgs.writeShellApplication {
-      name = "auto-pr-update";
-      runtimeInputs = with pkgs; [
-        npins
-        cargo
-      ];
-      text =
-        let
-          commands = {
-            "npins changes" = ''
-              npins update --directory "$REPO_ROOT/npins"'';
-            "cargo changes" = ''
-              cargo update --manifest-path "$REPO_ROOT/Cargo.toml"'';
+    autoPrUpdate =
+      let
+        updateScripts = {
+          npins = pkgs.writeShellApplication {
+            name = "update-npins";
+            runtimeInputs = with pkgs; [
+              npins
+            ];
+            text = ''
+              echo "<details><summary>npins changes</summary>"
+              # Needed because GitHub's rendering of the first body line breaks down otherwise
+              echo ""
+              echo '```'
+              npins update --directory "$1/npins" 2>&1
+              echo  '```'
+              echo "</details>"
+            '';
           };
-        in
-        ''
-          REPO_ROOT=$1
-          echo "Run automated updates"
-        ''
-        + pkgs.lib.concatStrings (pkgs.lib.mapAttrsToList (title: command: ''
-          echo -e '<details><summary>${title}</summary>\n\n```'
-          ${command} 2>&1
-          echo -e '```\n</details>'
-        '') commands);
-    };
+          cargo = pkgs.writeShellApplication {
+            name = "update-cargo";
+            runtimeInputs = with pkgs; [
+              cargo
+            ];
+            text = ''
+              echo "<details><summary>cargo changes</summary>"
+              # Needed because GitHub's rendering of the first body line breaks down otherwise
+              echo ""
+              echo '```'
+              cargo update --manifest-path "$1/Cargo.toml" 2>&1
+              echo  '```'
+              echo "</details>"
+            '';
+          };
+        };
+      in
+      pkgs.writeShellApplication {
+        name = "auto-pr-update";
+        text = ''
+          # Prevent impurities
+          unset PATH
+          ${lib.concatMapStringsSep "\n" (script: ''
+            echo >&2 "Running ${script}"
+            ${lib.getExe script} "$1"
+          '') (lib.attrValues updateScripts)}
+        '';
+      };
 
     # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
     nixpkgsCheck = pkgs.runCommand "test-nixpkgs-check-by-name" {
