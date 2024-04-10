@@ -16,7 +16,7 @@ root=$(git rev-parse --show-toplevel)
 repository=${GITHUB_REPOSITORY:-NixOS/nixpkgs-check-by-name}
 
 # Get the version from the Cargo.toml file
-version=$(nixeval "$root" -A build.version)
+version=$(nixeval "$root" -A version)
 echo "Current version is $version"
 
 if existingRelease=$(gh api \

@@ -10,10 +10,10 @@
   initNix,
   runtimeExprPath,
   testNixpkgsPath,
+  version,
 }:
 let
   fs = lib.fileset;
-  version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 in
 rustPlatform.buildRustPackage {
   pname = "nixpkgs-check-by-name";
