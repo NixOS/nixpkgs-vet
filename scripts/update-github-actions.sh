@@ -38,20 +38,18 @@ job:
           - "*"
 EOF
 
-if ! create_pull_request=$(LOCAL_GITHUB_ACCESS_TOKEN="$githubToken" \
+if create_pull_request=$(LOCAL_GITHUB_ACCESS_TOKEN="$githubToken" \
   dependabot update --file "$tmp/input.yml" --local "$REPO_ROOT" \
   | jq --exit-status 'select(.type == "create_pull_request").data'); then
-  # Nothing to update
-  exit 0
+
+  jq --exit-status --raw-output '."pr-body"' <<< "$create_pull_request"
+
+  jq --compact-output '."updated-dependency-files"[]' <<< "$create_pull_request" \
+    | while read -r fileUpdate; do
+      file=$(jq --exit-status --raw-output '.name' <<< "$fileUpdate")
+      # --join-output makes sure to not output a trailing newline
+      jq --exit-status --raw-output --join-output '.content' <<< "$fileUpdate" > "$REPO_ROOT/$file"
+    done
 fi
 
-jq --exit-status --raw-output '."pr-body"' <<< "$create_pull_request"
-
 echo '</details>'
-
-jq --compact-output '."updated-dependency-files"[]' <<< "$create_pull_request" \
-  | while read -r fileUpdate; do
-    file=$(jq --exit-status --raw-output '.name' <<< "$fileUpdate")
-    # --join-output makes sure to not output a trailing newline
-    jq --exit-status --raw-output --join-output '.content' <<< "$fileUpdate" > "$REPO_ROOT/$file"
-  done
