@@ -1,0 +1,31 @@
+name: Regular Version
+on:
+  workflow_dispatch: # Allows triggering manually
+  schedule:
+    - cron: '47 14 * * 2' # runs every Tuesday at 14:47 UTC (chosen somewhat randomly)
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: infinixbot/nixpkgs-check-by-name
+          ref: release
+
+      - name: Create Pull Request
+        run: |
+          # no-maintainer-edit because manually added commits would get overridden
+          # when the release branch updates again (which is a force push).
+          # Instead maintainers should push any fixes to the main branch.
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --title "$(git log -1 --format=%s HEAD)" \
+            --no-maintainer-edit \
+            --body "Automated release PR.
+
+          - [x] This change is user-facing
+          "
+        env:
+          # Needed so that CI triggers
+          GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }}
