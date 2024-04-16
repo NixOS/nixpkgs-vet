@@ -1,0 +1,42 @@
+name: Regular Version
+on:
+  workflow_dispatch: # Allows triggering manually
+  schedule:
+    - cron: '47 14 * * 2' # runs every Tuesday at 14:47 UTC (chosen somewhat randomly)
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This fetches the entire Git history.
+          # This is needed so we can determine the commits (and therefore PRs)
+          # where the changelogs have been added
+          depth: 0
+
+      - uses: cachix/install-nix-action@v26
+
+      - name: Increment version and assemble changelog
+        id: version
+        run: |
+          version=$(./scripts/version.sh .)
+          echo "version=$version" >> "$GITHUB_OUTPUTS"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          # To trigger CI for automated PRs, we use a separate machine account
+          # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
+          # and https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#push-pull-request-branches-to-a-fork
+          token: ${{ secrets.MACHINE_USER_PAT }}
+          path: repo
+          push-to-fork: infinixbot/nixpkgs-check-by-name
+          committer: infinixbot <infinixbot@infinisil.com>
+          author: infinixbot <infinixbot@infinisil.com>
+          commit-message: "Version ${{ github.steps.version.outputs.version }}"
+          branch: version
+          title: "Version ${{ github.steps.version.outputs.version }}"
+          body: "Automated version update. Merging this PR will trigger a release."

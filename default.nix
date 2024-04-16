@@ -112,6 +112,22 @@ let
         '';
       };
 
+    # Run regularly by CI and turned into a PR
+    autoVersion =
+      pkgs.writeShellApplication {
+        name = "auto-version";
+        runtimeInputs = with pkgs; [
+          coreutils
+          git
+          github-cli
+          jq
+          cargo
+          toml-cli
+          cargo-edit
+        ];
+        text = builtins.readFile ./scripts/version.sh;
+      };
+
     # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
     nixpkgsCheck = pkgs.runCommand "test-nixpkgs-check-by-name" {
       nativeBuildInputs = [
