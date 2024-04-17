@@ -7,6 +7,20 @@ on:
     branches:
       - main
 
+# This makes sure to only run one instance of this workflow per individual PR and pushes.
+# We need this especially for the release step, because it has side effects.
+# But it's also good in general, there's no need to finish action runs for commits
+# when you push another one right after.
+# Assumption: We push less frequently than it takes for this workflow to finish
+concurrency:
+  # For a push to the main branch, github.ref is refs/heads/<branch_name>
+  # For a pull request, github.ref is refs/pull/<pr_number>/merge
+  group: ${{ github.ref }}
+  # We don't want to cancel in progress workflows for pushes to the main branch,
+  # because it could be in the process of doing a release.
+  # Better wait until it's done
+  cancel-in-progress: ${{ github.event_name != 'pull' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
