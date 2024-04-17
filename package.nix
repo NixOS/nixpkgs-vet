@@ -2,7 +2,6 @@
   lib,
   rustPlatform,
   nix,
-  rustfmt,
   clippy,
   makeWrapper,
 
@@ -30,7 +29,6 @@ rustPlatform.buildRustPackage {
   cargoLock.lockFile = ./Cargo.lock;
   nativeBuildInputs = [
     nix
-    rustfmt
     clippy
     makeWrapper
   ];
@@ -38,7 +36,6 @@ rustPlatform.buildRustPackage {
   env.NIX_PATH = "test-nixpkgs=${testNixpkgsPath}:test-nixpkgs/lib=${nixpkgsLibPath}";
   preCheck = initNix;
   postCheck = ''
-    cargo fmt --check
     # --tests or --all-targets include tests for linting
     cargo clippy --all-targets -- -D warnings
   '';

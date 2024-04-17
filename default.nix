@@ -4,6 +4,7 @@ in
 {
   system ? builtins.currentSystem,
   nixpkgs ? sources.nixpkgs,
+  treefmt-nix ? sources.treefmt-nix,
 }:
 let
   pkgs = import nixpkgs {
@@ -34,6 +35,13 @@ let
   # Determine version from Cargo.toml
   version = (lib.importTOML ./Cargo.toml).package.version;
 
+  treefmtEval = (import treefmt-nix).evalModule pkgs {
+    # Used to find the project root
+    projectRootFile = ".git/config";
+
+    programs.rustfmt.enable = true;
+  };
+
   results = {
     # We're using this value as the root result. By default, derivations expose all of their
     # internal attributes, which is very messy. We prevent this using lib.lazyDerivation
@@ -51,8 +59,17 @@ let
       nativeBuildInputs = with pkgs; [
         npins
         rust-analyzer
+        treefmtEval.config.build.wrapper
       ];
     };
+
+    # This checks that all Git-tracked files are formatted appropriately
+    treefmt = treefmtEval.config.build.check (
+      lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.gitTracked ./.;
+      }
+    );
 
     # Run regularly by CI and turned into a PR
     autoPrUpdate =
