@@ -1,3 +1,1 @@
-{ someDrv }: someDrv // {
-  nixPath = <nixpkgs>;
-}
+{ someDrv }: someDrv // { nixPath = <nixpkgs>; }

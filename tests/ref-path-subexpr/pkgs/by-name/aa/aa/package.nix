@@ -1,3 +1,1 @@
-{ someDrv }: someDrv // {
-  pathWithSubexpr = ./${"test"};
-}
+{ someDrv }: someDrv // { pathWithSubexpr = ./${"test"}; }

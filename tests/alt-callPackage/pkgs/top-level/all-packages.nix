@@ -1,7 +1,6 @@
 self: super: {
 
-  alt.callPackage = self.lib.callPackageWith {};
+  alt.callPackage = self.lib.callPackageWith { };
 
   foo = self.alt.callPackage ({ }: self.someDrv) { };
-
 }

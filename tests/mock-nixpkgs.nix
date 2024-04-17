@@ -1,24 +1,22 @@
 /*
-This file returns a mocked version of Nixpkgs' default.nix for testing purposes.
-It does not depend on Nixpkgs itself for the sake of simplicity.
+  This file returns a mocked version of Nixpkgs' default.nix for testing purposes.
+  It does not depend on Nixpkgs itself for the sake of simplicity.
 
-It takes one attribute as an argument:
-- `root`: The root of Nixpkgs to read other files from, including:
-  - `./pkgs/by-name`: The `pkgs/by-name` directory to test
-  - `./all-packages.nix`: A file containing an overlay to mirror the real `pkgs/top-level/all-packages.nix`.
-    This allows adding overrides on top of the auto-called packages in `pkgs/by-name`.
+  It takes one attribute as an argument:
+  - `root`: The root of Nixpkgs to read other files from, including:
+    - `./pkgs/by-name`: The `pkgs/by-name` directory to test
+    - `./all-packages.nix`: A file containing an overlay to mirror the real `pkgs/top-level/all-packages.nix`.
+      This allows adding overrides on top of the auto-called packages in `pkgs/by-name`.
 
-It returns a Nixpkgs-like function that can be auto-called and evaluates to an attribute set.
+  It returns a Nixpkgs-like function that can be auto-called and evaluates to an attribute set.
 */
-{
-  root,
-}:
+{ root }:
 # The arguments for the Nixpkgs function
 {
   # Passed by the checker to modify `callPackage`
-  overlays ? [],
+  overlays ? [ ],
   # Passed by the checker to make sure a real Nixpkgs isn't influenced by impurities
-  config ? {},
+  config ? { },
   # Passed by the checker to make sure a real Nixpkgs isn't influenced by impurities
   system ? null,
 }:
@@ -29,7 +27,8 @@ let
 
   # The base fixed-point function to populate the resulting attribute set
   pkgsFun =
-    self: {
+    self:
+    {
       inherit lib;
       newScope = extra: lib.callPackageWith (self // extra);
       callPackage = self.newScope { };
@@ -42,7 +41,9 @@ let
     # By using `mapAttrs`, `builtins.unsafeGetAttrPos` just returns `null`,
     # which then doesn't trigger this check
     // lib.mapAttrs (name: value: value) {
-      someDrv = { type = "derivation"; };
+      someDrv = {
+        type = "derivation";
+      };
     };
 
   baseDirectory = root + "/pkgs/by-name";
@@ -53,31 +54,27 @@ let
     let
       entries = builtins.readDir baseDirectory;
 
-      namesForShard = shard:
+      namesForShard =
+        shard:
         if entries.${shard} != "directory" then
           # Only README.md is allowed to be a file, but it's not this code's job to check for that
           { }
         else
-          builtins.mapAttrs
-            (name: _: baseDirectory + "/${shard}/${name}/package.nix")
-            (builtins.readDir (baseDirectory + "/${shard}"));
-
+          builtins.mapAttrs (name: _: baseDirectory + "/${shard}/${name}/package.nix") (
+            builtins.readDir (baseDirectory + "/${shard}")
+          );
     in
-    builtins.foldl'
-      (acc: el: acc // el)
-      { }
-      (map namesForShard (builtins.attrNames entries));
+    builtins.foldl' (acc: el: acc // el) { } (map namesForShard (builtins.attrNames entries));
 
   # Turns autoCalledPackageFiles into an overlay that `callPackage`'s all of them
-  autoCalledPackages = self: super:
+  autoCalledPackages =
+    self: super:
     {
       # Needed to be able to detect empty arguments in all-packages.nix
       # See a more detailed description in pkgs/top-level/by-name-overlay.nix
       _internalCallByNamePackageFile = file: self.callPackage file { };
     }
-    // builtins.mapAttrs
-      (name: self._internalCallByNamePackageFile)
-      autoCalledPackageFiles;
+    // builtins.mapAttrs (name: self._internalCallByNamePackageFile) autoCalledPackageFiles;
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
   optionalAllPackagesOverlay =
@@ -95,13 +92,9 @@ let
       [ ];
 
   # All the overlays in the right order, including the user-supplied ones
-  allOverlays =
-    [
-      autoCalledPackages
-    ]
-    ++ optionalAllPackagesOverlay
-    ++ optionalAliasesOverlay
-    ++ overlays;
+  allOverlays = [
+    autoCalledPackages
+  ] ++ optionalAllPackagesOverlay ++ optionalAliasesOverlay ++ overlays;
 
   # Apply all the overlays in order to the base fixed-point function pkgsFun
   f = builtins.foldl' (f: overlay: lib.extends overlay f) pkgsFun allOverlays;

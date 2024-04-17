@@ -1,3 +1,1 @@
-self: super: builtins.mapAttrs (name: value: value) {
-  foo = self.someDrv;
-}
+self: super: builtins.mapAttrs (name: value: value) { foo = self.someDrv; }

@@ -2,10 +2,7 @@
 # Returns a value containing information on all Nixpkgs attributes
 # which is decoded on the Rust side.
 # See ./eval.rs for the meaning of the returned values
-{
-  attrsPath,
-  nixpkgsPath,
-}:
+{ attrsPath, nixpkgsPath }:
 let
   attrs = builtins.fromJSON (builtins.readFile attrsPath);
 
@@ -17,7 +14,8 @@ let
   overlay = final: prev: {
 
     # Adds information to each attribute about whether it's manually defined using `callPackage`
-    callPackage = fn: args:
+    callPackage =
+      fn: args:
       addVariantInfo (prev.callPackage fn args) {
         # This is a manual definition of the attribute, and it's a callPackage, specifically a semantic callPackage
         ManualDefinition.is_semantic_call_package = true;
@@ -28,20 +26,16 @@ let
     # used by that overlay.
     # This overrides the above `callPackage` information (we don't need that
     # one, since `pkgs/by-name` always uses `callPackage` underneath.
-    _internalCallByNamePackageFile = file:
-      addVariantInfo (prev._internalCallByNamePackageFile file) {
-        AutoDefinition = null;
-      };
-
+    _internalCallByNamePackageFile =
+      file: addVariantInfo (prev._internalCallByNamePackageFile file) { AutoDefinition = null; };
   };
 
   # We can't just replace attribute values with their info in the overlay,
   # because attributes can depend on other attributes, so this would break evaluation.
-  addVariantInfo = value: variant:
+  addVariantInfo =
+    value: variant:
     if builtins.isAttrs value then
-      value // {
-        _callPackageVariant = variant;
-      }
+      value // { _callPackageVariant = variant; }
     else
       # It's very rare that callPackage doesn't return an attribute set, but it can occur.
       # In such a case we can't really return anything sensible that would include the info,
@@ -61,14 +55,14 @@ let
   attrInfo = name: value: {
     location = builtins.unsafeGetAttrPos name pkgs;
     attribute_variant =
-      if ! builtins.isAttrs value then
+      if !builtins.isAttrs value then
         { NonAttributeSet = null; }
       else
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
             definition_variant =
-              if ! value ? _callPackageVariant then
+              if !value ? _callPackageVariant then
                 { ManualDefinition.is_semantic_call_package = false; }
               else
                 value._callPackageVariant;
@@ -77,19 +71,22 @@ let
   };
 
   # Information on all attributes that are in pkgs/by-name.
-  byNameAttrs = builtins.listToAttrs (map (name: {
-    inherit name;
-    value.ByName =
-      if ! pkgs ? ${name} then
-        { Missing = null; }
-      else
-        # Evaluation failures are not allowed, so don't try to catch them
-        { Existing = attrInfo name pkgs.${name}; };
-  }) attrs);
+  byNameAttrs = builtins.listToAttrs (
+    map (name: {
+      inherit name;
+      value.ByName =
+        if !pkgs ? ${name} then
+          { Missing = null; }
+        else
+          # Evaluation failures are not allowed, so don't try to catch them
+          { Existing = attrInfo name pkgs.${name}; };
+    }) attrs
+  );
 
   # Information on all attributes that exist but are not in pkgs/by-name.
   # We need this to enforce pkgs/by-name for new packages
-  nonByNameAttrs = builtins.mapAttrs (name: value:
+  nonByNameAttrs = builtins.mapAttrs (
+    name: value:
     let
       # Packages outside `pkgs/by-name` often fail evaluation,
       # so we need to handle that
@@ -97,11 +94,7 @@ let
       result = builtins.tryEval (builtins.deepSeq output null);
     in
     {
-      NonByName =
-        if result.success then
-          { EvalSuccess = output; }
-        else
-          { EvalFailure = null; };
+      NonByName = if result.success then { EvalSuccess = output; } else { EvalFailure = null; };
     }
   ) (builtins.removeAttrs pkgs attrs);
 

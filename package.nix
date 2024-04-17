@@ -43,5 +43,4 @@ rustPlatform.buildRustPackage {
     wrapProgram $out/bin/nixpkgs-check-by-name \
       --set NIX_CHECK_BY_NAME_EXPR_PATH "$NIX_CHECK_BY_NAME_EXPR_PATH"
   '';
-
 }

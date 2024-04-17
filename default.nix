@@ -9,8 +9,8 @@ in
 let
   pkgs = import nixpkgs {
     inherit system;
-    config = {};
-    overlays = [];
+    config = { };
+    overlays = [ ];
   };
   inherit (pkgs) lib;
 
@@ -40,6 +40,7 @@ let
     projectRootFile = ".git/config";
 
     programs.rustfmt.enable = true;
+    programs.nixfmt-rfc-style.enable = true;
   };
 
   results = {
@@ -47,7 +48,13 @@ let
     # internal attributes, which is very messy. We prevent this using lib.lazyDerivation
     build = lib.lazyDerivation {
       derivation = pkgs.callPackage ./package.nix {
-        inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath version;
+        inherit
+          nixpkgsLibPath
+          initNix
+          runtimeExprPath
+          testNixpkgsPath
+          version
+          ;
       };
     };
 
@@ -77,9 +84,7 @@ let
         updateScripts = {
           npins = pkgs.writeShellApplication {
             name = "update-npins";
-            runtimeInputs = with pkgs; [
-              npins
-            ];
+            runtimeInputs = with pkgs; [ npins ];
             text = ''
               echo "<details><summary>npins changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
@@ -92,9 +97,7 @@ let
           };
           cargo = pkgs.writeShellApplication {
             name = "update-cargo";
-            runtimeInputs = with pkgs; [
-              cargo
-            ];
+            runtimeInputs = with pkgs; [ cargo ];
             text = ''
               echo "<details><summary>cargo changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
@@ -130,21 +133,25 @@ let
       };
 
     # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
-    nixpkgsCheck = pkgs.runCommand "test-nixpkgs-check-by-name" {
-      nativeBuildInputs = [
-        results.build
-        pkgs.nix
-      ];
-      nixpkgsPath = nixpkgs;
-    } ''
-      ${initNix}
-      nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
-      touch $out
-    '';
+    nixpkgsCheck =
+      pkgs.runCommand "test-nixpkgs-check-by-name"
+        {
+          nativeBuildInputs = [
+            results.build
+            pkgs.nix
+          ];
+          nixpkgsPath = nixpkgs;
+        }
+        ''
+          ${initNix}
+          nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
+          touch $out
+        '';
   };
-
 in
-results.build // results // {
+results.build
+// results
+// {
 
   # Good for debugging
   inherit pkgs;

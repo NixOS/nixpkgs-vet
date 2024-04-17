@@ -1,3 +1,1 @@
-self: super: {
-  futureEval = throw "foo";
-}
+self: super: { futureEval = throw "foo"; }

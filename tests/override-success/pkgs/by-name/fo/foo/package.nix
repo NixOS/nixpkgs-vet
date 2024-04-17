@@ -2,7 +2,4 @@
   someDrv,
   enableBar ? false,
 }:
-if enableBar then
-  someDrv
-else
-  {}
+if enableBar then someDrv else { }
