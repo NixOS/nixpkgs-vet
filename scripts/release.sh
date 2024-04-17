@@ -32,7 +32,7 @@ fi
 
 echo "Building release artifact for system $system"
 
-nix-build "$root" -A build -o "$tmp/build" >/dev/null
+nix-build "$root" -A build -o "$tmp/build" > /dev/null
 readarray -t closure < <(nix-store -qR "$tmp/build")
 nix-store --export "${closure[@]}" > "$tmp/$system.nar"
 gzip "$tmp/$system.nar"

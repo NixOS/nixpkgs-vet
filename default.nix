@@ -41,6 +41,8 @@ let
 
     programs.rustfmt.enable = true;
     programs.nixfmt-rfc-style.enable = true;
+    programs.shfmt.enable = true;
+    settings.formatter.shfmt.options = [ "--space-redirects" ];
   };
 
   results = {
