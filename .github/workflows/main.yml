@@ -67,19 +67,16 @@ jobs:
         with:
           repository: NixOS/nixpkgs
 
-      - name: Get the Nixpkgs rev
-        run: echo "rev=$(git rev-parse HEAD)" >> $GITHUB_ENV
+      - name: Update nixpkgs-check-by-name in Nixpkgs
+        run: |
+          echo "rev=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "before=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
 
-      - name: Get version before
-        run: echo "before=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
+          # We run bash explicitly instead of using the files shebang,
+          # because the shebang is using nix-shell with dependencies we already have by default
+          bash pkgs/test/check-by-name/update-pinned-tool.sh
 
-      - name: Update the version
-        # We run bash explicitly instead of using the files shebang,
-        # because the shebang is using nix-shell with dependencies we already have by default
-        run: bash pkgs/test/check-by-name/update-pinned-tool.sh
-
-      - name: Get version after
-        run: echo "after=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
+          echo "after=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
