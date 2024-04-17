@@ -6,12 +6,12 @@ error:
 
        … while evaluating attribute 'ByName'
 
-         at src/eval.nix:82:5:
+         at src/eval.nix:77:7:
 
-           81|     inherit name;
-           82|     value.ByName =
-             |     ^
-           83|       if ! pkgs ? ${name} then
+           76|       inherit name;
+           77|       value.ByName =
+             |       ^
+           78|         if !pkgs ? ${name} then
 
        (stack trace truncated; use '--show-trace' to show the full trace)
 
