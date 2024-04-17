@@ -3,6 +3,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -14,6 +17,12 @@ jobs:
 
       - name: build
         run: nix-build -A ci
+
+      - name: release
+        if: ${{ github.event_name == 'push' }}
+        run: scripts/release.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   test-update:
     runs-on: ubuntu-latest
@@ -34,3 +43,49 @@ jobs:
           } > $GITHUB_STEP_SUMMARY
         env:
           GH_TOKEN: ${{ github.token }}
+
+  nixpkgs-pr:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: NixOS/nixpkgs
+
+      - name: Get the Nixpkgs rev
+        run: echo "rev=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Get version before
+        run: echo "before=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
+
+      - name: Update the version
+        # We run bash explicitly instead of using the files shebang,
+        # because the shebang is using nix-shell with dependencies we already have by default
+        run: bash pkgs/test/check-by-name/update-pinned-tool.sh
+
+      - name: Get version after
+        run: echo "after=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          # To trigger CI for automated PRs, we use a separate machine account
+          # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
+          # and https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#push-pull-request-branches-to-a-fork
+          token: ${{ secrets.MACHINE_USER_PAT }}
+          push-to-fork: infinixbot/nixpkgs
+          committer: infinixbot <infinixbot@infinisil.com>
+          author: infinixbot <infinixbot@infinisil.com>
+          branch: update/nixpkgs-check-by-name
+          commit-message: |
+            nixpkgs-check-by-name: ${{ env.before }} -> ${{ env.after }}
+
+            https://github.com/NixOS/nixpkgs-check-by-name/releases/tag/${{ env.after }}
+          title: "nixpkgs-check-by-name: ${{ env.before }} -> ${{ env.after }}"
+          body: >
+            This is an automated PR to update the version of [nixpkgs-check-by-name](https://github.com/NixOS/nixpkgs-check-by-name),
+            which is used by CI to [check the `pkgs/by-name`](https://github.com/NixOS/nixpkgs/tree/${{ env.rev }}/pkgs/by-name#validation) directory.
+            The update was performed by running [`pkgs/test/check-by-name/update-pinned-tool.sh`](https://github.com/NixOS/nixpkgs/tree/${{ env.rev }}/pkgs/test/check-by-name#update-pinned-toolsh).
+
+            This PR updates the tool to [version ${{ env.after }}](https://github.com/NixOS/nixpkgs-check-by-name/releases/tag/${{ env.after }}).
