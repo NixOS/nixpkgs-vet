@@ -1,26 +1,69 @@
 # Nixpkgs pkgs/by-name checker
 
-This directory implements a program to check the [validity](#validity-checks) of the [`pkgs/by-name` Nixpkgs directory](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name).
-This is part of the implementation of [RFC 140](https://github.com/NixOS/rfcs/pull/140).
+This repository implements a program to check [Nixpkgs' `pkgs/by-name` directory](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name) as part of [RFC 140](https://github.com/NixOS/rfcs/pull/140).
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for contributor documentation.
 Below is the user documentation.
 
-To see how it is used in Nixpkgs, see the [`check-by-name.yml` workflow](https://github.com/NixOS/nixpkgs/blob/master/.github/workflows/check-by-name.yml).
+Currently the only intended user for this program is [Nixpkgs](https://github.com/NixOS/nixpkgs).
+So the interface may be changed in breaking ways as long as Nixpkgs is adjusted to deal with it.
+See [the `pkgs/by-name` Readme](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/README.md#validation)
+for how it's used in Nixpkgs.
 
+## Nix derivations
 
-## Interface
+The source code contains a `default.nix` file, which defines a Nix function.
 
-The interface of the tool is shown with `--help`:
+The function takes an attribute set with at least these attributes as its argument:
+- `system` (String, defaults to [`builtins.currentSystem`](https://nixos.org/manual/nix/stable/language/builtin-constants.html#builtins-currentSystem)):
+  The [`system`](https://nixos.org/manual/nix/stable/language/derivations#attr-system)
+  to build the resulting derivation with.
+
+The function returns an attribute set with at least these attributes:
+- `build` ([Package attribute set](https://nixos.org/manual/nix/stable/glossary#package-attribute-set)):
+  A derivation that can be built with the given `system`.
+
+There is no guarantee that the derivation succeeds on systems that don't have [prebuilt store paths](#prebuilt-store-paths),
+but it can be attempted with
+
+```bash
+nix-build https://github.com/NixOS/nixpkgs-check-by-name/tarball/master -A build
 ```
-cargo run -- --help
+
+## Prebuilt store paths
+
+The [GitHub releases](https://github.com/NixOS/nixpkgs-check-by-name/releases)
+contain a [gzip](https://www.gnu.org/software/gzip/)-compressed
+[Nix Archive](https://nixos.org/manual/nix/stable/command-ref/nix-store/export.html)
+of the [build closure](https://nixos.org/manual/nix/stable/glossary#gloss-closure)
+of the [Nix derivation](#nix-derivations) with `x86_64-linux` as the `system`.
+
+This release artifact is named `x86_64-linux.nar.gz`
+and can be imported into a local Nix store using:
+
+```bash
+storePath=$(gzip -cd x86_64-linux.nar.gz | nix-store --import | tail -1)
+# To prevent it from being garbage-collected
+nix-store --realise "$storePath" --add-root result
 ```
 
-The interface may be changed over time only if the CI workflow making use of it is adjusted to deal with the change appropriately.
+Compared to building the [Nix derivations](#nix-derivations),
+this has the benefit that no Nix evaluation needs to take place
+and is therefore much faster and less storage intensive.
+
+## Binary interface
+
+The store path acquired from the above methods contains
+a `system`-specific binary under `$storePath/bin/nixpkgs-check-by-name`.
+
+The public interface of this binary is printed by calling
+```bash
+result/bin/nixpkgs-check-by-name --help
+```
 
 ## Validity checks
 
-These checks are performed by this tool:
+The following checks are performed when calling the binary:
 
 ### File structure checks
 - `pkgs/by-name` must only contain subdirectories of the form `${shard}/${name}`, called _package directories_.
