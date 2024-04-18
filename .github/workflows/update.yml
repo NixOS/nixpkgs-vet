@@ -3,6 +3,9 @@ on:
   workflow_dispatch: # Allows triggering manually
   schedule:
     - cron: '47 14 * * 1' # runs every Monday at 14:47 UTC (chosen somewhat randomly)
+  pull_request:
+    branches:
+      - main
 
 jobs:
   update:
@@ -14,14 +17,26 @@ jobs:
 
       - uses: cachix/install-nix-action@v26
 
-      - name: update
+      - name: Run update script
         run: |
           nix-build repo -A autoPrUpdate
           result/bin/auto-pr-update repo > body
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Output result
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          {
+            cat body
+            echo ""
+            echo '```diff'
+            git -C repo diff
+            echo '```'
+          } > $GITHUB_STEP_SUMMARY
+
       - name: Create Pull Request
+        if: ${{ github.event_name != 'pull_request' }}
         uses: peter-evans/create-pull-request@v6
         with:
           # To trigger CI for automated PRs, we use a separate machine account
