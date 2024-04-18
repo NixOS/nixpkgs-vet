@@ -45,26 +45,27 @@ let
     settings.formatter.shfmt.options = [ "--space-redirects" ];
   };
 
+  buildUnfiltered = pkgs.callPackage ./package.nix {
+    inherit
+      nixpkgsLibPath
+      initNix
+      runtimeExprPath
+      testNixpkgsPath
+      version
+      ;
+  };
+
   results = {
     # We're using this value as the root result. By default, derivations expose all of their
     # internal attributes, which is very messy. We prevent this using lib.lazyDerivation
-    build = lib.lazyDerivation {
-      derivation = pkgs.callPackage ./package.nix {
-        inherit
-          nixpkgsLibPath
-          initNix
-          runtimeExprPath
-          testNixpkgsPath
-          version
-          ;
-      };
-    };
+    build = lib.lazyDerivation { derivation = buildUnfiltered; };
 
     shell = pkgs.mkShell {
       env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
       env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-      inputsFrom = [ results.build ];
+      # inputsFrom relies on .nativeBuildInputs and co. to exist, which are filtered out by lazyDerivation
+      inputsFrom = [ buildUnfiltered ];
       nativeBuildInputs = with pkgs; [
         npins
         rust-analyzer
