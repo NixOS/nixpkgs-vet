@@ -27,6 +27,9 @@ jobs:
           # This is needed so we can determine the commits (and therefore PRs)
           # where the changelogs have been added
           fetch-depth: 0
+          # Needed so we can push to the fork later, it's stored in the git config otherwise and
+          # would override the URL basic authentication
+          persist-credentials: false
 
       - uses: cachix/install-nix-action@v26
 
@@ -36,7 +39,8 @@ jobs:
           version=$(result/bin/auto-version . ${{ github.event.pull_request.number || '' }})
           git config user.name ${{ github.actor }}
           git config user.email ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
-          git commit --all --message "Version $version
+          git add --all
+          git commit --message "Version $version
 
           Automated release"
 
@@ -45,15 +49,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Outputting draft release notes
+        # If we have a new version at all (it's not an empty string)
+        # And it's not a push event (so it's a PR),
         if: ${{ env.version && github.event_name != 'push' }}
+        # we just output the draft changelog into the step summary
         run: cat changes/released/${{ env.version }}.md > "$GITHUB_STEP_SUMMARY"
 
       - name: Update release branch
+        # But if this is a push te the main branch,
         #if: ${{ env.version && github.event_name == 'push' }}
+        # we push to the release branch.
         # This continuously updates the release branch to contain the latest release notes,
         # so that one can just merge the release branch into main to do a release.
         # A PR to do that is opened regularly with another workflow
-        run: git push origin HEAD:refs/heads/release -f
+        run: git push https://${{ secrets.MACHINE_USER_PAT }}@github.com/infinixbot/nixpkgs-check-by-name.git HEAD:refs/heads/release -f
 
 
   test-update:
