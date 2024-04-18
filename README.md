@@ -3,11 +3,11 @@
 This directory implements a program to check the [validity](#validity-checks) of the [`pkgs/by-name` Nixpkgs directory](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name).
 This is part of the implementation of [RFC 140](https://github.com/NixOS/rfcs/pull/140).
 
-This code in this repository was originally [part of Nixpkgs](https://github.com/NixOS/nixpkgs/commits/55bf02190ee57fcf83490fd7b6bf7834e28c9c86/pkgs/test/nixpkgs-check-by-name), but has since been [moved into this separate repository](https://github.com/NixOS/nixpkgs/issues/286559).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for contributor documentation.
+Below is the user documentation.
 
 To see how it is used in Nixpkgs, see the [`check-by-name.yml` workflow](https://github.com/NixOS/nixpkgs/blob/master/.github/workflows/check-by-name.yml).
 
-[@infinisil](https://github.com/infinisil) is the admin and main developer of this repository, while everybody in [@NixOS/nixpkgs-check-by-name](https://github.com/orgs/NixOS/teams/nixpkgs-check-by-name) has write access.
 
 ## Interface
 
@@ -52,52 +52,3 @@ The current ratchets are:
   (see [nix evaluation checks](#nix-evaluation-checks)) must not be introduced.
 - New top-level packages defined using `pkgs.callPackage` must be defined with a package directory.
   - Once a top-level package uses `pkgs/by-name`, it also can't be moved back out of it.
-
-## Development
-
-Enter the development environment in this directory either automatically with `direnv` or with
-```
-nix-shell
-```
-
-Then use `cargo`:
-```
-cargo build
-cargo test
-cargo fmt
-cargo clippy
-```
-
-## Tests
-
-Tests are declared in [`./tests`](./tests) as subdirectories imitating Nixpkgs with these files:
-- `default.nix`:
-  Always contains
-  ```nix
-  import <test-nixpkgs> { root = ./.; }
-  ```
-  which makes
-  ```
-  nix-instantiate <subdir> --eval -A <attr> --arg overlays <overlays>
-  ```
-  work very similarly to the real Nixpkgs, just enough for the program to be able to test it.
-- `pkgs/by-name`:
-  The `pkgs/by-name` directory to check.
-
-- `all-packages.nix` (optional):
-  Contains an overlay of the form
-  ```nix
-  self: super: {
-    # ...
-  }
-  ```
-  allowing the simulation of package overrides to the real [`pkgs/top-level/all-packages.nix`](https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/all-packages.nix).
-  The default is an empty overlay.
-
-- `base` (optional):
-  Contains another subdirectory imitating Nixpkgs with potentially any of the above structures.
-  This is used for [ratchet checks](#ratchet-checks).
-
-- `expected` (optional):
-  A file containing the expected standard output.
-  The default is expecting an empty standard output.
