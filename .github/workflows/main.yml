@@ -3,6 +3,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -14,6 +17,41 @@ jobs:
 
       - name: build
         run: nix-build -A ci
+
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This fetches the entire Git history.
+          # This is needed so we can determine the commits (and therefore PRs)
+          # where the changelogs have been added
+          depth: 0
+
+      - uses: cachix/install-nix-action@v26
+
+      - name: Increment version and assemble changelog
+        run: |
+          nix-build -A autoVersion
+          version=$(result/bin/auto-version .)
+          echo "version=$version" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Outputting draft release notes
+        if: ${{ env.version && github.event_name != 'push' }}
+        run: cat changes/released/${{ env.version }}.md > "$GITHUB_STEP_SUMMARY"
+
+      - name: Update release branch
+        if: ${{ env.version && github.event_name == 'push' }}
+        run: |
+          git config user.name infinixbot
+          git config user.email infinixbot@infinisil.com
+          git commit --all --message 'Version ${{ env.version }}
+
+          Automated release'
+          git push origin HEAD:release
+
 
   test-update:
     runs-on: ubuntu-latest
