@@ -4,12 +4,13 @@ in
 {
   system ? builtins.currentSystem,
   nixpkgs ? sources.nixpkgs,
+  treefmt-nix ? sources.treefmt-nix,
 }:
 let
   pkgs = import nixpkgs {
     inherit system;
-    config = {};
-    overlays = [];
+    config = { };
+    overlays = [ ];
   };
   inherit (pkgs) lib;
 
@@ -34,12 +35,28 @@ let
   # Determine version from Cargo.toml
   version = (lib.importTOML ./Cargo.toml).package.version;
 
+  treefmtEval = (import treefmt-nix).evalModule pkgs {
+    # Used to find the project root
+    projectRootFile = ".git/config";
+
+    programs.rustfmt.enable = true;
+    programs.nixfmt-rfc-style.enable = true;
+    programs.shfmt.enable = true;
+    settings.formatter.shfmt.options = [ "--space-redirects" ];
+  };
+
   results = {
     # We're using this value as the root result. By default, derivations expose all of their
     # internal attributes, which is very messy. We prevent this using lib.lazyDerivation
     build = lib.lazyDerivation {
       derivation = pkgs.callPackage ./package.nix {
-        inherit nixpkgsLibPath initNix runtimeExprPath testNixpkgsPath version;
+        inherit
+          nixpkgsLibPath
+          initNix
+          runtimeExprPath
+          testNixpkgsPath
+          version
+          ;
       };
     };
 
@@ -51,8 +68,17 @@ let
       nativeBuildInputs = with pkgs; [
         npins
         rust-analyzer
+        treefmtEval.config.build.wrapper
       ];
     };
+
+    # This checks that all Git-tracked files are formatted appropriately
+    treefmt = treefmtEval.config.build.check (
+      lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.gitTracked ./.;
+      }
+    );
 
     # Run regularly by CI and turned into a PR
     autoPrUpdate =
@@ -60,9 +86,7 @@ let
         updateScripts = {
           npins = pkgs.writeShellApplication {
             name = "update-npins";
-            runtimeInputs = with pkgs; [
-              npins
-            ];
+            runtimeInputs = with pkgs; [ npins ];
             text = ''
               echo "<details><summary>npins changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
@@ -75,9 +99,7 @@ let
           };
           cargo = pkgs.writeShellApplication {
             name = "update-cargo";
-            runtimeInputs = with pkgs; [
-              cargo
-            ];
+            runtimeInputs = with pkgs; [ cargo ];
             text = ''
               echo "<details><summary>cargo changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
@@ -113,21 +135,25 @@ let
       };
 
     # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
-    nixpkgsCheck = pkgs.runCommand "test-nixpkgs-check-by-name" {
-      nativeBuildInputs = [
-        results.build
-        pkgs.nix
-      ];
-      nixpkgsPath = nixpkgs;
-    } ''
-      ${initNix}
-      nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
-      touch $out
-    '';
+    nixpkgsCheck =
+      pkgs.runCommand "test-nixpkgs-check-by-name"
+        {
+          nativeBuildInputs = [
+            results.build
+            pkgs.nix
+          ];
+          nixpkgsPath = nixpkgs;
+        }
+        ''
+          ${initNix}
+          nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
+          touch $out
+        '';
   };
-
 in
-results.build // results // {
+results.build
+// results
+// {
 
   # Good for debugging
   inherit pkgs;

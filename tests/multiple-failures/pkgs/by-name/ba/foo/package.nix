@@ -1,4 +1,6 @@
-{ someDrv }: someDrv // {
+{ someDrv }:
+someDrv
+// {
   escapeAbsolute = /bar;
   escapeRelative = ../.;
   nixPath = <nixpkgs>;

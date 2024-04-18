@@ -1,5 +1,6 @@
 self: super: {
-  alternateCallPackage = self.myScope.callPackage ({ myScopeValue, someDrv }:
+  alternateCallPackage = self.myScope.callPackage (
+    { myScopeValue, someDrv }:
     assert myScopeValue;
     someDrv
   ) { };
@@ -8,9 +9,12 @@ self: super: {
     myScopeValue = true;
   });
 
-  myPackages = self.callPackages ({ someDrv }: {
-    a = someDrv;
-    b = someDrv;
-  }) { };
+  myPackages = self.callPackages (
+    { someDrv }:
+    {
+      a = someDrv;
+      b = someDrv;
+    }
+  ) { };
   inherit (self.myPackages) a b;
 }

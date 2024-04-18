@@ -1,3 +1,1 @@
-self: super: {
-  nonDerivation = self.callPackage ./../../someDrv.nix { };
-}
+self: super: { nonDerivation = self.callPackage ./../../someDrv.nix { }; }

@@ -2,7 +2,7 @@
 
     nonDerivation = callPackage ./../by-name/no/nonDerivation/package.nix { /* ... */ };
 
-  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:2:
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/all-packages.nix:1:
 
     nonDerivation = self.callPackage ./../by-name/no/nonDerivation/package.nix { };
 

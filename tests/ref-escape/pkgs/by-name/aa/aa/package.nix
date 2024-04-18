@@ -1,3 +1,1 @@
-{ someDrv }: someDrv // {
-  escape = ../.;
-}
+{ someDrv }: someDrv // { escape = ../.; }

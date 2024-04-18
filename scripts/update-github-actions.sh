@@ -22,7 +22,7 @@ trap 'rm -rf "$tmp"' exit
 
 # Use dependency groups to update all dependencies together
 # Note that repo is not used because we pass `--local` on the CLI
-cat <<EOF > "$tmp/input.yml"
+cat << EOF > "$tmp/input.yml"
 job:
   package-manager: "github_actions"
   allowed-updates:
@@ -39,13 +39,13 @@ job:
 EOF
 
 if create_pull_request=$(LOCAL_GITHUB_ACCESS_TOKEN="$githubToken" \
-  dependabot update --file "$tmp/input.yml" --local "$REPO_ROOT" \
-  | jq --exit-status 'select(.type == "create_pull_request").data'); then
+  dependabot update --file "$tmp/input.yml" --local "$REPO_ROOT" |
+  jq --exit-status 'select(.type == "create_pull_request").data'); then
 
   jq --exit-status --raw-output '."pr-body"' <<< "$create_pull_request"
 
-  jq --compact-output '."updated-dependency-files"[]' <<< "$create_pull_request" \
-    | while read -r fileUpdate; do
+  jq --compact-output '."updated-dependency-files"[]' <<< "$create_pull_request" |
+    while read -r fileUpdate; do
       file=$(jq --exit-status --raw-output '.name' <<< "$fileUpdate")
       # --join-output makes sure to not output a trailing newline
       jq --exit-status --raw-output --join-output '.content' <<< "$fileUpdate" > "$REPO_ROOT/$file"

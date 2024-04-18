@@ -1,3 +1,1 @@
-self: super: {
-  bar = self.foo;
-}
+self: super: { bar = self.foo; }

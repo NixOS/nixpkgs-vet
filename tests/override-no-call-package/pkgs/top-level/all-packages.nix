@@ -1,3 +1,1 @@
-self: super: {
-  nonDerivation = self.someDrv;
-}
+self: super: { nonDerivation = self.someDrv; }
