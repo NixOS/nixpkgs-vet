@@ -1,0 +1,27 @@
+name: Changelog
+on:
+  pull_request:
+    branches:
+      - main
+    # Edited such that we can detect changes to the description
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # We need to fetch the parents of the HEAD commit (which is a merge),
+          # because we need to compare the PR against the base branch
+          # to check whether it added a changelog
+          fetch-depth: 2
+
+      - name: check changelog
+        run: scripts/check-changelog.sh . ${{ github.event.pull_request.number }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+

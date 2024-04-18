@@ -1,0 +1,29 @@
+name: Regular Version
+on:
+  workflow_dispatch: # Allows triggering manually
+  schedule:
+    - cron: '47 14 * * 2' # runs every Tuesday at 14:47 UTC (chosen somewhat randomly)
+      #pull_request:
+      #  branches:
+      #    main
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: infinixbot/nixpkgs-check-by-name
+          ref: release
+
+      - name: Create Pull Request
+        run: |
+          subject=$(git log -1 --format=%s HEAD)
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --title "$(head -1 <<< "$subject")" \
+            --body "$(tail -1 <<< "$subject")" \
+            --head infinixbot:release
+        env:
+          # Needed so that CI triggers
+          GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }}
