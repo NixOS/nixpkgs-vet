@@ -26,14 +26,20 @@ jobs:
           # This fetches the entire Git history.
           # This is needed so we can determine the commits (and therefore PRs)
           # where the changelogs have been added
-          depth: 0
+          fetch-depth: 0
 
       - uses: cachix/install-nix-action@v26
 
       - name: Increment version and assemble changelog
         run: |
           nix-build -A autoVersion
-          version=$(result/bin/auto-version .)
+          version=$(result/bin/auto-version . ${{ github.event.pull_request.number || '' }})
+          git config user.name ${{ github.actor }}
+          git config user.email ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
+          git commit --all --message "Version $version
+
+          Automated release"
+
           echo "version=$version" >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,13 +50,7 @@ jobs:
 
       - name: Update release branch
         if: ${{ env.version && github.event_name == 'push' }}
-        run: |
-          git config user.name infinixbot
-          git config user.email infinixbot@infinisil.com
-          git commit --all --message 'Version ${{ env.version }}
-
-          Automated release'
-          git push origin HEAD:release
+        run: git push origin HEAD:release
 
 
   test-update:

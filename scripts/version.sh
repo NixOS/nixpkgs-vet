@@ -4,8 +4,9 @@ set -euo pipefail
 shopt -s nullglob
 
 root=$1
+currentPrNumber=${2:-}
 
-[[ "$(toml get --raw Cargo.toml package.version)" =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]]
+[[ "$(toml get --raw "$root"/Cargo.toml package.version)" =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]]
 splitVersion=( "${BASH_REMATCH[@]:1}" )
 
 majorChanges=( "$root"/changes/unreleased/major/*.md )
@@ -37,7 +38,7 @@ echo "" >> "$releaseFile"
 
 # shellcheck disable=SC2016
 for file in "${majorChanges[@]}" "${mediumChanges[@]}" "${minorChanges[@]}"; do
-  commit=$(git log -1 --format=%H -- "$file")
+  commit=$(git -C "$root" log -1 --format=%H -- "$file")
   if ! gh api graphql \
     -f sha="$commit" \
     -f query='
@@ -58,11 +59,11 @@ for file in "${majorChanges[@]}" "${mediumChanges[@]}" "${minorChanges[@]}"; do
         }
       }
     }' | \
-  jq --exit-status -r --arg file "$file" '
+  jq --exit-status -r ${currentPrNumber:+--argjson currentPrNumber "$currentPrNumber"} --arg file "$file" '
     .data.repository.commit.associatedPullRequests?.nodes?[]?
       | select(
         # We need to make sure to get the right PR, there can be many
-        .merged and
+        (.merged or .number == $ARGS.named.currentPrNumber) and
         .baseRepository.nameWithOwner == "NixOS/nixpkgs-check-by-name" and
         .baseRefName == "main")
       | "\(.number) \(.author.login) \($ARGS.named.file)"'; then
@@ -81,5 +82,5 @@ while read -r number author file; do
   rm "$file"
 done
 
-cargo set-version "$next"
+cargo set-version --manifest-path "$root"/Cargo.toml "$next"
 echo "$next"
