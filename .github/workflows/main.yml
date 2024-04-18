@@ -35,3 +35,13 @@ jobs:
         run: scripts/release.sh
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # Make sure that all links in Markdown documents are valid
+  xrefcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # While this has a Nix build available, it needs to evaluate and build so much
+      # that I don't think it's worth adding it to the nix-build.
+      - uses: serokell/xrefcheck-action@v1
