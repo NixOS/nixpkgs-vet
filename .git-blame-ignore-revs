@@ -1,0 +1,12 @@
+# This file contains a list of commits that are not likely what you
+# are looking for in a blame, such as mass reformatting or renaming.
+# You can set this file as a default ignore file for blame by running
+# the following command.
+#
+# $ git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Reformatted all Nix files
+81d712a6c4e020bf545fb931b3106aff64871962
+
+# Reformatted all Bash scripts
+b1306dd5ae96b0fb934256d91708733c1f850016
