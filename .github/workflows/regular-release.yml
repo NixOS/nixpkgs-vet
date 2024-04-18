@@ -1,0 +1,19 @@
+name: Regular Version
+on:
+  workflow_dispatch: # Allows triggering manually
+  schedule:
+    - cron: '47 14 * * 2' # runs every Tuesday at 14:47 UTC (chosen somewhat randomly)
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Pull Request
+        run: |
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --fill \
+            --head release
+        env:
+          # Needed so that CI triggers
+          GH_TOKEN: ${{ secrets.MACHINE_USER_PAT }}

@@ -46,7 +46,10 @@ To import it:
 ```bash
 gzip -cd '"$artifactName"' | nix-store --import | tail -1
 ```
-'
+
+## Changes
+
+'"$(tail -1 "$root"/changes/released/"$version".md)"
 
 echo "Creating draft release"
 if ! release=$(gh api \
