@@ -13,6 +13,7 @@ nixeval() {
 # The system to pre-build the release for and distribute artifacts for
 system=x86_64-linux
 root=$(git rev-parse --show-toplevel)
+rev=$(git -C "$root" rev-parse HEAD)
 repository=${GITHUB_REPOSITORY:-NixOS/nixpkgs-check-by-name}
 
 # Get the version from the Cargo.toml file
@@ -55,6 +56,7 @@ if ! release=$(gh api \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   /repos/"$repository"/releases \
   -f tag_name="$version" \
+  -f target_commitish="$rev" \
   -f name="Version $version" \
   -f body="$body" \
   -F draft=true); then
