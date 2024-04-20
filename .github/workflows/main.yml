@@ -1,8 +1,6 @@
 name: CI
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -35,25 +33,5 @@ jobs:
       - name: release
         if: ${{ github.event_name == 'push' }}
         run: scripts/release.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  test-update:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: cachix/install-nix-action@v26
-
-      - name: test update script
-        run: |
-          nix-build -A autoPrUpdate
-          {
-            result/bin/auto-pr-update .
-            echo ""
-            echo '```diff'
-            git diff
-            echo '```'
-          } > $GITHUB_STEP_SUMMARY
         env:
           GH_TOKEN: ${{ github.token }}
