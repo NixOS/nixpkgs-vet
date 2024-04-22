@@ -65,5 +65,5 @@ Integration tests are declared in [`./tests`](./tests) as subdirectories imitati
 
 Pinned dependencies are [regularly updated automatically](./.github/workflows/update.yml).
 
-Releases are [automatically created](./.github/workflows/after-release.yml) when the `version` field in [`Cargo.toml`](./Cargo.toml)
+Releases are [automatically](./.github/workflows/main.yml) [created](./scripts/release.sh) when the `version` field in [`Cargo.toml`](./Cargo.toml)
 is updated from a push to the main branch.
