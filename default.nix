@@ -127,8 +127,26 @@ let
             echo >&2 "Running ${script}"
             ${lib.getExe script} "$1"
           '') (lib.attrValues updateScripts)}
+          echo ""
+          # To not fail the changelog check
+          printf "%s\n" "- [ ] This change is user-facing"
         '';
       };
+
+    # Run regularly by CI and turned into a PR
+    autoVersion = pkgs.writeShellApplication {
+      name = "auto-version";
+      runtimeInputs = with pkgs; [
+        coreutils
+        git
+        github-cli
+        jq
+        cargo
+        toml-cli
+        cargo-edit
+      ];
+      text = builtins.readFile ./scripts/version.sh;
+    };
 
     # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
     nixpkgsCheck =
