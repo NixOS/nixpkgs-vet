@@ -1,3 +1,5 @@
+name: After Release
+
 on:
   release:
     types: [published]
