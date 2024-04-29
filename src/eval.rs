@@ -12,7 +12,6 @@ use crate::validation::{self, Validation::Success};
 use crate::NixFileStore;
 use relative_path::RelativePathBuf;
 use std::path::Path;
-use std::str::from_utf8;
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -168,7 +167,7 @@ pub fn check_values(
 
     if !result.status.success() {
         // Early return in case evaluation fails
-        let stderr = from_utf8(&result.stderr)?.to_owned();
+        let stderr = String::from_utf8_lossy(&result.stderr).to_string();
         return Ok(NixpkgsProblem::NixEval(NixEvalError { stderr }).into());
     }
     // Parse the resulting JSON value
