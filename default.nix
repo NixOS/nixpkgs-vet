@@ -62,6 +62,7 @@ let
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       inputsFrom = [ packages.build ];
       nativeBuildInputs = with pkgs; [
+        cargo-edit
         npins
         rust-analyzer
         treefmtEval.config.build.wrapper
@@ -95,13 +96,18 @@ let
           };
           cargo = pkgs.writeShellApplication {
             name = "update-cargo";
-            runtimeInputs = with pkgs; [ cargo ];
+            runtimeInputs = with pkgs; [
+              cargo
+              cargo-edit
+            ];
             text = ''
               echo "<details><summary>cargo changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
               echo ""
+              # Note: `cargo upgrade` is a subcommand provided by `cargo-edit`.
+              # --incompatible allows jumping to the next major version.
               echo '```'
-              cargo update --manifest-path "$1/Cargo.toml" 2>&1
+              cargo upgrade --incompatible --manifest-path "$1/Cargo.toml" 2>&1
               echo  '```'
               echo "</details>"
             '';
