@@ -5,13 +5,15 @@ in
   system ? builtins.currentSystem,
   nixpkgs ? sources.nixpkgs,
   treefmt-nix ? sources.treefmt-nix,
+  pkgs ? (
+    import nixpkgs {
+      inherit system;
+      config = { };
+      overlays = [ ];
+    }
+  ),
 }:
 let
-  pkgs = import nixpkgs {
-    inherit system;
-    config = { };
-    overlays = [ ];
-  };
   inherit (pkgs) lib;
 
   runtimeExprPath = ./src/eval.nix;
@@ -78,6 +80,9 @@ let
         fileset = lib.fileset.gitTracked ./.;
       }
     );
+
+    # Fits in with `nix fmt`.
+    treefmtWrapper = treefmtEval.config.build.wrapper;
 
     # Run regularly by CI and turned into a PR
     autoPrUpdate =
