@@ -13,7 +13,7 @@ jobs:
         with:
           path: repo
 
-      - uses: cachix/install-nix-action@v26
+      - uses: cachix/install-nix-action@V27
 
       - name: Run update script
         run: |
