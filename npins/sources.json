@@ -3,8 +3,8 @@
     "nixpkgs": {
       "type": "Channel",
       "name": "nixpkgs-unstable",
-      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-24.05pre628535.f9256de8281f/nixexprs.tar.xz",
-      "hash": "11lg3hq9hz2hmk615c65vjsg1j122661k1n3by5wr5fyrzr4yp4a"
+      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-24.11pre630522.3305b2b25e4a/nixexprs.tar.xz",
+      "hash": "1bg240s2jbyvdixpy14rc4fcn9zrjf36mcd2xv59rcxx508gwhi2"
     },
     "treefmt-nix": {
       "type": "Git",
