@@ -62,7 +62,9 @@ let
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       inputsFrom = [ packages.build ];
       nativeBuildInputs = with pkgs; [
+        cargo-audit
         cargo-edit
+        cargo-outdated
         npins
         rust-analyzer
         treefmtEval.config.build.wrapper
@@ -94,21 +96,40 @@ let
               echo "</details>"
             '';
           };
+          # These steps have to be in the same script because order matters.
+          # `carge upgrade` should happen before `cargo update` and then check
+          # `cargo outdated` and `cargo audit` after that.
           cargo = pkgs.writeShellApplication {
-            name = "update-cargo";
+            name = "cargo";
             runtimeInputs = with pkgs; [
               cargo
-              cargo-edit
+              cargo-audit
+              cargo-edit # provides `cargo upgrade`
+              cargo-outdated
             ];
             text = ''
               echo "<details><summary>cargo changes</summary>"
-              # Needed because GitHub's rendering of the first body line breaks down otherwise
               echo ""
-              # Note: `cargo upgrade` is a subcommand provided by `cargo-edit`.
+              echo "### cargo upgrade"
+              printf "\n\`\`\`\n"
               # --incompatible allows jumping to the next major version.
-              echo '```'
               cargo upgrade --incompatible --manifest-path "$1/Cargo.toml" 2>&1
-              echo  '```'
+              printf "\n\`\`\`\n"
+
+              echo "### cargo update"
+              printf "\n\`\`\`\n"
+              cargo update --manifest-path "$1/Cargo.toml" 2>&1
+              printf "\n\`\`\`\n"
+
+              echo "### cargo outdated"
+              printf "\n\`\`\`\n"
+              cargo outdated --manifest-path "$1/Cargo.toml" 2>&1
+              printf "\n\`\`\`\n"
+
+              echo "### cargo audit"
+              printf "\n\`\`\`\n"
+              cargo audit --file "$1/Cargo.lock" 2>&1
+              printf "\n\`\`\`\n"
               echo "</details>"
             '';
           };
