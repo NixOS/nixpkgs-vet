@@ -33,7 +33,7 @@ nix-build https://github.com/NixOS/nixpkgs-check-by-name/tarball/master -A build
 ## Prebuilt store paths
 
 The [GitHub releases](https://github.com/NixOS/nixpkgs-check-by-name/releases)
-contain a [gzip](https://www.gnu.org/software/gzip/)-compressed
+contain a [gzip](https://en.wikipedia.org/wiki/Gzip)-compressed
 [Nix Archive](https://nixos.org/manual/nix/stable/command-ref/nix-store/export.html)
 of the [build closure](https://nixos.org/manual/nix/stable/glossary#gloss-closure)
 of the [Nix derivation](#nix-derivations) with `x86_64-linux` as the `system`.
