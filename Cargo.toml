@@ -20,4 +20,5 @@ relative-path = "1.9.3"
 textwrap = "0.16.1"
 
 [dev-dependencies]
+pretty_assertions = "1.4.0"
 temp-env = "0.3.6"
