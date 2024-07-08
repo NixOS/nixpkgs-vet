@@ -22,8 +22,8 @@ use std::thread;
 
 /// Program to check the validity of pkgs/by-name
 ///
-/// This CLI interface may be changed over time if the CI workflow making use of
-/// it is adjusted to deal with the change appropriately.
+/// This CLI interface may be changed over time if the CI workflow making use of it is adjusted to
+/// deal with the change appropriately.
 ///
 /// Exit code:
 /// - `0`: If the validation is successful
@@ -36,12 +36,11 @@ use std::thread;
 #[derive(Parser, Debug)]
 #[command(about, verbatim_doc_comment)]
 pub struct Args {
-    /// Path to the main Nixpkgs to check.
-    /// For PRs, this should be set to a checkout of the PR branch.
+    /// Path to the main Nixpkgs to check. For PRs, set this to a checkout of the PR branch.
     nixpkgs: PathBuf,
 
     /// Path to the base Nixpkgs to run ratchet checks against.
-    /// For PRs, this should be set to a checkout of the PRs base branch.
+    /// For PRs, set this to a checkout of the PRs base branch.
     #[arg(long)]
     base: PathBuf,
 }
@@ -88,11 +87,19 @@ pub fn process<W: io::Write>(
 
     match (base_result, main_result) {
         (Failure(_), Failure(errors)) => {
-            // Base branch fails and the PR doesn't fix it and may also introduce additional problems
+            // The base branch fails, the PR doesn't fix it, and the PR may also introduce
+            // additional problems.
             for error in errors {
                 writeln!(error_writer, "{}", error.to_string().red())?
             }
-            writeln!(error_writer, "{}", "The base branch is broken and still has above problems with this PR, which need to be fixed first.\nConsider reverting the PR that introduced these problems in order to prevent more failures of unrelated PRs.".yellow())?;
+            writeln!(
+                error_writer,
+                "{}",
+                "The base branch is broken and still has above problems with this PR, \
+                which need to be fixed first.\nConsider reverting the PR that introduced \
+                these problems in order to prevent more failures of unrelated PRs."
+                    .yellow()
+            )?;
             Ok(false)
         }
         (Failure(_), Success(_)) => {
@@ -110,7 +117,8 @@ pub fn process<W: io::Write>(
             writeln!(
                 error_writer,
                 "{}",
-                "This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break."
+                "This PR introduces the problems listed above. \
+                Please fix them before merging, otherwise the base branch would break."
                     .yellow()
             )?;
             Ok(false)
@@ -122,7 +130,13 @@ pub fn process<W: io::Write>(
                     for error in errors {
                         writeln!(error_writer, "{}", error.to_string().red())?
                     }
-                    writeln!(error_writer, "{}", "This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.".yellow())?;
+                    writeln!(
+                        error_writer,
+                        "{}",
+                        "This PR introduces additional instances of discouraged patterns as \
+                        listed above. Merging is discouraged but would not break the base branch."
+                            .yellow()
+                    )?;
 
                     Ok(false)
                 }
@@ -197,8 +211,8 @@ mod tests {
         Ok(temp_env::with_vars(empty_list, tempfile::tempdir)?)
     }
 
-    // We cannot check case-conflicting files into Nixpkgs (the channel would fail to
-    // build), so we generate the case-conflicting file instead.
+    // We cannot check case-conflicting files into Nixpkgs (the channel would fail to build),
+    // so we generate the case-conflicting file instead.
     #[test]
     fn test_case_sensitive() -> anyhow::Result<()> {
         let temp_nixpkgs = tempdir()?;
@@ -220,19 +234,23 @@ mod tests {
         test_nixpkgs(
             "case_sensitive",
             path,
-            "pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\".\nThis PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.\n",
+            "pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\".\n\
+            This PR introduces the problems listed above. Please fix them before merging, \
+            otherwise the base branch would break.\n",
         )?;
 
         Ok(())
     }
 
     /// Tests symlinked temporary directories.
-    /// This is needed because on darwin, `/tmp` is a symlink to `/private/tmp`, and Nix's
+    ///
+    /// This is needed because on Darwin, `/tmp` is a symlink to `/private/tmp`, and Nix's
     /// restrict-eval doesn't also allow access to the canonical path when you allow the
     /// non-canonical one.
     ///
     /// The error if we didn't do this would look like this:
-    /// error: access to canonical path '/private/var/folders/[...]/.tmpFbcNO0' is forbidden in restricted mode
+    /// error: access to canonical path
+    /// '/private/var/folders/[...]/.tmpFbcNO0' is forbidden in restricted mode
     #[test]
     fn test_symlinked_tmpdir() -> anyhow::Result<()> {
         // Create a directory with two entries:
@@ -277,7 +295,8 @@ mod tests {
 
         if actual_errors != expected_errors {
             panic!(
-                "Failed test case {name}, expected these errors:\n=======\n{}\n=======\nbut got these:\n=======\n{}\n=======",
+                "Failed test case {name}, expected these errors:\n=======\n{}\n=======\n\
+                but got these:\n=======\n{}\n=======",
                 expected_errors, actual_errors
             );
         }
