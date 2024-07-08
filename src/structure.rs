@@ -52,7 +52,6 @@ pub fn check_structure(
 
             Ok(if shard_name == "README.md" {
                 // README.md is allowed to be a file and not checked
-
                 Success(vec![])
             } else if !shard_path.is_dir() {
                 NixpkgsProblem::Shard(ShardError {
@@ -60,7 +59,8 @@ pub fn check_structure(
                     kind: ShardErrorKind::ShardNonDir,
                 })
                 .into()
-                // we can't check for any other errors if it's a file, since there's no subdirectories to check
+                // We can't check for any other errors if it's a file, since there's no
+                // subdirectories to check.
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
@@ -112,7 +112,7 @@ pub fn check_structure(
         })
         .collect_vec()?;
 
-    // Combine the package names conatained within each shard into a longer list
+    // Combine the package names contained within each shard into a longer list.
     Ok(validation::sequence(shard_results).map(concat))
 }
 
@@ -153,8 +153,8 @@ fn check_package(
 
         let correct_relative_package_dir = relative_dir_for_package(&package_name);
         let result = result.and(if relative_package_dir != correct_relative_package_dir {
-            // Only show this error if we have a valid shard and package name
-            // Because if one of those is wrong, you should fix that first
+            // Only show this error if we have a valid shard and package name. If one of those is
+            // wrong, you should fix that first.
             if shard_name_valid && package_name_valid {
                 to_validation(PackageErrorKind::IncorrectShard {
                     correct_relative_package_dir: correct_relative_package_dir.clone(),
