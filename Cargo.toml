@@ -7,9 +7,9 @@ edition = "2021"
 rnix = "0.11.0"
 regex = "1.10.5"
 clap = { version = "4.5.8", features = ["derive"] }
-serde_json = "1.0.119"
+serde_json = "1.0.120"
 tempfile = "3.10.1"
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 anyhow = "1.0"
 lazy_static = "1.5.0"
 colored = "2.1.0"
