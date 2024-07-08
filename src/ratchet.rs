@@ -59,27 +59,28 @@ impl Package {
 
 /// The ratchet state of a generic ratchet check.
 pub enum RatchetState<Ratchet: ToNixpkgsProblem> {
-    /// The ratchet is loose, it can be tightened more.
-    /// In other words, this is the legacy state we're trying to move away from.
-    /// Introducing new instances is not allowed but previous instances will continue to be allowed.
-    /// The `Context` is context for error messages in case a new instance of this state is
-    /// introduced
+    /// The ratchet is loose. It can be tightened more. In other words, this is the legacy state
+    /// we're trying to move away from.
+    ///
+    /// Introducing new instances is not allowed but previous instances will continue to be
+    /// allowed. The `Context` is context for error messages in case a new instance of this state
+    /// is introduced.
     Loose(Ratchet::ToContext),
-    /// The ratchet is tight, it can't be tightened any further.
-    /// This is either because we already use the latest state, or because the ratchet isn't
-    /// relevant.
+
+    /// The ratchet is tight. It can't be tightened any further. This is either because we already
+    /// use the latest state, or because the ratchet isn't relevant.
     Tight,
-    /// This ratchet can't be applied.
-    /// State transitions from/to NonApplicable are always allowed
+
+    /// This ratchet can't be applied. State transitions from/to NonApplicable are always allowed.
     NonApplicable,
 }
 
-/// A trait that can convert an attribute-specific error context into a NixpkgsProblem
+/// A trait that can convert an attribute-specific error context into a NixpkgsProblem.
 pub trait ToNixpkgsProblem {
-    /// Context relating to the Nixpkgs that is being transitioned _to_
+    /// Context relating to the Nixpkgs that is being transitioned _to_.
     type ToContext;
 
-    /// How to convert an attribute-specific error context into a NixpkgsProblem
+    /// How to convert an attribute-specific error context into a NixpkgsProblem.
     fn to_nixpkgs_problem(
         name: &str,
         optional_from: Option<()>,
@@ -92,12 +93,12 @@ impl<Context: ToNixpkgsProblem> RatchetState<Context> {
     /// The previous state may be `None` in case the attribute is new.
     fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         match (optional_from, to) {
-            // Loosening a ratchet is now allowed
+            // Loosening a ratchet is not allowed.
             (Some(RatchetState::Tight), RatchetState::Loose(loose_context)) => {
                 Context::to_nixpkgs_problem(name, Some(()), loose_context).into()
             }
 
-            // Introducing a loose ratchet is also not allowed
+            // Introducing a loose ratchet is also not allowed.
             (None, RatchetState::Loose(loose_context)) => {
                 Context::to_nixpkgs_problem(name, None, loose_context).into()
             }
@@ -111,19 +112,22 @@ impl<Context: ToNixpkgsProblem> RatchetState<Context> {
     }
 }
 
-/// The ratchet to check whether a top-level attribute has/needs
-/// a manual definition, e.g. in all-packages.nix.
+/// The ratchet to check whether a top-level attribute has/needs a manual definition, e.g. in
+/// `pkgs/top-level/all-packages.nix`.
 ///
 /// This ratchet is only tight for attributes that:
-/// - Are not defined in `pkgs/by-name`, and rely on a manual definition
-/// - Are defined in `pkgs/by-name` without any manual definition,
-///   (no custom argument overrides)
+///
+/// - Are not defined in `pkgs/by-name`, and rely on a manual definition.
+///
+/// - Are defined in `pkgs/by-name` without any manual definition (no custom argument overrides).
+///
 /// - Are defined with `pkgs/by-name` with a manual definition that can't be removed
-///   because it provides custom argument overrides
+///   because it provides custom argument overrides.
 ///
 /// In comparison, this ratchet is loose for attributes that:
-/// - Are defined in `pkgs/by-name` with a manual definition
-///   that doesn't have any custom argument overrides
+///
+/// - Are defined in `pkgs/by-name` with a manual definition that doesn't have any
+///   custom argument overrides.
 pub enum ManualDefinition {}
 
 impl ToNixpkgsProblem for ManualDefinition {
@@ -138,11 +142,11 @@ impl ToNixpkgsProblem for ManualDefinition {
     }
 }
 
-/// The ratchet value of an attribute
-/// for the check that new packages use pkgs/by-name
+/// The ratchet value of an attribute for the check that new packages use `pkgs/by-name`.
 ///
-/// This checks that all new package defined using callPackage must be defined via pkgs/by-name
-/// It also checks that once a package uses pkgs/by-name, it can't switch back to all-packages.nix
+/// This checks that all new package defined using `callPackage` must be defined via
+/// `pkgs/by-name`. It also checks that once a package uses `pkgs/by-name`, it can't switch back
+/// to `pkgs/top-level/all-packages.nix`.
 pub enum UsesByName {}
 
 impl ToNixpkgsProblem for UsesByName {
