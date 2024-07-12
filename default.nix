@@ -67,6 +67,7 @@ let
         cargo-outdated
         npins
         rust-analyzer
+        rustfmt
         treefmtEval.config.build.wrapper
       ];
     };

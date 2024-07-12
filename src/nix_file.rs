@@ -16,8 +16,8 @@ use std::fs::read_to_string;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// A structure to store parse results of Nix files in memory,
-/// making sure that the same file never has to be parsed twice
+/// A structure to store parse results of Nix files in memory, making sure that the same file never
+/// has to be parsed twice.
 #[derive(Default)]
 pub struct NixFileStore {
     entries: HashMap<PathBuf, NixFile>,
@@ -25,10 +25,10 @@ pub struct NixFileStore {
 
 impl NixFileStore {
     /// Get the store entry for a Nix file if it exists, otherwise parse the file, insert it into
-    /// the store, and return the value
+    /// the store, and return the value.
     ///
-    /// Note that this function only gives an anyhow::Result::Err for I/O errors.
-    /// A parse error is anyhow::Result::Ok(Result::Err(error))
+    /// Note that this function only gives an `anyhow::Result::Err` for I/O errors.
+    /// A parse error is `anyhow::Result::Ok(Result::Err(error))`
     pub fn get(&mut self, path: &Path) -> anyhow::Result<&NixFile> {
         match self.entries.entry(path.to_owned()) {
             Entry::Occupied(entry) => Ok(entry.into_mut()),
@@ -37,18 +37,18 @@ impl NixFileStore {
     }
 }
 
-/// A structure for storing a successfully parsed Nix file
+/// A structure for storing a successfully parsed Nix file.
 pub struct NixFile {
-    /// The parent directory of the Nix file, for more convenient error handling
+    /// The parent directory of the Nix file, for more convenient error handling.
     pub parent_dir: PathBuf,
-    /// The path to the file itself, for errors
+    /// The path to the file itself, for errors.
     pub path: PathBuf,
     pub syntax_root: rnix::Root,
     pub line_index: LineIndex,
 }
 
 impl NixFile {
-    /// Creates a new NixFile, failing for I/O or parse errors
+    /// Creates a new NixFile, failing for I/O or parse errors.
     fn new(path: impl AsRef<Path>) -> anyhow::Result<NixFile> {
         let Some(parent_dir) = path.as_ref().parent() else {
             anyhow::bail!("Could not get parent of path {}", path.as_ref().display())
@@ -56,6 +56,7 @@ impl NixFile {
 
         let contents = read_to_string(&path)
             .with_context(|| format!("Could not read file {}", path.as_ref().display()))?;
+
         let line_index = LineIndex::new(&contents);
 
         // NOTE: There's now another Nixpkgs CI check to make sure all changed Nix files parse
@@ -63,8 +64,8 @@ impl NixFile {
         // errors. In the future we should unify these two checks, ideally moving the other CI
         // check into this tool as well and checking for both mainline Nix and rnix.
         rnix::Root::parse(&contents)
-            // rnix's ::ok returns Result<_, _> , so no error is thrown away like it would be with
-            // std::result's ::ok
+            // rnix's `rnix::Parse::ok` returns `Result<_, _>`, so no error is thrown away like it
+            // would be with `std::result::Result::ok`.
             .ok()
             .map(|syntax_root| NixFile {
                 parent_dir: parent_dir.to_path_buf(),
@@ -76,40 +77,52 @@ impl NixFile {
     }
 }
 
-/// Information about callPackage arguments
+/// Information about `callPackage` arguments.
 #[derive(Debug, PartialEq)]
 pub struct CallPackageArgumentInfo {
     /// The relative path of the first argument, or `None` if it's not a path.
     pub relative_path: Option<RelativePathBuf>,
-    /// Whether the second argument is an empty attribute set
+
+    /// Whether the second argument is an empty attribute set.
     pub empty_arg: bool,
 }
 
 impl NixFile {
-    /// Returns information about callPackage arguments for an attribute at a specific line/column
-    /// index.
-    /// If the definition at the given location is not of the form `<attr> = callPackage <arg1> <arg2>;`,
-    /// `Ok((None, String))` is returned, with `String` being the definition itself.
+    /// Returns information about `callPackage` arguments for an attribute at a specific
+    /// line/column index.
+    ///
+    /// If the definition at the given location is not of the form
+    /// `<attr> = callPackage <arg1> <arg2>;`, `Ok((None, String))` is returned, with `String`
+    /// being the definition itself.
     ///
     /// This function only returns `Err` for problems that can't be caused by the Nix contents,
     /// but rather problems in this programs code itself.
     ///
     /// This is meant to be used with the location returned from `builtins.unsafeGetAttrPos`, e.g.:
-    /// - Create file `default.nix` with contents
+    ///
+    /// - Create file `default.nix` with this contents:
+    ///
     ///   ```nix
     ///   self: {
     ///     foo = self.callPackage ./default.nix { };
     ///   }
     ///   ```
-    /// - Evaluate
+    ///
+    /// - Evaluate using `nix-instantiate`:
+    ///
     ///   ```nix
     ///   builtins.unsafeGetAttrPos "foo" (import ./default.nix { })
     ///   ```
+    ///
     ///   results in `{ file = ./default.nix; line = 2; column = 3; }`
+    ///
     /// - Get the NixFile for `.file` from a `NixFileStore`
-    /// - Call this function with `.line`, `.column` and `relative_to` as the (absolute) current directory
+    ///
+    /// - Call this function with `.line`, `.column` and `relative_to` as the (absolute) current
+    ///   directory.
     ///
     /// You'll get back
+    ///
     /// ```rust
     /// Ok((
     ///   Some(CallPackageArgumentInfo { path = Some("default.nix"), empty_arg: true }),
@@ -157,13 +170,18 @@ impl NixFile {
         //  This is the token offset, we get both the (newline + indentation) on the left side,
         //  and the attribute name on the right side.
         let TokenAtOffset::Between(_space, token) = token_at_offset else {
-            anyhow::bail!("Line {line} column {column} in {} is not the start of a token, but rather {token_at_offset:?}", self.path.display())
+            anyhow::bail!(
+                "Line {line} column {column} in {} is not the start of a token, but rather \
+                {token_at_offset:?}",
+                self.path.display()
+            )
         };
 
-        // token looks like "foo"
+        // Token looks like "foo"
         let Some(node) = token.parent() else {
             anyhow::bail!(
-                "Token on line {line} column {column} in {} does not have a parent node: {token:?}",
+                "Token on line {line} column {column} in {} does not have a parent node: \
+                {token:?}",
                 self.path.display()
             )
         };
@@ -171,20 +189,20 @@ impl NixFile {
         if ast::Attr::can_cast(node.kind()) {
             // Something like `foo`, `"foo"` or `${"foo"}`
         } else if ast::Inherit::can_cast(node.kind()) {
-            // Something like `inherit <attr>` or `inherit (<source>) <attr>`
+            // Something like `inherit <attr>` or `inherit (<source>) <attr>`.
             // This is the only other way how `builtins.unsafeGetAttrPos` can return
-            // attribute positions, but we only look for ones like `<attr-path> = <value>`, so
-            // ignore this
+            // attribute positions, but we only look for ones like `<attr-path> = <value>`,
+            // so ignore this.
             return Ok(Left(node.to_string()));
         } else {
-            // However, anything else is not expected and smells like a bug
+            // However, anything else is not expected and smells like a bug.
             anyhow::bail!(
                 "Node in {} is neither an attribute node nor an inherit node: {node:?}",
                 self.path.display()
             )
         }
 
-        // node looks like "foo"
+        // Node looks like "foo"
         let Some(attrpath_node) = node.parent() else {
             anyhow::bail!(
                 "Node in {} does not have a parent node: {node:?}",
@@ -193,7 +211,7 @@ impl NixFile {
         };
 
         if !ast::Attrpath::can_cast(attrpath_node.kind()) {
-            // We know that `node` is an attribute, its parent should be an attribute path
+            // We know that `node` is an attribute, so its parent should be an attribute path.
             anyhow::bail!(
                 "In {}, attribute parent node is not an attribute path node: {attrpath_node:?}",
                 self.path.display()
@@ -214,17 +232,17 @@ impl NixFile {
                 self.path.display()
             )
         }
-        // attrpath_value_node looks like "foo.bar = 10;"
 
-        // unwrap is fine because we confirmed that we can cast with the above check.
-        // We could avoid this `unwrap` for a `clone`, since `cast` consumes the argument,
-        // but we still need it for the error message when the cast fails.
+        // attrpath_value_node looks like `foo.bar = 10;`. `unwrap` is fine because we confirmed
+        // that we can cast with the above check.  We could avoid this `unwrap` for a `clone`,
+        // since `cast` consumes the argument, but we still need it for the error message when the
+        // cast fails.
         Ok(Right(
             ast::AttrpathValue::cast(attrpath_value_node).unwrap(),
         ))
     }
 
-    // Internal function mainly to make attrpath_value_at independently testable
+    // Internal function mainly to make `attrpath_value_at` independently testable.
     fn attrpath_value_call_package_argument_info(
         &self,
         attrpath_value: ast::AttrpathValue,
@@ -244,8 +262,9 @@ impl NixFile {
             // paths and we can't really know which one it is. We could have a case like
             // `foo.bar = callPackage ... { }` and trying to determine if `bar` is a `callPackage`,
             // where this is not correct.
-            // However, this case typically doesn't occur anyways,
-            // because top-level packages wouldn't be nested under an attribute set.
+            //
+            // However, this case typically doesn't occur anyways, because top-level packages
+            // wouldn't be nested under an attribute set.
             return Ok(None);
         }
         let Some(value) = attrpath_value.value() else {
@@ -258,87 +277,95 @@ impl NixFile {
             // Not even a function call, instead something like `foo = null`
             return Ok(None);
         };
+
         let Some(function1) = apply1.lambda() else {
             anyhow::bail!("apply node doesn't have a lambda: {apply1:?}")
         };
+
         let Some(arg1) = apply1.argument() else {
             anyhow::bail!("apply node doesn't have an argument: {apply1:?}")
         };
 
         // At this point we know it's something like `foo = <fun> <arg>`.
-        // For a callPackage, `<fun>` would be `callPackage ./file` and `<arg>` would be `{ }`
+        // For a callPackage, `<fun>` would be `callPackage ./file` and `<arg>` would be `{ }`.
 
         let empty_arg = if let Expr::AttrSet(attrset) = arg1 {
             // We can only statically determine whether the argument is empty if it's an attribute
-            // set _expression_, even though other kind of expressions could evaluate to an attribute
-            // set _value_. But this is what we want anyways
+            // set _expression_, even though other kind of expressions could evaluate to an
+            // attribute set _value_. But this is what we want anyway.
             attrset.entries().next().is_none()
         } else {
             false
         };
 
-        // Because callPackage takes two curried arguments, the first function needs to be a
-        // function call itself
+        // Because `callPackage` takes two curried arguments, the first function needs to be a
+        // function call itself.
         let Expr::Apply(apply2) = function1 else {
-            // Not a callPackage, instead something like `foo = import ./foo`
+            // Not a `callPackage`, instead something like `foo = import ./foo`.
             return Ok(None);
         };
+
         let Some(function2) = apply2.lambda() else {
             anyhow::bail!("apply node doesn't have a lambda: {apply2:?}")
         };
+
         let Some(arg2) = apply2.argument() else {
             anyhow::bail!("apply node doesn't have an argument: {apply2:?}")
         };
 
         // At this point we know it's something like `foo = <fun2> <arg2> <arg1>`.
-        // For a callPackage, `<fun2>` would be `callPackage`, `<arg2>` would be `./file`
+        // For a callPackage, `<fun2>` would be `callPackage`, `<arg2>` would be `./file`.
 
-        // Check that <arg2> is a path expression
+        // Check that <arg2> is a path expression.
         let path = if let Expr::Path(actual_path) = arg2 {
-            // Try to statically resolve the path and turn it into a nixpkgs-relative path
+            // Try to statically resolve the path and turn it into a nixpkgs-relative path.
             if let ResolvedPath::Within(p) = self.static_resolve_path(actual_path, relative_to) {
                 Some(p)
             } else {
-                // We can't statically know an existing path inside Nixpkgs used as <arg2>
+                // We can't statically know an existing path inside Nixpkgs used as <arg2>.
                 None
             }
         } else {
-            // <arg2> is not a path, but rather e.g. an inline expression
+            // <arg2> is not a path, but rather e.g. an inline expression.
             None
         };
 
-        // Check that <fun2> is an identifier, or an attribute path with an identifier at the end
+        // Check that <fun2> is an identifier, or an attribute path with an identifier at the end.
         let ident = match function2 {
             Expr::Ident(ident) => {
-                // This means it's something like `foo = callPackage <arg2> <arg1>`
+                // This means it's something like `foo = callPackage <arg2> <arg1>`.
                 ident
             }
+
             Expr::Select(select) => {
                 // This means it's something like `foo = self.callPackage <arg2> <arg1>`.
                 // We also end up here for e.g. `pythonPackages.callPackage`, but the
-                // callPackage-mocking method will take care of not triggering for this case.
-
+                // `callPackage`-mocking method will take care of not triggering for this case.
                 if select.default_expr().is_some() {
-                    // Very odd case, but this would be `foo = self.callPackage or true ./test.nix {}
-                    // (yes this is valid Nix code)
+                    // Very odd case: `foo = self.callPackage or true ./test.nix {}`.
+                    // Yes, this is valid Nix code!
                     return Ok(None);
                 }
+
                 let Some(attrpath) = select.attrpath() else {
                     anyhow::bail!("select node doesn't have an attrpath: {select:?}")
                 };
+
                 let Some(last) = attrpath.attrs().last() else {
                     // This case shouldn't be possible, it would be `foo = self. ./test.nix {}`,
-                    // which shouldn't parse
+                    // which shouldn't parse.
                     anyhow::bail!("select node has an empty attrpath: {select:?}")
                 };
+
                 if let ast::Attr::Ident(ident) = last {
                     ident
                 } else {
-                    // Here it's something like `foo = self."callPackage" /test.nix {}`
-                    // which we're not gonna bother with
+                    // Here it's something like `foo = self."callPackage" /test.nix {}` which we're
+                    // not going to bother with.
                     return Ok(None);
                 }
             }
+
             // Any other expression we're not gonna treat as callPackage
             _ => return Ok(None),
         };
@@ -358,27 +385,31 @@ impl NixFile {
     }
 }
 
-/// The result of trying to statically resolve a Nix path expression
+/// The result of trying to statically resolve a Nix path expression.
 pub enum ResolvedPath {
-    /// Something like `./foo/${bar}/baz`, can't be known statically
+    /// Something like `./foo/${bar}/baz`. This can't be known statically.
     Interpolated,
-    /// Something like `<nixpkgs>`, can't be known statically
+
+    /// Something like `<nixpkgs>`. This can't be known statically.
     SearchPath,
-    /// Path couldn't be resolved due to an IO error,
-    /// e.g. if the path doesn't exist or you don't have the right permissions
+
+    /// Path couldn't be resolved due to an IO error, e.g. if the path doesn't exist or you don't
+    /// have the right permissions.
     Unresolvable(std::io::Error),
-    /// The path is outside the given absolute path
+
+    /// The path is outside the given absolute path.
     Outside,
-    /// The path is within the given absolute path.
-    /// The `RelativePathBuf` is the relative path under the given absolute path.
+
+    /// The path is within the given absolute path. The `RelativePathBuf` is the relative path
+    /// under the given absolute path.
     Within(RelativePathBuf),
 }
 
 impl NixFile {
-    /// Statically resolves a Nix path expression and checks that it's within an absolute path
+    /// Statically resolves a Nix path expression and checks that it's within an absolute path.
     ///
-    /// E.g. for the path expression `./bar.nix` in `./foo.nix` and an absolute path of the
-    /// current directory, the function returns `ResolvedPath::Within(./bar.nix)`
+    /// Given the path expression `./bar.nix` in `./foo.nix` and an absolute path of the
+    /// current directory, the function returns `ResolvedPath::Within(./bar.nix)`.
     pub fn static_resolve_path(&self, node: ast::Path, relative_to: &Path) -> ResolvedPath {
         if node.parts().count() != 1 {
             // If there's more than 1 interpolated part, it's of the form `./foo/${bar}/baz`.
@@ -389,18 +420,19 @@ impl NixFile {
 
         if text.starts_with('<') {
             // A search path like `<nixpkgs>`. There doesn't appear to be better way to detect
-            // these in rnix
+            // these in rnix.
             return ResolvedPath::SearchPath;
         }
 
-        // Join the file's parent directory and the path expression, then resolve it
+        // Join the file's parent directory and the path expression, then resolve it.
+        //
         // FIXME: Expressions like `../../../../foo/bar/baz/qux` or absolute paths
         // may resolve close to the original file, but may have left the relative_to.
-        // That should be checked more strictly
+        // That should be checked more strictly.
         match self.parent_dir.join(Path::new(&text)).canonicalize() {
             Err(resolution_error) => ResolvedPath::Unresolvable(resolution_error),
             Ok(resolved) => {
-                // Check if it's within relative_to
+                // Check if it's within relative_to.
                 match resolved.strip_prefix(relative_to) {
                     Err(_prefix_error) => ResolvedPath::Outside,
                     Ok(suffix) => ResolvedPath::Within(
@@ -450,7 +482,7 @@ mod tests {
 
         let nix_file = NixFile::new(&file)?;
 
-        // These are builtins.unsafeGetAttrPos locations for the attributes
+        // These are `builtins.unsafeGetAttrPos` locations for the attributes
         let cases = [
             (2, 3, Right("foo = 1;")),
             (3, 3, Right(r#""bar" = 2;"#)),

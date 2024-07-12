@@ -20,8 +20,8 @@ pub fn check_references(
 ) -> validation::Result<()> {
     // The first subpath to check is the package directory itself, which we can represent as an
     // empty path, since the absolute package directory gets prepended to this.
-    // We don't use `./.` to keep the error messages cleaner
-    // (there's no canonicalisation going on underneath)
+    // We don't use `./.` to keep the error messages cleaner, since there's no canonicalisation
+    // going on underneath.
     let subpath = RelativePath::new("");
     check_path(
         nix_file_store,
@@ -37,7 +37,7 @@ pub fn check_references(
     })
 }
 
-/// Checks for a specific path to not have references outside
+/// Checks for a specific path to not have references outside.
 ///
 /// The subpath is the relative path within the package directory we're currently checking.
 /// A relative path so that the error messages don't get absolute paths (which are messy in CI).
@@ -59,11 +59,11 @@ fn check_path(
     };
 
     Ok(if path.is_symlink() {
-        // Check whether the symlink resolves to outside the package directory
+        // Check whether the symlink resolves to outside the package directory.
         match path.canonicalize() {
             Ok(target) => {
-                // No need to handle the case of it being inside the directory, since we scan through the
-                // entire directory recursively anyways
+                // No need to handle the case of it being inside the directory, since we scan
+                // through the entire directory recursively in any case.
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
                     to_validation(PathErrorKind::OutsideSymlink)
                 } else {
@@ -114,8 +114,8 @@ fn check_path(
     })
 }
 
-/// Check whether a nix file contains path expression references pointing outside the package
-/// directory
+/// Check whether a Nix file contains path expression references pointing outside the package
+/// directory.
 fn check_nix_file(
     nix_file_store: &mut NixFileStore,
     relative_package_dir: &RelativePath,
@@ -159,8 +159,8 @@ fn check_nix_file(
                     })
                 }
                 ResolvedPath::Within(..) => {
-                    // No need to handle the case of it being inside the directory, since we scan through the
-                    // entire directory recursively anyways
+                    // No need to handle the case of it being inside the directory, since we scan
+                    // through the entire directory recursively in any case.
                     Success(())
                 }
             }

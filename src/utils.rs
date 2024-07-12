@@ -6,22 +6,25 @@ use std::path::Path;
 pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
-/// Deterministic file listing so that tests are reproducible
+/// Deterministic file listing so that tests are reproducible.
 pub fn read_dir_sorted(base_dir: &Path) -> anyhow::Result<Vec<fs::DirEntry>> {
     let listing = base_dir
         .read_dir()
         .with_context(|| format!("Could not list directory {}", base_dir.display()))?;
+
     let mut shard_entries = listing
         .collect::<io::Result<Vec<_>>>()
         .with_context(|| format!("Could not list directory {}", base_dir.display()))?;
+
     shard_entries.sort_by_key(|entry| entry.file_name());
+
     Ok(shard_entries)
 }
 
 /// A simple utility for calculating the line for a string offset.
-/// This doesn't do any Unicode handling, though that probably doesn't matter
-/// because newlines can't split up Unicode characters. Also this is only used
-/// for error reporting
+///
+/// This doesn't do any Unicode handling, though that probably doesn't matter because newlines
+/// can't split up Unicode characters. This is only used for error reporting.
 pub struct LineIndex {
     /// Stores the indices of newlines
     newlines: Vec<usize>,
@@ -41,7 +44,7 @@ impl LineIndex {
     }
 
     /// Returns the line number for a string index.
-    /// If the index points to a newline, returns the line number before the newline
+    /// If the index points to a newline, returns the line number before the newline.
     pub fn line(&self, index: usize) -> usize {
         match self.newlines.binary_search(&index) {
             // +1 because lines are 1-indexed
@@ -60,7 +63,7 @@ impl LineIndex {
             // For the nth line, we add the index of the (n-1)st newline to the column,
             // and remove one more from the index since arrays are 0-indexed.
             // Then add the 1-indexed column to get not the newline index itself,
-            // but rather the index of the position on the next line
+            // but rather the index of the position on the next line.
             self.newlines[line - 2] + column
         }
     }
