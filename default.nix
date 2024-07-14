@@ -40,7 +40,7 @@ let
     projectRootFile = ".git/config";
 
     programs.rustfmt.enable = true;
-    programs.nixfmt-rfc-style.enable = true;
+    programs.nixfmt.enable = true;
     programs.shfmt.enable = true;
     settings.formatter.shfmt.options = [ "--space-redirects" ];
   };
