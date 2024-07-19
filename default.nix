@@ -45,6 +45,9 @@ let
     settings.formatter.shfmt.options = [ "--space-redirects" ];
   };
 
+  # The resulting package is built to always use this Nix version, such that the result is reproducible
+  defaultNixPackage = pkgs.nix;
+
   packages = {
     build = pkgs.callPackage ./package.nix {
       inherit
@@ -54,10 +57,12 @@ let
         testNixpkgsPath
         version
         ;
+      nix = defaultNixPackage;
     };
 
     shell = pkgs.mkShell {
       env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
+      env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin defaultNixPackage;
       env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       inputsFrom = [ packages.build ];
@@ -69,6 +74,7 @@ let
         rust-analyzer
         rustfmt
         treefmtEval.config.build.wrapper
+        defaultNixPackage
       ];
     };
 

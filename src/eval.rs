@@ -125,8 +125,12 @@ pub fn check_values(
     let expr_path = std::env::var("NIX_CHECK_BY_NAME_EXPR_PATH")
         .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_EXPR_PATH")?;
 
+    // Pinning nix in this way makes the tool more reproducible
+    let nix_package = std::env::var("NIX_CHECK_BY_NAME_NIX_PACKAGE")
+        .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_NIX_PACKAGE")?;
+
     // With restrict-eval, only paths in NIX_PATH can be accessed. We explicitly specify them here.
-    let mut command = process::Command::new("nix-instantiate");
+    let mut command = process::Command::new(format!("{nix_package}/bin/nix-instantiate"));
     command
         // Capture stderr so that it can be printed later in case of failure
         .stderr(process::Stdio::piped())
