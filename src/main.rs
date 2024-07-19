@@ -181,6 +181,7 @@ mod tests {
     use crate::process;
     use crate::utils;
     use anyhow::Context;
+    use std::ffi::OsStr;
     use std::fs;
     use std::path::Path;
     use tempfile::{tempdir_in, TempDir};
@@ -277,14 +278,24 @@ mod tests {
         } else {
             Path::new("tests/empty-base")
         };
+        // Empty dir, needed so that no warnings are printed when testing older Nix versions
+        // that don't recognise certain newer keys in nix.conf
+        let nix_conf_dir = tempdir()?;
 
         // We don't want coloring to mess up the tests
-        let writer = temp_env::with_var("NO_COLOR", Some("1"), || -> anyhow::Result<_> {
-            let mut writer = vec![];
-            process(base_nixpkgs.to_owned(), path.to_owned(), true, &mut writer)
-                .with_context(|| format!("Failed test case {name}"))?;
-            Ok(writer)
-        })?;
+        let writer = temp_env::with_vars(
+            [
+                ("NO_COLOR", Some(OsStr::new("1"))),
+                // See above comment on nix_conf_dir
+                ("NIX_CONF_DIR", Some(nix_conf_dir.path().as_os_str())),
+            ],
+            || -> anyhow::Result<_> {
+                let mut writer = vec![];
+                process(base_nixpkgs.to_owned(), path.to_owned(), true, &mut writer)
+                    .with_context(|| format!("Failed test case {name}"))?;
+                Ok(writer)
+            },
+        )?;
 
         let expr_path = std::env::var("NIX_CHECK_BY_NAME_EXPR_PATH")
             .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_EXPR_PATH")?;
@@ -293,7 +304,16 @@ mod tests {
         // on the output, which we need to relativise for the tests to succeed everywhere
         let actual_errors = String::from_utf8_lossy(&writer).replace(&expr_path, "src/eval.nix");
 
-        if actual_errors != expected_errors {
+        let pattern = format!(
+            "^{}$",
+            regex::escape(expected_errors).replace("@REDACTED@", ".*")
+        );
+
+        let expected_errors_regex = regex::RegexBuilder::new(&pattern)
+            .dot_matches_new_line(true)
+            .build()?;
+
+        if !expected_errors_regex.is_match(&actual_errors) {
             panic!(
                 "Failed test case {name}, expected these errors:\n=======\n{}\n=======\n\
                 but got these:\n=======\n{}\n=======",

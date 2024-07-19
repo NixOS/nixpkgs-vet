@@ -61,6 +61,10 @@ Integration tests are declared in [`./tests`](./tests) as subdirectories imitati
   A file containing the expected standard output.
   The default is expecting an empty standard output.
 
+  This file is matched against the error almost literally,
+  with the only exception being that the `@REDACTED@` string can match anything,
+  which is useful for non-deterministic errors.
+
 ## Automation
 
 Pinned dependencies are [regularly updated automatically](./.github/workflows/update.yml).

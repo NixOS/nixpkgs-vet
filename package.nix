@@ -9,6 +9,7 @@
   nixVersionsToTest ? [
     nix
     nixVersions.stable
+    nixVersions.minimum
   ],
 
   nixpkgsLibPath,
