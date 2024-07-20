@@ -14,7 +14,6 @@
 
   nixpkgsLibPath,
   initNix,
-  runtimeExprPath,
   testNixpkgsPath,
   version,
 }:
@@ -38,7 +37,6 @@ rustPlatform.buildRustPackage {
     clippy
     makeWrapper
   ];
-  env.NIX_CHECK_BY_NAME_EXPR_PATH = "${runtimeExprPath}";
   env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin nix;
   env.NIX_PATH = "test-nixpkgs=${testNixpkgsPath}:test-nixpkgs/lib=${nixpkgsLibPath}";
   checkPhase = ''
@@ -62,7 +60,6 @@ rustPlatform.buildRustPackage {
   '';
   postInstall = ''
     wrapProgram $out/bin/nixpkgs-check-by-name \
-      --set NIX_CHECK_BY_NAME_EXPR_PATH "$NIX_CHECK_BY_NAME_EXPR_PATH" \
       --set NIX_CHECK_BY_NAME_NIX_PACKAGE ${lib.getBin nix}
   '';
 }

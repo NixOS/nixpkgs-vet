@@ -14,7 +14,6 @@ let
   };
   inherit (pkgs) lib;
 
-  runtimeExprPath = ./src/eval.nix;
   testNixpkgsPath = ./tests/mock-nixpkgs.nix;
   nixpkgsLibPath = nixpkgs + "/lib";
 
@@ -53,7 +52,6 @@ let
       inherit
         nixpkgsLibPath
         initNix
-        runtimeExprPath
         testNixpkgsPath
         version
         ;
@@ -61,7 +59,6 @@ let
     };
 
     shell = pkgs.mkShell {
-      env.NIX_CHECK_BY_NAME_EXPR_PATH = toString runtimeExprPath;
       env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin defaultNixPackage;
       env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
