@@ -35,6 +35,8 @@ let
           nix
         ];
 
+        env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin nix;
+
         passthru = {
           # Allow running against all other Nix versions.
           nixVersions = lib.mapAttrs mkNixpkgsCheck (derivationsFromAttrset nixVersions);

@@ -3,6 +3,7 @@
   rustPlatform,
   nix,
   nixVersions,
+  lixVersions,
   clippy,
   makeWrapper,
 
@@ -10,6 +11,9 @@
     nix
     nixVersions.stable
     nixVersions.minimum
+    nixVersions.latest
+    lixVersions.stable
+    lixVersions.latest
   ],
 
   nixpkgsLibPath,
