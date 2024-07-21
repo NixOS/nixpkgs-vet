@@ -11,13 +11,16 @@ use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::NixFileStore;
 use relative_path::RelativePathBuf;
+use std::fs;
 use std::path::Path;
 
 use anyhow::Context;
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::process;
-use tempfile::NamedTempFile;
+use tempfile::Builder;
+
+const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 
 /// Attribute set of this structure is returned by `./eval.nix`
 #[derive(Deserialize)]
@@ -106,26 +109,29 @@ pub fn check_values(
     package_names: Vec<String>,
     is_test: bool,
 ) -> validation::Result<ratchet::Nixpkgs> {
+    let work_dir = Builder::new()
+        .prefix("nixpkgs-check-by-name")
+        .tempdir()
+        .with_context(|| "Failed to create a working directory")?;
+
+    // Canonicalize the path so that if a symlink were returned, we wouldn't ask Nix to follow it.
+    let work_dir_path = work_dir.path().canonicalize()?;
+
     // Write the list of packages we need to check into a temporary JSON file.
-    // This can then get read by the Nix evaluation.
-    let attrs_file = NamedTempFile::new().with_context(|| "Failed to create a temporary file")?;
-
-    // We need to canonicalise this path. If it's a symlink (which can be the case on Darwin),
-    // Nix would need to read both the symlink and the target path, and therefore need two NIX_PATH
-    // entries for restrict-eval. If we resolve the symlinks, we only need one predictable entry.
-    let attrs_file_path = attrs_file.path().canonicalize()?;
-
-    serde_json::to_writer(&attrs_file, &package_names).with_context(|| {
+    let package_names_path = work_dir_path.join("package-names.json");
+    let package_names_file = fs::File::create(&package_names_path)?;
+    serde_json::to_writer(&package_names_file, &package_names).with_context(|| {
         format!(
-            "Failed to serialise the package names to the temporary path {}",
-            attrs_file_path.display()
+            "Failed to serialise the package names to the work dir {}",
+            work_dir_path.display()
         )
     })?;
 
-    let expr_path = std::env::var("NIX_CHECK_BY_NAME_EXPR_PATH")
-        .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_EXPR_PATH")?;
+    // Write the Nix file into the work directory.
+    let eval_nix_path = work_dir_path.join("eval.nix");
+    fs::write(&eval_nix_path, EVAL_NIX)?;
 
-    // Pinning nix in this way makes the tool more reproducible
+    // Pinning Nix in this way makes the tool more reproducible
     let nix_package = std::env::var("NIX_CHECK_BY_NAME_NIX_PACKAGE")
         .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_NIX_PACKAGE")?;
 
@@ -141,13 +147,13 @@ pub fn check_values(
             "--readonly-mode",
             "--restrict-eval",
         ])
-        // Pass the path to the attrs_file as an argument and add it to the NIX_PATH so it can be
-        // accessed in restrict-eval mode.
-        .args(["--arg", "attrsPath"])
-        .arg(&attrs_file_path)
+        // Add the work directory to the NIX_PATH so that it can be accessed in restrict-eval mode.
         .arg("-I")
-        .arg(&attrs_file_path)
-        // Same for the nixpkgs to test.
+        .arg(&work_dir_path)
+        .args(["--arg", "attrsPath"])
+        .arg(&package_names_path)
+        // Same for the nixpkgs to test, adding it to the NIX_PATH so it can be accessed in
+        // restrict-eval mode.
         .args(["--arg", "nixpkgsPath"])
         .arg(nixpkgs_path)
         .arg("-I")
@@ -162,8 +168,7 @@ pub fn check_values(
         command.arg("--show-trace");
     }
 
-    command.args(["-I", &expr_path]);
-    command.arg(expr_path);
+    command.arg(eval_nix_path);
 
     let result = command
         .output()
@@ -174,6 +179,7 @@ pub fn check_values(
         let stderr = String::from_utf8_lossy(&result.stderr).to_string();
         return Ok(NixpkgsProblem::NixEval(NixEvalError { stderr }).into());
     }
+
     // Parse the resulting JSON value
     let attributes: Vec<(String, Attribute)> = serde_json::from_slice(&result.stdout)
         .with_context(|| {

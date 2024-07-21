@@ -272,12 +272,23 @@ mod tests {
     }
 
     fn test_nixpkgs(name: &str, path: &Path, expected_errors: &str) -> anyhow::Result<()> {
+        // Match the expected errors almost verbatim -- `@REDACTED@` turns into `.*`.
+        let pattern = format!(
+            "^{}$",
+            regex::escape(expected_errors).replace("@REDACTED@", ".*")
+        );
+
+        let expected_errors_regex = regex::RegexBuilder::new(&pattern)
+            .dot_matches_new_line(true)
+            .build()?;
+
         let base_path = path.join("base");
         let base_nixpkgs = if base_path.exists() {
             base_path.as_path()
         } else {
             Path::new("tests/empty-base")
         };
+
         // Empty dir, needed so that no warnings are printed when testing older Nix versions
         // that don't recognise certain newer keys in nix.conf
         let nix_conf_dir = tempdir()?;
@@ -297,21 +308,7 @@ mod tests {
             },
         )?;
 
-        let expr_path = std::env::var("NIX_CHECK_BY_NAME_EXPR_PATH")
-            .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_EXPR_PATH")?;
-
-        // We end up with a small Nix trace that includes the absolute path to src/eval.nix
-        // on the output, which we need to relativise for the tests to succeed everywhere
-        let actual_errors = String::from_utf8_lossy(&writer).replace(&expr_path, "src/eval.nix");
-
-        let pattern = format!(
-            "^{}$",
-            regex::escape(expected_errors).replace("@REDACTED@", ".*")
-        );
-
-        let expected_errors_regex = regex::RegexBuilder::new(&pattern)
-            .dot_matches_new_line(true)
-            .build()?;
+        let actual_errors = String::from_utf8_lossy(&writer);
 
         if !expected_errors_regex.is_match(&actual_errors) {
             panic!(
