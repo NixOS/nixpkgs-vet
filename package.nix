@@ -1,6 +1,7 @@
 {
   lib,
   rustPlatform,
+  path,
   nix,
   nixVersions,
   clippy,
@@ -12,9 +13,7 @@
     nixVersions.minimum
   ],
 
-  nixpkgsLibPath,
   initNix,
-  testNixpkgsPath,
   version,
 }:
 let
@@ -23,6 +22,7 @@ in
 rustPlatform.buildRustPackage {
   pname = "nixpkgs-check-by-name";
   inherit version;
+
   src = fs.toSource {
     root = ./.;
     fileset = fs.unions [
@@ -32,18 +32,24 @@ rustPlatform.buildRustPackage {
       ./tests
     ];
   };
+
   cargoLock.lockFile = ./Cargo.lock;
+
   nativeBuildInputs = [
     clippy
     makeWrapper
   ];
+
   env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin nix;
-  env.NIX_PATH = "test-nixpkgs=${testNixpkgsPath}:test-nixpkgs/lib=${nixpkgsLibPath}";
+  env.NIX_CHECK_BY_NAME_NIXPKGS_LIB = "${path}/lib";
+
   checkPhase = ''
     # This path will be symlinked to the current version that is being tested
     nixPackage=$(mktemp -d)/nix
+
     # For initNix
     export PATH=$nixPackage/bin:$PATH
+
     # This is what nixpkgs-check-by-name uses
     export NIX_CHECK_BY_NAME_NIX_PACKAGE=$nixPackage
 
