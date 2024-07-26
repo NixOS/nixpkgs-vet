@@ -14,9 +14,6 @@ let
   };
   inherit (pkgs) lib;
 
-  testNixpkgsPath = ./tests/mock-nixpkgs.nix;
-  nixpkgsLibPath = nixpkgs + "/lib";
-
   # Needed to make Nix evaluation work inside nix builds
   initNix = ''
     export TEST_ROOT=$(pwd)/test-tmp
@@ -49,18 +46,13 @@ let
 
   packages = {
     build = pkgs.callPackage ./package.nix {
-      inherit
-        nixpkgsLibPath
-        initNix
-        testNixpkgsPath
-        version
-        ;
+      inherit initNix version;
       nix = defaultNixPackage;
     };
 
     shell = pkgs.mkShell {
       env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin defaultNixPackage;
-      env.NIX_PATH = "test-nixpkgs=${toString testNixpkgsPath}:test-nixpkgs/lib=${toString nixpkgsLibPath}";
+      env.NIX_CHECK_BY_NAME_NIXPKGS_LIB = "${nixpkgs}/lib";
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       inputsFrom = [ packages.build ];
       nativeBuildInputs = with pkgs; [

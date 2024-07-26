@@ -47,7 +47,7 @@ pub struct Args {
 
 fn main() -> ExitCode {
     let args = Args::parse();
-    match process(args.base, args.nixpkgs, false, &mut io::stderr()) {
+    match process(args.base, args.nixpkgs, &mut io::stderr()) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::from(1),
         Err(e) => {
@@ -62,8 +62,6 @@ fn main() -> ExitCode {
 /// # Arguments
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
-/// - `is_test`: Whether we're running a test right now, which e.g. allows access to the
-///   <mock-nixpkgs> NIX_PATH entry
 /// - `error_writer`: An `io::Write` value to write validation errors to, if any.
 ///
 /// # Return value
@@ -73,12 +71,11 @@ fn main() -> ExitCode {
 pub fn process<W: io::Write>(
     base_nixpkgs: PathBuf,
     main_nixpkgs: PathBuf,
-    is_test: bool,
     error_writer: &mut W,
 ) -> anyhow::Result<bool> {
     // Very easy to parallelise this, since it's totally independent
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, is_test));
-    let main_result = check_nixpkgs(&main_nixpkgs, is_test)?;
+    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs));
+    let main_result = check_nixpkgs(&main_nixpkgs)?;
 
     let base_result = match base_thread.join() {
         Ok(res) => res?,
@@ -154,7 +151,7 @@ pub fn process<W: io::Write>(
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-pub fn check_nixpkgs(nixpkgs_path: &Path, is_test: bool) -> validation::Result<ratchet::Nixpkgs> {
+pub fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
     let mut nix_file_store = NixFileStore::default();
 
     Ok({
@@ -169,9 +166,10 @@ pub fn check_nixpkgs(nixpkgs_path: &Path, is_test: bool) -> validation::Result<r
             // No pkgs/by-name directory, always valid
             Success(ratchet::Nixpkgs::default())
         } else {
-            check_structure(&nixpkgs_path, &mut nix_file_store)?.result_map(|package_names|
+            check_structure(&nixpkgs_path, &mut nix_file_store)?.result_map(|package_names| {
                 // Only if we could successfully parse the structure, we do the evaluation checks
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names, is_test))?
+                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names)
+            })?
         }
     })
 }
@@ -302,7 +300,7 @@ mod tests {
             ],
             || -> anyhow::Result<_> {
                 let mut writer = vec![];
-                process(base_nixpkgs.to_owned(), path.to_owned(), true, &mut writer)
+                process(base_nixpkgs.to_owned(), path.to_owned(), &mut writer)
                     .with_context(|| format!("Failed test case {name}"))?;
                 Ok(writer)
             },

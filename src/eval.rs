@@ -11,13 +11,11 @@ use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::NixFileStore;
 use relative_path::RelativePathBuf;
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::{env, fs, process};
 
 use anyhow::Context;
 use serde::Deserialize;
-use std::path::PathBuf;
-use std::process;
 use tempfile::Builder;
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
@@ -100,6 +98,56 @@ pub enum DefinitionVariant {
     },
 }
 
+/// Pass through variables needed to make Nix evaluation work inside Nix build. See `initNix`.
+/// If these variables don't exist, assume we're not in a Nix sandbox.
+fn pass_through_environment_variables_for_nix_eval_in_nix_build(command: &mut process::Command) {
+    for variable in [
+        "NIX_CONF_DIR",
+        "NIX_LOCALSTATE_DIR",
+        "NIX_LOG_DIR",
+        "NIX_STATE_DIR",
+        "NIX_STORE_DIR",
+    ] {
+        if let Ok(value) = env::var(variable) {
+            command.env(variable, value);
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn mutate_nix_instatiate_arguments_based_on_cfg(
+    _work_dir_path: &Path,
+    command: &mut process::Command,
+) -> anyhow::Result<()> {
+    command.arg("--show-trace");
+
+    Ok(())
+}
+
+/// Tests need to be able to mock out `<nixpkgs>`; do that for them.
+#[cfg(test)]
+fn mutate_nix_instatiate_arguments_based_on_cfg(
+    work_dir_path: &Path,
+    command: &mut process::Command,
+) -> anyhow::Result<()> {
+    const MOCK_NIXPKGS: &[u8] = include_bytes!("../tests/mock-nixpkgs.nix");
+    let mock_nixpkgs_path = work_dir_path.join("mock-nixpkgs.nix");
+    fs::write(&mock_nixpkgs_path, MOCK_NIXPKGS)?;
+
+    // Wire it up so that it can be imported as `import <test-nixpkgs> { }`.
+    command.arg("-I");
+    command.arg(&format!("test-nixpkgs={}", mock_nixpkgs_path.display()));
+
+    // Retrieve the path to the real nixpkgs lib, then wire it up to `import <test-nixpkgs/lib>`.
+    let nixpkgs_lib = env::var("NIX_CHECK_BY_NAME_NIXPKGS_LIB")
+        .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_NIXPKGS_LIB")?;
+
+    command.arg("-I");
+    command.arg(&format!("test-nixpkgs/lib={nixpkgs_lib}"));
+
+    Ok(())
+}
+
 /// Check that the Nixpkgs attribute values corresponding to the packages in `pkgs/by-name` are of
 /// the form `callPackage <package_file> { ... }`. See the `./eval.nix` file for how this is
 /// achieved on the Nix side.
@@ -107,7 +155,6 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: Vec<String>,
-    is_test: bool,
 ) -> validation::Result<ratchet::Nixpkgs> {
     let work_dir = Builder::new()
         .prefix("nixpkgs-check-by-name")
@@ -132,7 +179,7 @@ pub fn check_values(
     fs::write(&eval_nix_path, EVAL_NIX)?;
 
     // Pinning Nix in this way makes the tool more reproducible
-    let nix_package = std::env::var("NIX_CHECK_BY_NAME_NIX_PACKAGE")
+    let nix_package = env::var("NIX_CHECK_BY_NAME_NIX_PACKAGE")
         .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_NIX_PACKAGE")?;
 
     // With restrict-eval, only paths in NIX_PATH can be accessed. We explicitly specify them here.
@@ -140,6 +187,8 @@ pub fn check_values(
     command
         // Capture stderr so that it can be printed later in case of failure
         .stderr(process::Stdio::piped())
+        // Clear environment so that nothing from the outside influences this `nix-instantiate`.
+        .env_clear()
         .args([
             "--eval",
             "--json",
@@ -159,14 +208,8 @@ pub fn check_values(
         .arg("-I")
         .arg(nixpkgs_path);
 
-    // Only do these actions if we're not running tests.
-    if !is_test {
-        // Clear NIX_PATH to be sure it doesn't influence the result.
-        // During tests we need to have <mock-nixpkgs> available.
-        command.env_remove("NIX_PATH");
-        // Show the full Nix error trace, but not in tests because the full trace is super impure.
-        command.arg("--show-trace");
-    }
+    pass_through_environment_variables_for_nix_eval_in_nix_build(&mut command);
+    mutate_nix_instatiate_arguments_based_on_cfg(&work_dir_path, &mut command)?;
 
     command.arg(eval_nix_path);
 
