@@ -1,6 +1,7 @@
 name: After Release
 
 on:
+  workflow_dispatch: # Allows triggering manually
   release:
     types: [published]
 
