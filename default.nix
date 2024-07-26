@@ -161,21 +161,20 @@ let
         '';
       };
 
-    # Tests the tool on the pinned Nixpkgs tree, this is a good sanity check
-    nixpkgsCheck =
-      pkgs.runCommand "test-nixpkgs-check-by-name"
-        {
-          nativeBuildInputs = [
-            packages.build
-            pkgs.nix
-          ];
-          nixpkgsPath = nixpkgs;
-        }
-        ''
-          ${initNix}
-          nixpkgs-check-by-name --base "$nixpkgsPath" "$nixpkgsPath"
-          touch $out
-        '';
+    # Tests the tool on the pinned Nixpkgs tree with stable Nix. This is a good sanity check.
+    nixpkgsCheck = pkgs.callPackage ./nixpkgs-check.nix {
+      inherit initNix nixpkgs;
+      nixpkgs-check-by-name = packages.build;
+      nix = pkgs.nixVersions.stable;
+    };
+
+    # Tests the tool on the pinned Nixpkgs tree with various Nix and Lix versions.
+    # This allows exposure to changes in behavior from Nix and Nix-alikes.
+    nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
+    nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
+    nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
+    nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
+    nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
   };
 in
 packages
