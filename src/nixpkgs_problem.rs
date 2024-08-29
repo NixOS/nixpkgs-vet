@@ -158,17 +158,17 @@ impl fmt::Display for NixpkgsProblem {
                     ShardErrorKind::ShardNonDir =>
                         write!(
                             f,
-                            "{relative_shard_path}: This is a file, but it should be a directory.",
+                            "- {relative_shard_path}: This is a file, but it should be a directory.",
                         ),
                     ShardErrorKind::InvalidShardName =>
                         write!(
                             f,
-                            "{relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
+                            "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
                         ),
                     ShardErrorKind::CaseSensitiveDuplicate { first, second } =>
                         write!(
                             f,
-                            "{relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
+                            "- {relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
                         ),
                 }
             }
@@ -181,28 +181,28 @@ impl fmt::Display for NixpkgsProblem {
                         let relative_package_dir = structure::relative_dir_for_package(package_name);
                         write!(
                             f,
-                            "{relative_package_dir}: This path is a file, but it should be a directory.",
+                            "- {relative_package_dir}: This path is a file, but it should be a directory.",
                         )
                     }
                     PackageErrorKind::InvalidPackageName { invalid_package_name } =>
                         write!(
                             f,
-                            "{relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
+                            "- {relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
                         ),
                     PackageErrorKind::IncorrectShard { correct_relative_package_dir } =>
                         write!(
                             f,
-                            "{relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
+                            "- {relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
                         ),
                     PackageErrorKind::PackageNixNonExistent =>
                         write!(
                             f,
-                            "{relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
+                            "- {relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
                         ),
                     PackageErrorKind::PackageNixDir =>
                         write!(
                             f,
-                            "{relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
+                            "- {relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
                         ),
                 }
             }
@@ -215,25 +215,25 @@ impl fmt::Display for NixpkgsProblem {
                         let relative_package_file = structure::relative_file_for_package(attribute_name);
                         write!(
                             f,
-                            "pkgs.{attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
+                            "- pkgs.{attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
                         )
                     }
                     ByNameErrorKind::NonDerivation => {
                         let relative_package_file = structure::relative_file_for_package(attribute_name);
                         write!(
                             f,
-                            "pkgs.{attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
+                            "- pkgs.{attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
                         )
                     }
                     ByNameErrorKind::InternalCallPackageUsed =>
                         write!(
                             f,
-                            "pkgs.{attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
+                            "- pkgs.{attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
                         ),
                     ByNameErrorKind::CannotDetermineAttributeLocation =>
                         write!(
                             f,
-                            "pkgs.{attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
+                            "- pkgs.{attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
                         ),
                 }
             }
@@ -333,12 +333,12 @@ impl fmt::Display for NixpkgsProblem {
                     PathErrorKind::OutsideSymlink =>
                         write!(
                             f,
-                            "{relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
+                            "- {relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
                         ),
                     PathErrorKind::UnresolvableSymlink { io_error } =>
                         write!(
                             f,
-                            "{relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
+                            "- {relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
                         ),
                 }
             },
@@ -353,22 +353,30 @@ impl fmt::Display for NixpkgsProblem {
                     NixFileErrorKind::PathInterpolation =>
                         write!(
                             f,
-                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
+                            "- {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
                         ),
                     NixFileErrorKind::SearchPath =>
                         write!(
                             f,
-                            "{relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
+                            "- {relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
                         ),
                     NixFileErrorKind::OutsidePathReference =>
-                        write!(
+                        writedoc!(
                             f,
-                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.",
+                            "
+                            - {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.
+                              This is undesirable because it creates dependencies between internal paths, making it harder to reorganise Nixpkgs in the future.
+                              Alternatives include:
+                              - If you are creating a new version of a package with a common file between versions, consider following the recommendation in https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name#recommendation-for-new-packages-with-multiple-versions.
+                              - If the path being referenced could be considered a stable interface with multiple uses, consider exposing it via a `pkgs` attribute, then taking it as a attribute argument in {PACKAGE_NIX_FILENAME}.
+                              - If the path being referenced is internal and has multiple uses, consider passing the file as an explicit `callPackage` argument in `pkgs/top-level/all-packages.nix`.
+                              - If the path being referenced is internal and will need to be modified independently of the original, consider copying it into the {relative_package_dir} directory.
+                            "
                         ),
                     NixFileErrorKind::UnresolvablePathReference { io_error } =>
                         write!(
                             f,
-                            "{relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
+                            "- {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
                         ),
                 }
             },
