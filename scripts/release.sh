@@ -14,7 +14,7 @@ nixeval() {
 system=x86_64-linux
 root=$(git rev-parse --show-toplevel)
 rev=$(git -C "$root" rev-parse HEAD)
-repository=${GITHUB_REPOSITORY:-NixOS/nixpkgs-check-by-name}
+repository=${GITHUB_REPOSITORY:-NixOS/nixpkgs-vet}
 
 # Get the version from the Cargo.toml file
 version=$(nixeval "$root" -A version)

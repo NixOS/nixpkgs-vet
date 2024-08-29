@@ -24,7 +24,7 @@ let
   fs = lib.fileset;
 in
 rustPlatform.buildRustPackage {
-  pname = "nixpkgs-check-by-name";
+  pname = "nixpkgs-vet";
   inherit version;
 
   src = fs.toSource {
@@ -44,8 +44,8 @@ rustPlatform.buildRustPackage {
     makeWrapper
   ];
 
-  env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin nix;
-  env.NIX_CHECK_BY_NAME_NIXPKGS_LIB = "${path}/lib";
+  env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
+  env.NIXPKGS_VET_NIXPKGS_LIB = "${path}/lib";
 
   checkPhase = ''
     # This path will be symlinked to the current version that is being tested
@@ -54,8 +54,8 @@ rustPlatform.buildRustPackage {
     # For initNix
     export PATH=$nixPackage/bin:$PATH
 
-    # This is what nixpkgs-check-by-name uses
-    export NIX_CHECK_BY_NAME_NIX_PACKAGE=$nixPackage
+    # This is what nixpkgs-vet uses
+    export NIXPKGS_VET_NIX_PACKAGE=$nixPackage
 
     ${lib.concatMapStringsSep "\n" (nix: ''
       ln -s ${lib.getBin nix} "$nixPackage"
@@ -69,7 +69,7 @@ rustPlatform.buildRustPackage {
     cargo clippy --all-targets -- -D warnings
   '';
   postInstall = ''
-    wrapProgram $out/bin/nixpkgs-check-by-name \
-      --set NIX_CHECK_BY_NAME_NIX_PACKAGE ${lib.getBin nix}
+    wrapProgram $out/bin/nixpkgs-vet \
+      --set NIXPKGS_VET_NIX_PACKAGE ${lib.getBin nix}
   '';
 }

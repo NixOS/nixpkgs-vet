@@ -27,12 +27,12 @@ There is no guarantee that the derivation succeeds on systems that don't have [p
 but it can be attempted with
 
 ```bash
-nix-build https://github.com/NixOS/nixpkgs-check-by-name/tarball/master -A build
+nix-build https://github.com/NixOS/nixpkgs-vet/tarball/master -A build
 ```
 
 ## Prebuilt store paths
 
-The [GitHub releases](https://github.com/NixOS/nixpkgs-check-by-name/releases)
+The [GitHub releases](https://github.com/NixOS/nixpkgs-vet/releases)
 contain a [gzip](https://en.wikipedia.org/wiki/Gzip)-compressed
 [Nix Archive](https://nixos.org/manual/nix/stable/command-ref/nix-store/export.html)
 of the [build closure](https://nixos.org/manual/nix/stable/glossary#gloss-closure)
@@ -54,11 +54,11 @@ and is therefore much faster and less storage intensive.
 ## Binary interface
 
 The store path acquired from the above methods contains
-a `system`-specific binary under `$storePath/bin/nixpkgs-check-by-name`.
+a `system`-specific binary under `$storePath/bin/nixpkgs-vet`.
 
 The public interface of this binary is printed by calling
 ```bash
-result/bin/nixpkgs-check-by-name --help
+result/bin/nixpkgs-vet --help
 ```
 
 ## Validity checks

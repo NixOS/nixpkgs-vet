@@ -1,7 +1,7 @@
 {
   lib,
   runCommand,
-  nixpkgs-check-by-name,
+  nixpkgs-vet,
   initNix,
   nixpkgs,
   nix,
@@ -28,14 +28,14 @@ let
 
   mkNixpkgsCheck =
     name: nix:
-    runCommand "test-nixpkgs-check-by-name-with-${nix.name}"
+    runCommand "test-nixpkgs-vet-with-${nix.name}"
       {
         nativeBuildInputs = [
-          nixpkgs-check-by-name
+          nixpkgs-vet
           nix
         ];
 
-        env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin nix;
+        env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
 
         passthru = {
           # Allow running against all other Nix versions.
@@ -47,9 +47,9 @@ let
       }
       ''
         ${initNix}
-        # This is what nixpkgs-check-by-name uses
-        export NIX_CHECK_BY_NAME_NIX_PACKAGE=${lib.getBin nix}
-        ${nixpkgs-check-by-name}/bin/.nixpkgs-check-by-name-wrapped --base "${nixpkgs}" "${nixpkgs}"
+        # This is what nixpkgs-vet uses
+        export NIXPKGS_VET_NIX_PACKAGE=${lib.getBin nix}
+        ${nixpkgs-vet}/bin/.nixpkgs-vet-wrapped --base "${nixpkgs}" "${nixpkgs}"
         touch $out
       '';
 in

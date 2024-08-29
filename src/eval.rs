@@ -139,8 +139,8 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
     command.arg(&format!("test-nixpkgs={}", mock_nixpkgs_path.display()));
 
     // Retrieve the path to the real nixpkgs lib, then wire it up to `import <test-nixpkgs/lib>`.
-    let nixpkgs_lib = env::var("NIX_CHECK_BY_NAME_NIXPKGS_LIB")
-        .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_NIXPKGS_LIB")?;
+    let nixpkgs_lib = env::var("NIXPKGS_VET_NIXPKGS_LIB")
+        .with_context(|| "Could not get environment variable NIXPKGS_VET_NIXPKGS_LIB")?;
 
     command.arg("-I");
     command.arg(&format!("test-nixpkgs/lib={nixpkgs_lib}"));
@@ -157,7 +157,7 @@ pub fn check_values(
     package_names: Vec<String>,
 ) -> validation::Result<ratchet::Nixpkgs> {
     let work_dir = Builder::new()
-        .prefix("nixpkgs-check-by-name")
+        .prefix("nixpkgs-vet")
         .tempdir()
         .with_context(|| "Failed to create a working directory")?;
 
@@ -179,8 +179,8 @@ pub fn check_values(
     fs::write(&eval_nix_path, EVAL_NIX)?;
 
     // Pinning Nix in this way makes the tool more reproducible
-    let nix_package = env::var("NIX_CHECK_BY_NAME_NIX_PACKAGE")
-        .with_context(|| "Could not get environment variable NIX_CHECK_BY_NAME_NIX_PACKAGE")?;
+    let nix_package = env::var("NIXPKGS_VET_NIX_PACKAGE")
+        .with_context(|| "Could not get environment variable NIXPKGS_VET_NIX_PACKAGE")?;
 
     // With restrict-eval, only paths in NIX_PATH can be accessed. We explicitly specify them here.
     let mut command = process::Command::new(format!("{nix_package}/bin/nix-instantiate"));
