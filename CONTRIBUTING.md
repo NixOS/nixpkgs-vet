@@ -1,7 +1,7 @@
 # Contributor documentation
 
 [@infinisil](https://github.com/infinisil) is the admin and main developer of this repository,
-while everybody in [@NixOS/nixpkgs-check-by-name](https://github.com/orgs/NixOS/teams/nixpkgs-check-by-name) has write access.
+while everybody in [@NixOS/nixpkgs-vet](https://github.com/orgs/NixOS/teams/nixpkgs-vet) has write access.
 
 ## Development
 

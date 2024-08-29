@@ -51,8 +51,8 @@ let
     };
 
     shell = pkgs.mkShell {
-      env.NIX_CHECK_BY_NAME_NIX_PACKAGE = lib.getBin defaultNixPackage;
-      env.NIX_CHECK_BY_NAME_NIXPKGS_LIB = "${nixpkgs}/lib";
+      env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin defaultNixPackage;
+      env.NIXPKGS_VET_NIXPKGS_LIB = "${nixpkgs}/lib";
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       inputsFrom = [ packages.build ];
       nativeBuildInputs = with pkgs; [
@@ -156,7 +156,7 @@ let
     # Tests the tool on the pinned Nixpkgs tree with stable Nix. This is a good sanity check.
     nixpkgsCheck = pkgs.callPackage ./nixpkgs-check.nix {
       inherit initNix nixpkgs;
-      nixpkgs-check-by-name = packages.build;
+      nixpkgs-vet = packages.build;
       nix = pkgs.nixVersions.stable;
     };
 

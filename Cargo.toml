@@ -1,5 +1,5 @@
 [package]
-name = "nixpkgs-check-by-name"
+name = "nixpkgs-vet"
 version = "0.1.3"
 edition = "2021"
 
