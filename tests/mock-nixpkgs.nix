@@ -42,6 +42,7 @@ let
     # which then doesn't trigger this check
     // lib.mapAttrs (name: value: value) {
       someDrv = {
+        pname = "someDrv";
         type = "derivation";
       };
     };
