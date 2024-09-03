@@ -1,14 +1,14 @@
-# Nixpkgs pkgs/by-name checker
+# Nixpkgs vet (check) tool
 
-This repository implements a program to check [Nixpkgs' `pkgs/by-name` directory](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name) as part of [RFC 140](https://github.com/NixOS/rfcs/pull/140).
+This repository implements a program  which checks Nixpkgs for many sorts of defects, both major and minor. It's named `nixpkgs-vet`, since it '[vets](https://en.wiktionary.org/wiki/vet#Verb)' contributions to Nixpkgs.
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for contributor documentation.
-Below is the user documentation.
+It implements all checks for [Nixpkgs' `pkgs/by-name` directory](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name) as part of [RFC 140](https://github.com/NixOS/rfcs/pull/140).
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for contributor documentation. Below is the user documentation.
 
 Currently the only intended user for this program is [Nixpkgs](https://github.com/NixOS/nixpkgs).
-So the interface may be changed in breaking ways as long as Nixpkgs is adjusted to deal with it.
-See [the `pkgs/by-name` Readme](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/README.md#validation)
-for how it's used in Nixpkgs.
+Expect that the interface may be changed in breaking ways as long as Nixpkgs is adjusted to deal with it.
+See [the `pkgs/by-name` Readme](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/README.md#validation) for how it's used in Nixpkgs.
 
 ## Nix derivations
 
