@@ -15,6 +15,7 @@ mod npv_103_by_name_cannot_determine_attribute_location;
 mod npv_104_by_name_override_of_non_syntactic_call_package;
 mod npv_105_by_name_override_of_non_top_level_package;
 mod npv_106_by_name_override_contains_wrong_call_package_path;
+mod npv_107_by_name_override_contains_empty_argument;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -23,6 +24,7 @@ pub use npv_103_by_name_cannot_determine_attribute_location::ByNameCannotDetermi
 pub use npv_104_by_name_override_of_non_syntactic_call_package::ByNameOverrideOfNonSyntacticCallPackage;
 pub use npv_105_by_name_override_of_non_top_level_package::ByNameOverrideOfNonTopLevelPackage;
 pub use npv_106_by_name_override_contains_wrong_call_package_path::ByNameOverrideContainsWrongCallPackagePath;
+pub use npv_107_by_name_override_contains_empty_argument::ByNameOverrideContainsEmptyArgument;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -49,6 +51,9 @@ pub enum Problem {
 
     /// NPV-106: by-name override contains wrong callPackage path
     ByNameOverrideContainsWrongCallPackagePath(ByNameOverrideContainsWrongCallPackagePath),
+
+    /// NPV-107: by-name override contains empty argument
+    ByNameOverrideContainsEmptyArgument(ByNameOverrideContainsEmptyArgument),
 
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
@@ -179,6 +184,7 @@ impl fmt::Display for Problem {
             Self::ByNameOverrideOfNonSyntacticCallPackage(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameOverrideOfNonTopLevelPackage(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameOverrideContainsWrongCallPackagePath(inner) => fmt::Display::fmt(inner, f),
+            Self::ByNameOverrideContainsEmptyArgument(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Shard(ShardError {

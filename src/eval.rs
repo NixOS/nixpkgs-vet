@@ -9,9 +9,9 @@ use tempfile::Builder;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
-    ByNameOverrideContainsWrongCallPackagePath, ByNameOverrideError, ByNameOverrideErrorKind,
-    ByNameOverrideOfNonSyntacticCallPackage, ByNameOverrideOfNonTopLevelPackage,
-    ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameOverrideContainsEmptyArgument, ByNameOverrideContainsWrongCallPackagePath,
+    ByNameOverrideError, ByNameOverrideErrorKind, ByNameOverrideOfNonSyntacticCallPackage,
+    ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
@@ -446,7 +446,14 @@ fn by_name_override(
                     // but existing ones should continue to be allowed.
                     let manual_definition_ratchet = if syntactic_call_package.empty_arg {
                         // This is the state to migrate away from.
-                        Loose(to_problem(ByNameOverrideErrorKind::EmptyArgument))
+                        Loose(
+                            ByNameOverrideContainsEmptyArgument::new(
+                                attribute_name,
+                                location,
+                                definition,
+                            )
+                            .into(),
+                        )
                     } else {
                         // This is the state to migrate to.
                         Tight
