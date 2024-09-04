@@ -1,19 +1,33 @@
-use crate::problem::{PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind};
-use crate::references;
-use crate::utils;
-use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
-use crate::validation::{self, ResultIteratorExt, Validation::Success};
-use crate::NixFileStore;
-use itertools::concat;
+use std::fs::DirEntry;
+use std::path::Path;
+
+use anyhow::Context;
+use itertools::{concat, process_results};
 use lazy_static::lazy_static;
 use regex::Regex;
 use relative_path::RelativePathBuf;
-use std::fs::DirEntry;
-use std::path::Path;
+
+use crate::problem::{PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind};
+use crate::references;
+use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
+use crate::validation::{self, ResultIteratorExt, Validation::Success};
+use crate::NixFileStore;
 
 lazy_static! {
     static ref SHARD_NAME_REGEX: Regex = Regex::new(r"^[a-z0-9_-]{1,2}$").unwrap();
     static ref PACKAGE_NAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
+}
+
+/// Deterministic file listing so that tests are reproducible.
+pub fn read_dir_sorted(base_dir: &Path) -> anyhow::Result<Vec<DirEntry>> {
+    let ctx = || format!("Could not list directory {}", base_dir.display());
+    let listing = base_dir.read_dir().with_context(ctx)?;
+
+    process_results(listing, |listing| {
+        use itertools::Itertools;
+        Itertools::collect_vec(listing.sorted_by_key(|entry| entry.file_name()))
+    })
+    .with_context(ctx)
 }
 
 // Some utility functions for the basic structure
@@ -42,7 +56,7 @@ pub fn check_structure(
 ) -> validation::Result<Vec<String>> {
     let base_dir = path.join(BASE_SUBPATH);
 
-    let shard_results = utils::read_dir_sorted(&base_dir)?
+    let shard_results = read_dir_sorted(&base_dir)?
         .into_iter()
         .map(|shard_entry| -> validation::Result<_> {
             let shard_path = shard_entry.path();
@@ -71,7 +85,7 @@ pub fn check_structure(
                     Success(())
                 };
 
-                let entries = utils::read_dir_sorted(&shard_path)?;
+                let entries = read_dir_sorted(&shard_path)?;
 
                 let duplicate_results = entries
                     .iter()

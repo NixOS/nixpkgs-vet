@@ -1,13 +1,14 @@
-use crate::problem::{NixFileError, NixFileErrorKind, PathError, PathErrorKind, Problem};
-use crate::utils;
-use crate::validation::{self, ResultIteratorExt, Validation::Success};
-use crate::NixFileStore;
-use relative_path::RelativePath;
-
-use anyhow::Context;
-use rowan::ast::AstNode;
 use std::ffi::OsStr;
 use std::path::Path;
+
+use anyhow::Context;
+use relative_path::RelativePath;
+use rowan::ast::AstNode;
+
+use crate::problem::{NixFileError, NixFileErrorKind, PathError, PathErrorKind, Problem};
+use crate::structure::read_dir_sorted;
+use crate::validation::{self, ResultIteratorExt, Validation::Success};
+use crate::NixFileStore;
 
 /// Check that every package directory in pkgs/by-name doesn't link to outside that directory.
 /// Both symlinks and Nix path expressions are checked.
@@ -75,7 +76,7 @@ fn check_path(
     } else if path.is_dir() {
         // Recursively check each entry
         validation::sequence_(
-            utils::read_dir_sorted(&path)?
+            read_dir_sorted(&path)?
                 .into_iter()
                 .map(|entry| {
                     check_path(
