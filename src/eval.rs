@@ -403,54 +403,41 @@ fn by_name_override(
     definition: String,
     location: location::Location,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
-    // At this point, we completed two different checks for whether it's a `callPackage`
-    match (is_semantic_call_package, optional_syntactic_call_package) {
+    let Some(syntactic_call_package) = optional_syntactic_call_package else {
         // Something like `<attr> = foo`
-        (_, None) => {
-            ByNameOverrideOfNonSyntacticCallPackage::new(attribute_name, location, definition)
-                .into()
-        }
+        return ByNameOverrideOfNonSyntacticCallPackage::new(attribute_name, location, definition)
+            .into();
+    };
 
+    if !is_semantic_call_package {
         // Something like `<attr> = pythonPackages.callPackage ...`
-        (false, Some(_)) => {
-            ByNameOverrideOfNonTopLevelPackage::new(attribute_name, location, definition).into()
-        }
+        return ByNameOverrideOfNonTopLevelPackage::new(attribute_name, location, definition)
+            .into();
+    }
 
-        // Something like `<attr> = pkgs.callPackage ...`
-        (true, Some(syntactic_call_package)) => {
-            if let Some(actual_package_path) = syntactic_call_package.relative_path {
-                let expected_package_path = structure::relative_file_for_package(attribute_name);
-                if actual_package_path != expected_package_path {
-                    ByNameOverrideContainsWrongCallPackagePath::new(
-                        attribute_name,
-                        actual_package_path,
-                        location,
-                    )
-                    .into()
-                } else {
-                    // Manual definitions with empty arguments are not allowed anymore,
-                    // but existing ones should continue to be allowed.
-                    let manual_definition_ratchet = if syntactic_call_package.empty_arg {
-                        // This is the state to migrate away from.
-                        Loose(
-                            ByNameOverrideContainsEmptyArgument::new(
-                                attribute_name,
-                                location,
-                                definition,
-                            )
-                            .into(),
-                        )
-                    } else {
-                        // This is the state to migrate to.
-                        Tight
-                    };
+    let Some(actual_package_path) = syntactic_call_package.relative_path else {
+        return ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition).into();
+    };
 
-                    Success(manual_definition_ratchet)
-                }
-            } else {
-                ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition).into()
-            }
-        }
+    let expected_package_path = structure::relative_file_for_package(attribute_name);
+    if actual_package_path != expected_package_path {
+        return ByNameOverrideContainsWrongCallPackagePath::new(
+            attribute_name,
+            actual_package_path,
+            location,
+        )
+        .into();
+    }
+
+    // Manual definitions with empty arguments are not allowed anymore, but existing ones should
+    // continue to be allowed. This is the state to migrate away from.
+    if syntactic_call_package.empty_arg {
+        Success(Loose(
+            ByNameOverrideContainsEmptyArgument::new(attribute_name, location, definition).into(),
+        ))
+    } else {
+        // This is the state to migrate to.
+        Success(Tight)
     }
 }
 
