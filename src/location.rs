@@ -1,3 +1,23 @@
+use relative_path::RelativePathBuf;
+
+/// A location that's suitable for error messages.
+#[derive(Clone, Debug)]
+pub struct Location {
+    pub file: RelativePathBuf,
+    pub line: usize,
+    pub column: usize,
+}
+
+impl Location {
+    pub fn new(file: impl Into<RelativePathBuf>, line: usize, column: usize) -> Self {
+        Self {
+            file: file.into(),
+            line,
+            column,
+        }
+    }
+}
+
 /// A simple utility for calculating the line for a string offset.
 ///
 /// This doesn't do any Unicode handling, though that probably doesn't matter because newlines

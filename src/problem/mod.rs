@@ -237,7 +237,7 @@ impl fmt::Display for Problem {
             }) => {
                 let relative_package_dir = structure::relative_dir_for_package(package_name);
                 let expected_path_expr = create_path_expr(file, expected_package_path);
-                let indented_definition = indent_definition(*column, definition.clone());
+                let indented_definition = indent_definition(*column, definition);
 
                 match kind {
                     ByNameOverrideErrorKind::NonSyntacticCallPackage => {
@@ -433,7 +433,7 @@ impl fmt::Display for Problem {
     }
 }
 
-fn indent_definition(column: usize, definition: String) -> String {
+fn indent_definition(column: usize, definition: &str) -> String {
     // The entire code should be indented 4 spaces
     textwrap::indent(
         // But first we want to strip the code's natural indentation

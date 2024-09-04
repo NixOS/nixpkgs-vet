@@ -12,12 +12,12 @@ use crate::problem::{
     ByNameOverrideError, ByNameOverrideErrorKind, ByNameOverrideOfNonSyntacticCallPackage,
     ByNameUndefinedAttribute, NixEvalError, Problem,
 };
-use crate::ratchet;
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::NixFileStore;
+use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 
@@ -53,23 +53,25 @@ struct AttributeInfo {
 
 /// The structure returned by a successful `builtins.unsafeGetAttrPos`.
 #[derive(Deserialize, Clone, Debug)]
-pub struct Location {
+struct Location {
     pub file: PathBuf,
     pub line: usize,
     pub column: usize,
 }
 
 impl Location {
-    /// Returns the [file] field, but relative to Nixpkgs.
-    fn relative_file(&self, nixpkgs_path: &Path) -> anyhow::Result<RelativePathBuf> {
-        let path = self.file.strip_prefix(nixpkgs_path).with_context(|| {
+    /// Returns the location, but relative to the given Nixpkgs root.
+    fn relative(self, nixpkgs_path: &Path) -> anyhow::Result<location::Location> {
+        let Self { file, line, column } = self;
+        let path = file.strip_prefix(nixpkgs_path).with_context(|| {
             format!(
                 "The file ({}) is outside Nixpkgs ({})",
-                self.file.display(),
+                file.display(),
                 nixpkgs_path.display()
             )
         })?;
-        Ok(RelativePathBuf::from_path(path).expect("relative path"))
+        let relative_file = RelativePathBuf::from_path(path).expect("relative path");
+        Ok(location::Location::new(relative_file, line, column))
     }
 }
 
@@ -338,13 +340,11 @@ fn by_name(
                         let nix_file = nix_file_store.get(&location.file)?;
 
                         // The relative path of the Nix file, for error messages
-                        let relative_location_file =
-                            location.relative_file(nixpkgs_path).with_context(|| {
-                                format!(
-                                    "Failed to resolve the file where attribute {} is defined",
-                                    attribute_name
-                                )
-                            })?;
+                        let location = location.relative(nixpkgs_path).with_context(|| {
+                            format!(
+                                "Failed to resolve the file where attribute {attribute_name} is defined"
+                            )
+                        })?;
 
                         // Figure out whether it's an attribute definition of the form
                         // `= callPackage <arg1> <arg2>`, returning the arguments if so.
@@ -367,7 +367,6 @@ fn by_name(
                             optional_syntactic_call_package,
                             definition,
                             location,
-                            relative_location_file,
                         )
                     } else {
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
@@ -401,18 +400,18 @@ fn by_name_override(
     is_semantic_call_package: bool,
     optional_syntactic_call_package: Option<CallPackageArgumentInfo>,
     definition: String,
-    location: Location,
-    relative_location_file: RelativePathBuf,
+    location: location::Location,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
     let expected_package_path = structure::relative_file_for_package(attribute_name);
 
     let to_problem = |kind| {
+        let location::Location { file, line, column } = location.clone();
         Problem::ByNameOverride(ByNameOverrideError {
             package_name: attribute_name.to_owned(),
             expected_package_path: expected_package_path.to_owned(),
-            file: relative_location_file.clone(),
-            line: location.line,
-            column: location.column,
+            file,
+            line,
+            column,
             definition: definition.clone(),
             kind,
         })
@@ -421,13 +420,10 @@ fn by_name_override(
     // At this point, we completed two different checks for whether it's a `callPackage`
     match (is_semantic_call_package, optional_syntactic_call_package) {
         // Something like `<attr> = foo`
-        (_, None) => ByNameOverrideOfNonSyntacticCallPackage::new(
-            attribute_name,
-            relative_location_file,
-            location,
-            definition,
-        )
-        .into(),
+        (_, None) => {
+            ByNameOverrideOfNonSyntacticCallPackage::new(attribute_name, location, definition)
+                .into()
+        }
 
         // Something like `<attr> = pythonPackages.callPackage ...`
         (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
@@ -526,8 +522,8 @@ fn handle_non_by_name_attribute(
         // Parse the Nix file in the location
         let nix_file = nix_file_store.get(&location.file)?;
 
-        // The relative path of the Nix file, for error messages
-        let relative_location_file = location.relative_file(nixpkgs_path).with_context(|| {
+        // The relative location of the Nix file, for error messages
+        let location = location.relative(nixpkgs_path).with_context(|| {
             format!("Failed to resolve the file where attribute {attribute_name} is defined")
         })?;
 
@@ -581,7 +577,7 @@ fn handle_non_by_name_attribute(
                     _ => {
                         // Otherwise, the path is outside `pkgs/by-name`, which means it can be
                         // migrated.
-                        Loose((syntactic_call_package, relative_location_file))
+                        Loose((syntactic_call_package, location.file))
                     }
                 }
             }
