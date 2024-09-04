@@ -1,7 +1,7 @@
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::{
+use crate::problem::{
     ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixEvalError,
-    NixpkgsProblem,
+    Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::ratchet::{self, ManualDefinition, RatchetState};
@@ -220,7 +220,7 @@ pub fn check_values(
     if !result.status.success() {
         // Early return in case evaluation fails
         let stderr = String::from_utf8_lossy(&result.stderr).to_string();
-        return Ok(NixpkgsProblem::NixEval(NixEvalError { stderr }).into());
+        return Ok(Problem::NixEval(NixEvalError { stderr }).into());
     }
 
     // Parse the resulting JSON value
@@ -272,7 +272,7 @@ fn by_name(
     use ByNameAttribute::*;
 
     let to_validation = |kind| -> validation::Validation<RatchetState<ManualDefinition>> {
-        NixpkgsProblem::ByName(ByNameError {
+        Problem::ByName(ByNameError {
             attribute_name: attribute_name.to_owned(),
             kind,
         })
@@ -417,7 +417,7 @@ fn by_name_override(
     let expected_package_path = structure::relative_file_for_package(attribute_name);
 
     let to_problem = |kind| {
-        NixpkgsProblem::ByNameOverride(ByNameOverrideError {
+        Problem::ByNameOverride(ByNameOverrideError {
             package_name: attribute_name.to_owned(),
             expected_package_path: expected_package_path.to_owned(),
             file: relative_location_file,

@@ -10,7 +10,7 @@ use std::fmt;
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
 /// location
 #[derive(Clone)]
-pub enum NixpkgsProblem {
+pub enum Problem {
     Shard(ShardError),
     Package(PackageError),
     ByName(ByNameError),
@@ -146,10 +146,10 @@ pub struct NixEvalError {
     pub stderr: String,
 }
 
-impl fmt::Display for NixpkgsProblem {
+impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NixpkgsProblem::Shard(ShardError {
+            Problem::Shard(ShardError {
                 shard_name,
                 kind,
             }) => {
@@ -172,7 +172,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             }
-            NixpkgsProblem::Package(PackageError {
+            Problem::Package(PackageError {
                 relative_package_dir,
                 kind,
             }) => {
@@ -206,7 +206,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             }
-            NixpkgsProblem::ByName(ByNameError {
+            Problem::ByName(ByNameError {
                 attribute_name,
                 kind,
             }) => {
@@ -237,7 +237,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             }
-            NixpkgsProblem::ByNameOverride(ByNameOverrideError {
+            Problem::ByNameOverride(ByNameOverrideError {
                 package_name,
                 expected_package_path,
                 file,
@@ -324,7 +324,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::Path(PathError {
+            Problem::Path(PathError {
                 relative_package_dir,
                 subpath,
                 kind,
@@ -342,7 +342,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::NixFile(NixFileError {
+            Problem::NixFile(NixFileError {
                 relative_package_dir,
                 subpath,
                 line,
@@ -380,7 +380,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::TopLevelPackage(TopLevelPackageError {
+            Problem::TopLevelPackage(TopLevelPackageError {
                 package_name,
                 call_package_path,
                 file,
@@ -436,7 +436,7 @@ impl fmt::Display for NixpkgsProblem {
                         ),
                 }
             },
-            NixpkgsProblem::NixEval(NixEvalError { stderr }) => {
+            Problem::NixEval(NixEvalError { stderr }) => {
                 f.write_str(stderr)?;
                 write!(f, "- Nix evaluation failed for some package in `pkgs/by-name`, see error above")
             },

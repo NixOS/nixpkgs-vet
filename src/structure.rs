@@ -1,6 +1,4 @@
-use crate::nixpkgs_problem::{
-    NixpkgsProblem, PackageError, PackageErrorKind, ShardError, ShardErrorKind,
-};
+use crate::problem::{PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind};
 use crate::references;
 use crate::utils;
 use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
@@ -54,7 +52,7 @@ pub fn check_structure(
                 // README.md is allowed to be a file and not checked
                 Success(vec![])
             } else if !shard_path.is_dir() {
-                NixpkgsProblem::Shard(ShardError {
+                Problem::Shard(ShardError {
                     shard_name: shard_name.clone(),
                     kind: ShardErrorKind::ShardNonDir,
                 })
@@ -64,7 +62,7 @@ pub fn check_structure(
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
-                    NixpkgsProblem::Shard(ShardError {
+                    Problem::Shard(ShardError {
                         shard_name: shard_name.clone(),
                         kind: ShardErrorKind::InvalidShardName,
                     })
@@ -82,7 +80,7 @@ pub fn check_structure(
                         l.file_name().to_ascii_lowercase() == r.file_name().to_ascii_lowercase()
                     })
                     .map(|(l, r)| {
-                        NixpkgsProblem::Shard(ShardError {
+                        Problem::Shard(ShardError {
                             shard_name: shard_name.clone(),
                             kind: ShardErrorKind::CaseSensitiveDuplicate {
                                 first: l.file_name(),
@@ -129,7 +127,7 @@ fn check_package(
         RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}/{package_name}"));
 
     let to_validation = |kind| -> validation::Validation<()> {
-        NixpkgsProblem::Package(PackageError {
+        Problem::Package(PackageError {
             relative_package_dir: relative_package_dir.clone(),
             kind,
         })

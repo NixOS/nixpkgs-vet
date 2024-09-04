@@ -3,7 +3,7 @@
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::{NixpkgsProblem, TopLevelPackageError};
+use crate::problem::{Problem, TopLevelPackageError};
 use crate::validation::{self, Validation, Validation::Success};
 use relative_path::RelativePathBuf;
 use std::collections::HashMap;
@@ -58,7 +58,7 @@ impl Package {
 }
 
 /// The ratchet state of a generic ratchet check.
-pub enum RatchetState<Ratchet: ToNixpkgsProblem> {
+pub enum RatchetState<Ratchet: ToProblem> {
     /// The ratchet is loose. It can be tightened more. In other words, this is the legacy state
     /// we're trying to move away from.
     ///
@@ -75,32 +75,28 @@ pub enum RatchetState<Ratchet: ToNixpkgsProblem> {
     NonApplicable,
 }
 
-/// A trait that can convert an attribute-specific error context into a NixpkgsProblem.
-pub trait ToNixpkgsProblem {
+/// A trait that can convert an attribute-specific error context into a Problem.
+pub trait ToProblem {
     /// Context relating to the Nixpkgs that is being transitioned _to_.
     type ToContext;
 
-    /// How to convert an attribute-specific error context into a NixpkgsProblem.
-    fn to_nixpkgs_problem(
-        name: &str,
-        optional_from: Option<()>,
-        to: &Self::ToContext,
-    ) -> NixpkgsProblem;
+    /// How to convert an attribute-specific error context into a Problem.
+    fn to_problem(name: &str, optional_from: Option<()>, to: &Self::ToContext) -> Problem;
 }
 
-impl<Context: ToNixpkgsProblem> RatchetState<Context> {
+impl<Context: ToProblem> RatchetState<Context> {
     /// Compare the previous ratchet state of an attribute to the new state.
     /// The previous state may be `None` in case the attribute is new.
     fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         match (optional_from, to) {
             // Loosening a ratchet is not allowed.
             (Some(RatchetState::Tight), RatchetState::Loose(loose_context)) => {
-                Context::to_nixpkgs_problem(name, Some(()), loose_context).into()
+                Context::to_problem(name, Some(()), loose_context).into()
             }
 
             // Introducing a loose ratchet is also not allowed.
             (None, RatchetState::Loose(loose_context)) => {
-                Context::to_nixpkgs_problem(name, None, loose_context).into()
+                Context::to_problem(name, None, loose_context).into()
             }
 
             // Everything else is allowed, including:
@@ -130,14 +126,10 @@ impl<Context: ToNixpkgsProblem> RatchetState<Context> {
 ///   custom argument overrides.
 pub enum ManualDefinition {}
 
-impl ToNixpkgsProblem for ManualDefinition {
-    type ToContext = NixpkgsProblem;
+impl ToProblem for ManualDefinition {
+    type ToContext = Problem;
 
-    fn to_nixpkgs_problem(
-        _name: &str,
-        _optional_from: Option<()>,
-        to: &Self::ToContext,
-    ) -> NixpkgsProblem {
+    fn to_problem(_name: &str, _optional_from: Option<()>, to: &Self::ToContext) -> Problem {
         (*to).clone()
     }
 }
@@ -149,15 +141,11 @@ impl ToNixpkgsProblem for ManualDefinition {
 /// to `pkgs/top-level/all-packages.nix`.
 pub enum UsesByName {}
 
-impl ToNixpkgsProblem for UsesByName {
+impl ToProblem for UsesByName {
     type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
 
-    fn to_nixpkgs_problem(
-        name: &str,
-        optional_from: Option<()>,
-        (to, file): &Self::ToContext,
-    ) -> NixpkgsProblem {
-        NixpkgsProblem::TopLevelPackage(TopLevelPackageError {
+    fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
+        Problem::TopLevelPackage(TopLevelPackageError {
             package_name: name.to_owned(),
             call_package_path: to.relative_path.clone(),
             file: file.to_owned(),

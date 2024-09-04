@@ -1,6 +1,6 @@
 mod eval;
 mod nix_file;
-mod nixpkgs_problem;
+mod problem;
 mod ratchet;
 mod references;
 mod status;

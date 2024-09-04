@@ -1,6 +1,4 @@
-use crate::nixpkgs_problem::{
-    NixFileError, NixFileErrorKind, NixpkgsProblem, PathError, PathErrorKind,
-};
+use crate::problem::{NixFileError, NixFileErrorKind, PathError, PathErrorKind, Problem};
 use crate::utils;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
@@ -50,7 +48,7 @@ fn check_path(
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
     let to_validation = |kind| -> validation::Validation<()> {
-        NixpkgsProblem::Path(PathError {
+        Problem::Path(PathError {
             relative_package_dir: relative_package_dir.to_owned(),
             subpath: subpath.to_owned(),
             kind,
@@ -137,7 +135,7 @@ fn check_nix_file(
             };
 
             let to_validation = |kind| -> validation::Validation<()> {
-                NixpkgsProblem::NixFile(NixFileError {
+                Problem::NixFile(NixFileError {
                     relative_package_dir: relative_package_dir.to_owned(),
                     subpath: subpath.to_owned(),
                     line,
