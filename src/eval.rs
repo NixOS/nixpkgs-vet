@@ -1,7 +1,8 @@
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
-    ByNameOverrideError, ByNameOverrideErrorKind, ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameOverrideError, ByNameOverrideErrorKind, ByNameOverrideOfNonSyntacticCallPackage,
+    ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet;
 use crate::ratchet::RatchetState::{Loose, Tight};
@@ -52,7 +53,7 @@ struct AttributeInfo {
 
 /// The structure returned by a successful `builtins.unsafeGetAttrPos`.
 #[derive(Deserialize, Clone, Debug)]
-struct Location {
+pub struct Location {
     pub file: PathBuf,
     pub line: usize,
     pub column: usize,
@@ -409,10 +410,10 @@ fn by_name_override(
         Problem::ByNameOverride(ByNameOverrideError {
             package_name: attribute_name.to_owned(),
             expected_package_path: expected_package_path.to_owned(),
-            file: relative_location_file,
+            file: relative_location_file.clone(),
             line: location.line,
             column: location.column,
-            definition,
+            definition: definition.clone(),
             kind,
         })
     };
@@ -420,7 +421,13 @@ fn by_name_override(
     // At this point, we completed two different checks for whether it's a `callPackage`
     match (is_semantic_call_package, optional_syntactic_call_package) {
         // Something like `<attr> = foo`
-        (_, None) => to_problem(ByNameOverrideErrorKind::NonSyntacticCallPackage).into(),
+        (_, None) => ByNameOverrideOfNonSyntacticCallPackage::new(
+            attribute_name,
+            relative_location_file,
+            location,
+            definition,
+        )
+        .into(),
 
         // Something like `<attr> = pythonPackages.callPackage ...`
         (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
