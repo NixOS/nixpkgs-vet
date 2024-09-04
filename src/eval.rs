@@ -9,8 +9,8 @@ use tempfile::Builder;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
-    ByNameOverrideContainsEmptyArgument, ByNameOverrideContainsWrongCallPackagePath,
-    ByNameOverrideError, ByNameOverrideErrorKind, ByNameOverrideOfNonSyntacticCallPackage,
+    ByNameOverrideContainsEmptyArgument, ByNameOverrideContainsEmptyPath,
+    ByNameOverrideContainsWrongCallPackagePath, ByNameOverrideOfNonSyntacticCallPackage,
     ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
@@ -403,21 +403,6 @@ fn by_name_override(
     definition: String,
     location: location::Location,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
-    let expected_package_path = structure::relative_file_for_package(attribute_name);
-
-    let to_problem = |kind| {
-        let location::Location { file, line, column } = location.clone();
-        Problem::ByNameOverride(ByNameOverrideError {
-            package_name: attribute_name.to_owned(),
-            expected_package_path: expected_package_path.to_owned(),
-            file,
-            line,
-            column,
-            definition: definition.clone(),
-            kind,
-        })
-    };
-
     // At this point, we completed two different checks for whether it's a `callPackage`
     match (is_semantic_call_package, optional_syntactic_call_package) {
         // Something like `<attr> = foo`
@@ -434,6 +419,7 @@ fn by_name_override(
         // Something like `<attr> = pkgs.callPackage ...`
         (true, Some(syntactic_call_package)) => {
             if let Some(actual_package_path) = syntactic_call_package.relative_path {
+                let expected_package_path = structure::relative_file_for_package(attribute_name);
                 if actual_package_path != expected_package_path {
                     ByNameOverrideContainsWrongCallPackagePath::new(
                         attribute_name,
@@ -462,8 +448,7 @@ fn by_name_override(
                     Success(manual_definition_ratchet)
                 }
             } else {
-                // No path...
-                to_problem(ByNameOverrideErrorKind::NonPath).into()
+                ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition).into()
             }
         }
     }
