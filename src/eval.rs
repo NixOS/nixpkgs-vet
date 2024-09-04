@@ -10,7 +10,7 @@ use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
     ByNameOverrideError, ByNameOverrideErrorKind, ByNameOverrideOfNonSyntacticCallPackage,
-    ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
@@ -426,7 +426,9 @@ fn by_name_override(
         }
 
         // Something like `<attr> = pythonPackages.callPackage ...`
-        (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
+        (false, Some(_)) => {
+            ByNameOverrideOfNonTopLevelPackage::new(attribute_name, location, definition).into()
+        }
 
         // Something like `<attr> = pkgs.callPackage ...`
         (true, Some(syntactic_call_package)) => {

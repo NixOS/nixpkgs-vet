@@ -13,12 +13,14 @@ mod npv_101_by_name_non_derivation;
 mod npv_102_by_name_internal_call_package_used;
 mod npv_103_by_name_cannot_determine_attribute_location;
 mod npv_104_by_name_override_of_non_syntactic_call_package;
+mod npv_105_by_name_override_of_non_top_level_package;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
 pub use npv_102_by_name_internal_call_package_used::ByNameInternalCallPackageUsed;
 pub use npv_103_by_name_cannot_determine_attribute_location::ByNameCannotDetermineAttributeLocation;
 pub use npv_104_by_name_override_of_non_syntactic_call_package::ByNameOverrideOfNonSyntacticCallPackage;
+pub use npv_105_by_name_override_of_non_top_level_package::ByNameOverrideOfNonTopLevelPackage;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -39,6 +41,9 @@ pub enum Problem {
 
     /// NPV-104: non-syntactic override of by-name package
     ByNameOverrideOfNonSyntacticCallPackage(ByNameOverrideOfNonSyntacticCallPackage),
+
+    /// NPV-105: by-name override of ill-defined callPackage
+    ByNameOverrideOfNonTopLevelPackage(ByNameOverrideOfNonTopLevelPackage),
 
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
@@ -167,6 +172,7 @@ impl fmt::Display for Problem {
             Self::ByNameInternalCallPackageUsed(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameCannotDetermineAttributeLocation(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameOverrideOfNonSyntacticCallPackage(inner) => fmt::Display::fmt(inner, f),
+            Self::ByNameOverrideOfNonTopLevelPackage(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Shard(ShardError {
