@@ -1,3 +1,11 @@
+use std::path::{Path, PathBuf};
+use std::{env, fs, process};
+
+use relative_path::RelativePathBuf;
+use anyhow::Context;
+use serde::Deserialize;
+use tempfile::Builder;
+
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
@@ -6,18 +14,10 @@ use crate::problem::{
 };
 use crate::ratchet;
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::structure;
-use crate::utils;
+use crate::structure::{self, BASE_SUBPATH};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::NixFileStore;
-use relative_path::RelativePathBuf;
-use std::path::{Path, PathBuf};
-use std::{env, fs, process};
-
-use anyhow::Context;
-use serde::Deserialize;
-use tempfile::Builder;
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 
@@ -563,7 +563,7 @@ fn handle_non_by_name_attribute(
             (true, Some(syntactic_call_package)) => {
                 // It's only possible to migrate such a definitions if..
                 match syntactic_call_package.relative_path {
-                    Some(ref rel_path) if rel_path.starts_with(utils::BASE_SUBPATH) => {
+                    Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
                         // ..the path is not already within `pkgs/by-name` like
                         //
                         //   foo-variant = callPackage ../by-name/fo/foo/package.nix {

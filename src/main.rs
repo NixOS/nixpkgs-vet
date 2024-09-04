@@ -102,7 +102,7 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
         )
     })?;
 
-    if !nixpkgs_path.join(utils::BASE_SUBPATH).exists() {
+    if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
         // No pkgs/by-name directory, always valid
         return Ok(Success(ratchet::Nixpkgs::default()));
     }
@@ -127,7 +127,7 @@ mod tests {
     use pretty_assertions::StrComparison;
     use tempfile::{tempdir_in, TempDir};
 
-    use super::{process, utils::BASE_SUBPATH};
+    use super::{process, structure::BASE_SUBPATH};
 
     #[test]
     fn tests_dir() -> anyhow::Result<()> {

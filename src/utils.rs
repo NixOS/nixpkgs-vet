@@ -1,6 +1,3 @@
-pub const BASE_SUBPATH: &str = "pkgs/by-name";
-pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
-
 /// A simple utility for calculating the line for a string offset.
 ///
 /// This doesn't do any Unicode handling, though that probably doesn't matter because newlines

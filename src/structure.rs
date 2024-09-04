@@ -9,9 +9,11 @@ use relative_path::RelativePathBuf;
 
 use crate::problem::{PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind};
 use crate::references;
-use crate::utils::{BASE_SUBPATH, PACKAGE_NIX_FILENAME};
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
+
+pub const BASE_SUBPATH: &str = "pkgs/by-name";
+pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
 lazy_static! {
     static ref SHARD_NAME_REGEX: Regex = Regex::new(r"^[a-z0-9_-]{1,2}$").unwrap();

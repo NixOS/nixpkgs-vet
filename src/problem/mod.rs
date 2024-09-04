@@ -6,8 +6,7 @@ use indoc::writedoc;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 
-use crate::structure;
-use crate::utils::PACKAGE_NIX_FILENAME;
+use crate::structure::{self, PACKAGE_NIX_FILENAME};
 
 mod npv_100_by_name_undefined_attribute;
 mod npv_101_by_name_non_derivation;
