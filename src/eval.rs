@@ -1,10 +1,10 @@
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    ByNameError, ByNameErrorKind, ByNameInternalCallPackageUsed, ByNameNonDerivation,
+    ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
     ByNameOverrideError, ByNameOverrideErrorKind, ByNameUndefinedAttribute, NixEvalError, Problem,
 };
+use crate::ratchet;
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::ratchet::{self, ManualDefinition, RatchetState};
 use crate::structure;
 use crate::utils;
 use crate::validation::ResultIteratorExt as _;
@@ -268,29 +268,18 @@ fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
-    use ratchet::RatchetState::*;
-    use ByNameAttribute::*;
-
-    let to_validation = |kind| -> validation::Validation<RatchetState<ManualDefinition>> {
-        Problem::ByName(ByNameError {
-            attribute_name: attribute_name.to_owned(),
-            kind,
-        })
-        .into()
-    };
-
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.  This match
     // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
     // definition could be removed.
     let manual_definition_result = match by_name_attribute {
         // The attribute is missing.
-        Missing => {
+        ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
             ByNameUndefinedAttribute::new(attribute_name).into()
         }
         // The attribute exists
-        Existing(AttributeInfo {
+        ByNameAttribute::Existing(AttributeInfo {
             // But it's not an attribute set, which limits the amount of information we can get
             // about this attribute (see ./eval.nix)
             attribute_variant: AttributeVariant::NonAttributeSet,
@@ -304,7 +293,7 @@ fn by_name(
             ByNameNonDerivation::new(attribute_name).into()
         }
         // The attribute exists
-        Existing(AttributeInfo {
+        ByNameAttribute::Existing(AttributeInfo {
             // And it's an attribute set, which allows us to get more information about it
             attribute_variant:
                 AttributeVariant::AttributeSet {
@@ -383,7 +372,7 @@ fn by_name(
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
                         // over, e.g. if it's defined in aliases.nix.
                         // We can't verify whether its of the expected `callPackage`, so error out.
-                        to_validation(ByNameErrorKind::CannotDetermineAttributeLocation)
+                        ByNameCannotDetermineAttributeLocation::new(attribute_name).into()
                     }
                 }
             };
