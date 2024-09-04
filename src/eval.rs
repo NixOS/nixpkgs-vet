@@ -1,7 +1,7 @@
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    ByNameError, ByNameErrorKind, ByNameNonDerivation, ByNameOverrideError,
-    ByNameOverrideErrorKind, ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameError, ByNameErrorKind, ByNameInternalCallPackageUsed, ByNameNonDerivation,
+    ByNameOverrideError, ByNameOverrideErrorKind, ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::ratchet::{self, ManualDefinition, RatchetState};
@@ -330,7 +330,7 @@ fn by_name(
                         // Such an automatic definition should definitely not have a location.
                         // Having one indicates that somebody is using
                         // `_internalCallByNamePackageFile`,
-                        to_validation(ByNameErrorKind::InternalCallPackageUsed)
+                        ByNameInternalCallPackageUsed::new(attribute_name).into()
                     } else {
                         Success(Tight)
                     }

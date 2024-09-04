@@ -11,9 +11,11 @@ use crate::utils::PACKAGE_NIX_FILENAME;
 
 mod npv_100_by_name_undefined_attribute;
 mod npv_101_by_name_non_derivation;
+mod npv_102_by_name_internal_call_package_used;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
+pub use npv_102_by_name_internal_call_package_used::ByNameInternalCallPackageUsed;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -25,6 +27,9 @@ pub enum Problem {
 
     /// NPV-101: attribute is not a derivation
     ByNameNonDerivation(ByNameNonDerivation),
+
+    /// NPV-102: attribute uses `_internalCallByNamePackageFile`
+    ByNameInternalCallPackageUsed(ByNameInternalCallPackageUsed),
 
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
@@ -167,6 +172,7 @@ impl fmt::Display for Problem {
         match self {
             Self::ByNameUndefinedAttribute(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameNonDerivation(inner) => fmt::Display::fmt(inner, f),
+            Self::ByNameInternalCallPackageUsed(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Shard(ShardError {
