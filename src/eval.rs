@@ -9,8 +9,9 @@ use tempfile::Builder;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
-    ByNameOverrideError, ByNameOverrideErrorKind, ByNameOverrideOfNonSyntacticCallPackage,
-    ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameOverrideContainsWrongCallPackagePath, ByNameOverrideError, ByNameOverrideErrorKind,
+    ByNameOverrideOfNonSyntacticCallPackage, ByNameOverrideOfNonTopLevelPackage,
+    ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
@@ -434,10 +435,11 @@ fn by_name_override(
         (true, Some(syntactic_call_package)) => {
             if let Some(actual_package_path) = syntactic_call_package.relative_path {
                 if actual_package_path != expected_package_path {
-                    // Wrong path
-                    to_problem(ByNameOverrideErrorKind::WrongCallPackagePath {
-                        actual_path: actual_package_path,
-                    })
+                    ByNameOverrideContainsWrongCallPackagePath::new(
+                        attribute_name,
+                        actual_package_path,
+                        location,
+                    )
                     .into()
                 } else {
                     // Manual definitions with empty arguments are not allowed anymore,
