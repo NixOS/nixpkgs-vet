@@ -10,8 +10,10 @@ use crate::structure;
 use crate::utils::PACKAGE_NIX_FILENAME;
 
 mod npv_100_by_name_undefined_attribute;
+mod npv_101_by_name_non_derivation;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
+pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -20,6 +22,9 @@ pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
     ByNameUndefinedAttribute(ByNameUndefinedAttribute),
+
+    /// NPV-101: attribute is not a derivation
+    ByNameNonDerivation(ByNameNonDerivation),
 
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
@@ -161,6 +166,7 @@ impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::ByNameUndefinedAttribute(inner) => fmt::Display::fmt(inner, f),
+            Self::ByNameNonDerivation(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Shard(ShardError {

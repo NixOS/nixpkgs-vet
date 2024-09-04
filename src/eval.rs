@@ -1,7 +1,7 @@
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind,
-    ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameError, ByNameErrorKind, ByNameNonDerivation, ByNameOverrideError,
+    ByNameOverrideErrorKind, ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::ratchet::{self, ManualDefinition, RatchetState};
@@ -301,7 +301,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            to_validation(ByNameErrorKind::NonDerivation)
+            ByNameNonDerivation::new(attribute_name).into()
         }
         // The attribute exists
         Existing(AttributeInfo {
@@ -317,7 +317,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                to_validation(ByNameErrorKind::NonDerivation).map(|_| ())
+                ByNameNonDerivation::new(attribute_name).into()
             };
 
             // If the definition looks correct
