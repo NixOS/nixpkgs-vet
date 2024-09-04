@@ -18,6 +18,7 @@ rowan = "0.15.16"
 indoc = "2.0.5"
 relative-path = "1.9.3"
 textwrap = "0.16.1"
+derive-enum-from-into = "0.2.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

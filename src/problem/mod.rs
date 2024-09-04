@@ -1,16 +1,27 @@
-use crate::structure;
-use crate::utils::PACKAGE_NIX_FILENAME;
+use std::ffi::OsString;
+use std::fmt;
+
+use derive_enum_from_into::EnumFrom;
 use indoc::writedoc;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
-use std::ffi::OsString;
-use std::fmt;
+
+use crate::structure;
+use crate::utils::PACKAGE_NIX_FILENAME;
+
+mod npv_100_by_name_undefined_attribute;
+
+pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
 /// location
-#[derive(Clone)]
+#[derive(Clone, EnumFrom)]
 pub enum Problem {
+    /// NPV-100: attribute is not defined but it should be defined automatically
+    ByNameUndefinedAttribute(ByNameUndefinedAttribute),
+
+    // By the end of this PR, all these will be gone.
     Shard(ShardError),
     Package(PackageError),
     ByName(ByNameError),
@@ -149,6 +160,9 @@ pub struct NixEvalError {
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::ByNameUndefinedAttribute(inner) => fmt::Display::fmt(inner, f),
+
+            // By the end of this PR, all these cases will vanish.
             Problem::Shard(ShardError {
                 shard_name,
                 kind,

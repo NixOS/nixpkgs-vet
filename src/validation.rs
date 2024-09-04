@@ -16,10 +16,10 @@ pub enum Validation<A> {
     Success(A),
 }
 
-impl<A> From<Problem> for Validation<A> {
+impl<A, P: Into<Problem>> From<P> for Validation<A> {
     /// Create a `Validation<A>` from a single check problem
-    fn from(value: Problem) -> Self {
-        Failure(vec![value])
+    fn from(value: P) -> Self {
+        Failure(vec![value.into()])
     }
 }
 

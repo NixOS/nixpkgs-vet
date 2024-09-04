@@ -1,7 +1,7 @@
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixEvalError,
-    Problem,
+    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind,
+    ByNameUndefinedAttribute, NixEvalError, Problem,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::ratchet::{self, ManualDefinition, RatchetState};
@@ -287,7 +287,7 @@ fn by_name(
         Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
-            to_validation(ByNameErrorKind::UndefinedAttr)
+            ByNameUndefinedAttribute::new(attribute_name).into()
         }
         // The attribute exists
         Existing(AttributeInfo {
