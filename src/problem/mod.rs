@@ -63,7 +63,6 @@ pub enum Problem {
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
     Package(PackageError),
-    ByNameOverride(ByNameOverrideError),
     Path(PathError),
     NixFile(NixFileError),
     TopLevelPackage(TopLevelPackageError),
@@ -104,28 +103,6 @@ pub enum PackageErrorKind {
     },
     PackageNixNonExistent,
     PackageNixDir,
-}
-
-/// An error related to packages in `pkgs/by-name` that are manually overridden, e.g. in
-/// all-packages.nix
-#[derive(Clone)]
-pub struct ByNameOverrideError {
-    pub package_name: String,
-    pub expected_package_path: RelativePathBuf,
-    pub file: RelativePathBuf,
-    pub line: usize,
-    pub column: usize,
-    pub definition: String,
-    pub kind: ByNameOverrideErrorKind,
-}
-
-#[derive(Clone)]
-pub enum ByNameOverrideErrorKind {
-    NonSyntacticCallPackage,
-    NonToplevelCallPackage,
-    WrongCallPackagePath { actual_path: RelativePathBuf },
-    EmptyArgument,
-    NonPath,
 }
 
 /// An error that results from checks that verify a specific path does not reference outside the
@@ -250,93 +227,6 @@ impl fmt::Display for Problem {
                         ),
                 }
             }
-            Problem::ByNameOverride(ByNameOverrideError {
-                package_name,
-                expected_package_path,
-                file,
-                line,
-                column,
-                definition,
-                kind,
-            }) => {
-                let relative_package_dir = structure::relative_dir_for_package(package_name);
-                let expected_path_expr = create_path_expr(file, expected_package_path);
-                let indented_definition = indent_definition(*column, definition);
-
-                match kind {
-                    ByNameOverrideErrorKind::NonSyntacticCallPackage => {
-
-                        writedoc!(
-                            f,
-                            "
-                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
-
-                              However, in this PR, it isn't defined that way. See the definition in {file}:{line}
-
-                            {indented_definition}
-                            ",
-                        )
-                    }
-                    ByNameOverrideErrorKind::NonToplevelCallPackage =>
-                        writedoc!(
-                            f,
-                            "
-                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
-
-                              However, in this PR, a different `callPackage` is used. See the definition in {file}:{line}:
-
-                            {indented_definition}
-                            ",
-                        ),
-                    ByNameOverrideErrorKind::WrongCallPackagePath { actual_path } => {
-                        let actual_path_expr = create_path_expr(file, actual_path);
-                        writedoc!(
-                            f,
-                            "
-                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
-
-                              However, in this PR, the first `callPackage` argument is the wrong path. See the definition in {file}:{line}:
-
-                                {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
-                            ",
-                        )
-                    }
-                    ByNameOverrideErrorKind::EmptyArgument =>
-                        writedoc!(
-                            f,
-                            "
-                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
-
-                              However, in this PR, the second argument is empty. See the definition in {file}:{line}:
-
-                            {indented_definition}
-
-                              Such a definition is provided automatically and therefore not necessary. Please remove it.
-                            ",
-                        ),
-                    ByNameOverrideErrorKind::NonPath =>
-                        writedoc!(
-                            f,
-                            "
-                            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
-
-                                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
-
-                              However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
-
-                            {indented_definition}
-                            ",
-                        ),
-                }
-            },
             Problem::Path(PathError {
                 relative_package_dir,
                 subpath,
