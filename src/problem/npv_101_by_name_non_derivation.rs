@@ -2,23 +2,22 @@ use std::fmt;
 
 use crate::structure;
 
-use super::{ByNameError, ByNameErrorKind};
-
 #[derive(Clone)]
-pub struct ByNameNonDerivation(ByNameError);
+pub struct ByNameNonDerivation {
+    attribute_name: String,
+}
 
 impl ByNameNonDerivation {
     pub fn new(attribute_name: impl Into<String>) -> Self {
-        Self(ByNameError {
+        Self {
             attribute_name: attribute_name.into(),
-            kind: ByNameErrorKind::NonDerivation,
-        })
+        }
     }
 }
 
 impl fmt::Display for ByNameNonDerivation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self(ByNameError { attribute_name, .. }) = self;
+        let Self { attribute_name } = self;
         let relative_package_file = structure::relative_file_for_package(attribute_name);
         write!(
             f,

@@ -39,7 +39,6 @@ pub enum Problem {
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
     Package(PackageError),
-    ByName(ByNameError),
     ByNameOverride(ByNameOverrideError),
     Path(PathError),
     NixFile(NixFileError),
@@ -81,22 +80,6 @@ pub enum PackageErrorKind {
     },
     PackageNixNonExistent,
     PackageNixDir,
-}
-
-/// An error related to checks involving by-name attributes. For example, attribute `foo` in
-/// `pkgs/by-name/fo/foo/package.nix`.
-#[derive(Clone)]
-pub struct ByNameError {
-    pub attribute_name: String,
-    pub kind: ByNameErrorKind,
-}
-
-#[derive(Clone)]
-pub enum ByNameErrorKind {
-    UndefinedAttr,
-    NonDerivation,
-    InternalCallPackageUsed,
-    CannotDetermineAttributeLocation,
 }
 
 /// An error related to packages in `pkgs/by-name` that are manually overridden, e.g. in
@@ -235,37 +218,6 @@ impl fmt::Display for Problem {
                         write!(
                             f,
                             "- {relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
-                        ),
-                }
-            }
-            Problem::ByName(ByNameError {
-                attribute_name,
-                kind,
-            }) => {
-                match kind {
-                    ByNameErrorKind::UndefinedAttr => {
-                        let relative_package_file = structure::relative_file_for_package(attribute_name);
-                        write!(
-                            f,
-                            "- pkgs.{attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
-                        )
-                    }
-                    ByNameErrorKind::NonDerivation => {
-                        let relative_package_file = structure::relative_file_for_package(attribute_name);
-                        write!(
-                            f,
-                            "- pkgs.{attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
-                        )
-                    }
-                    ByNameErrorKind::InternalCallPackageUsed =>
-                        write!(
-                            f,
-                            "- pkgs.{attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
-                        ),
-                    ByNameErrorKind::CannotDetermineAttributeLocation =>
-                        write!(
-                            f,
-                            "- pkgs.{attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
                         ),
                 }
             }
