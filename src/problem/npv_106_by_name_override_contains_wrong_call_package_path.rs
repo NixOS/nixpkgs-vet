@@ -1,5 +1,6 @@
 use std::fmt;
 
+use derive_new::new;
 use indoc::writedoc;
 use relative_path::RelativePathBuf;
 
@@ -8,25 +9,13 @@ use crate::structure;
 
 use super::create_path_expr;
 
-#[derive(Clone)]
+#[derive(Clone, new)]
 pub struct ByNameOverrideContainsWrongCallPackagePath {
+    #[new(into)]
     package_name: String,
+    #[new(into)]
     actual_path: RelativePathBuf,
     location: Location,
-}
-
-impl ByNameOverrideContainsWrongCallPackagePath {
-    pub fn new(
-        package_name: impl Into<String>,
-        actual_path: impl Into<RelativePathBuf>,
-        location: impl Into<Location>,
-    ) -> Self {
-        Self {
-            package_name: package_name.into(),
-            actual_path: actual_path.into(),
-            location: location.into(),
-        }
-    }
 }
 
 impl fmt::Display for ByNameOverrideContainsWrongCallPackagePath {

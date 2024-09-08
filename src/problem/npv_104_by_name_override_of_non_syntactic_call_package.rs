@@ -1,5 +1,6 @@
 use std::fmt;
 
+use derive_new::new;
 use indoc::writedoc;
 
 use crate::location::Location;
@@ -7,25 +8,13 @@ use crate::structure;
 
 use super::{create_path_expr, indent_definition};
 
-#[derive(Clone)]
+#[derive(Clone, new)]
 pub struct ByNameOverrideOfNonSyntacticCallPackage {
+    #[new(into)]
     package_name: String,
     location: Location,
+    #[new(into)]
     definition: String,
-}
-
-impl ByNameOverrideOfNonSyntacticCallPackage {
-    pub fn new(
-        attribute_name: impl Into<String>,
-        location: impl Into<Location>,
-        definition: impl Into<String>,
-    ) -> Self {
-        Self {
-            package_name: attribute_name.into(),
-            location: location.into(),
-            definition: definition.into(),
-        }
-    }
 }
 
 impl fmt::Display for ByNameOverrideOfNonSyntacticCallPackage {

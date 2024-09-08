@@ -1,16 +1,11 @@
 use std::fmt;
 
-#[derive(Clone)]
-pub struct ByNameInternalCallPackageUsed {
-    attribute_name: String,
-}
+use derive_new::new;
 
-impl ByNameInternalCallPackageUsed {
-    pub fn new(attribute_name: impl Into<String>) -> Self {
-        Self {
-            attribute_name: attribute_name.into(),
-        }
-    }
+#[derive(Clone, new)]
+pub struct ByNameInternalCallPackageUsed {
+    #[new(into)]
+    attribute_name: String,
 }
 
 impl fmt::Display for ByNameInternalCallPackageUsed {

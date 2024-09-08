@@ -1,18 +1,13 @@
 use std::fmt;
 
+use derive_new::new;
+
 use crate::structure;
 
-#[derive(Clone)]
+#[derive(Clone, new)]
 pub struct ByNameNonDerivation {
+    #[new(into)]
     attribute_name: String,
-}
-
-impl ByNameNonDerivation {
-    pub fn new(attribute_name: impl Into<String>) -> Self {
-        Self {
-            attribute_name: attribute_name.into(),
-        }
-    }
 }
 
 impl fmt::Display for ByNameNonDerivation {
