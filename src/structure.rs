@@ -8,7 +8,8 @@ use regex::Regex;
 use relative_path::RelativePathBuf;
 
 use crate::problem::{
-    ByNameShardIsNotDirectory, PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind,
+    ByNameShardIsInvalid, ByNameShardIsNotDirectory, PackageError, PackageErrorKind, Problem,
+    ShardError, ShardErrorKind,
 };
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -76,11 +77,7 @@ pub fn check_structure(
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
-                    Problem::Shard(ShardError {
-                        shard_name: shard_name.clone(),
-                        kind: ShardErrorKind::InvalidShardName,
-                    })
-                    .into()
+                    ByNameShardIsInvalid::new(shard_name.clone()).into()
                 } else {
                     Success(())
                 };
