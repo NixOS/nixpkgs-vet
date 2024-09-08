@@ -17,6 +17,7 @@ mod npv_105_by_name_override_of_non_top_level_package;
 mod npv_106_by_name_override_contains_wrong_call_package_path;
 mod npv_107_by_name_override_contains_empty_argument;
 mod npv_108_by_name_override_contains_empty_path;
+mod npv_109_by_name_shard_is_not_directory;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -27,6 +28,7 @@ pub use npv_105_by_name_override_of_non_top_level_package::ByNameOverrideOfNonTo
 pub use npv_106_by_name_override_contains_wrong_call_package_path::ByNameOverrideContainsWrongCallPackagePath;
 pub use npv_107_by_name_override_contains_empty_argument::ByNameOverrideContainsEmptyArgument;
 pub use npv_108_by_name_override_contains_empty_path::ByNameOverrideContainsEmptyPath;
+pub use npv_109_by_name_shard_is_not_directory::ByNameShardIsNotDirectory;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -59,6 +61,9 @@ pub enum Problem {
 
     /// NPV-108: by-name override contains empty path
     ByNameOverrideContainsEmptyPath(ByNameOverrideContainsEmptyPath),
+
+    /// NPV-109: by-name shard is not a directory
+    ByNameShardIsNotDirectory(ByNameShardIsNotDirectory),
 
     // By the end of this PR, all these will be gone.
     Shard(ShardError),
@@ -168,6 +173,7 @@ impl fmt::Display for Problem {
             Self::ByNameOverrideContainsWrongCallPackagePath(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameOverrideContainsEmptyArgument(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameOverrideContainsEmptyPath(inner) => fmt::Display::fmt(inner, f),
+            Self::ByNameShardIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Shard(ShardError {

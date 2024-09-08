@@ -7,7 +7,9 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use relative_path::RelativePathBuf;
 
-use crate::problem::{PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind};
+use crate::problem::{
+    ByNameShardIsNotDirectory, PackageError, PackageErrorKind, Problem, ShardError, ShardErrorKind,
+};
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
@@ -68,13 +70,9 @@ pub fn check_structure(
                 // README.md is allowed to be a file and not checked
                 Success(vec![])
             } else if !shard_path.is_dir() {
-                Problem::Shard(ShardError {
-                    shard_name: shard_name.clone(),
-                    kind: ShardErrorKind::ShardNonDir,
-                })
-                .into()
-                // We can't check for any other errors if it's a file, since there's no
+                // We can't check for any other errors if it's not a directory, since there are no
                 // subdirectories to check.
+                ByNameShardIsNotDirectory::new(shard_name).into()
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
