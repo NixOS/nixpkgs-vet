@@ -10,7 +10,7 @@ use relative_path::RelativePathBuf;
 use crate::problem::{
     ByNameShardIsCaseSensitiveDuplicate, ByNameShardIsInvalid, ByNameShardIsNotDirectory,
     InvalidPackageDirectoryName, PackageDirectoryIsNotDirectory, PackageError, PackageErrorKind,
-    Problem,
+    PackageInWrongShard, Problem,
 };
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -157,12 +157,10 @@ fn check_package(
 
         let correct_relative_package_dir = relative_dir_for_package(&package_name);
         let result = result.and(if relative_package_dir != correct_relative_package_dir {
-            // Only show this error if we have a valid shard and package name. If one of those is
-            // wrong, you should fix that first.
+            // Only show this error if we have a valid shard and package name.
+            // If one of those is wrong, you should fix that first.
             if shard_name_valid && package_name_valid {
-                to_validation(PackageErrorKind::IncorrectShard {
-                    correct_relative_package_dir: correct_relative_package_dir.clone(),
-                })
+                PackageInWrongShard::new(package_name.clone(), relative_package_dir.clone()).into()
             } else {
                 Success(())
             }
