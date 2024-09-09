@@ -8,7 +8,7 @@ use rowan::ast::AstNode;
 use crate::problem::{
     NixFileContainsPathInterpolation, NixFileContainsPathOutsideDirectory,
     NixFileContainsSearchPath, NixFileContainsUnresolvablePath,
-    PackageContainsSymlinkPointingOutside, PathError, PathErrorKind, Problem,
+    PackageContainsSymlinkPointingOutside, PackageContainsUnresolvableSymlink,
 };
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -52,14 +52,6 @@ fn check_path(
     subpath: &RelativePath,
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
-    let to_validation = |kind| -> validation::Validation<()> {
-        Problem::Path(PathError {
-            relative_package_dir: relative_package_dir.to_owned(),
-            subpath: subpath.to_owned(),
-            kind,
-        })
-        .into()
-    };
 
     Ok(if path.is_symlink() {
         // Check whether the symlink resolves to outside the package directory.
@@ -73,9 +65,9 @@ fn check_path(
                     Success(())
                 }
             }
-            Err(io_error) => to_validation(PathErrorKind::UnresolvableSymlink {
-                io_error: io_error.to_string(),
-            }),
+            Err(err) => {
+                PackageContainsUnresolvableSymlink::new(relative_package_dir, subpath, err).into()
+            }
         }
     } else if path.is_dir() {
         // Recursively check each entry
