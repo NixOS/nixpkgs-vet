@@ -7,7 +7,8 @@ use rowan::ast::AstNode;
 
 use crate::problem::{
     NixFileContainsPathInterpolation, NixFileContainsPathOutsideDirectory,
-    NixFileContainsSearchPath, NixFileContainsUnresolvablePath, PathError, PathErrorKind, Problem,
+    NixFileContainsSearchPath, NixFileContainsUnresolvablePath,
+    PackageContainsSymlinkPointingOutside, PathError, PathErrorKind, Problem,
 };
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -64,10 +65,10 @@ fn check_path(
         // Check whether the symlink resolves to outside the package directory.
         match path.canonicalize() {
             Ok(target) => {
-                // No need to handle the case of it being inside the directory, since we scan
-                // through the entire directory recursively in any case.
+                // No need to handle the case of it being inside the directory,
+                // since we scan through the entire directory recursively in any case.
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
-                    to_validation(PathErrorKind::OutsideSymlink)
+                    PackageContainsSymlinkPointingOutside::new(relative_package_dir, subpath).into()
                 } else {
                     Success(())
                 }
