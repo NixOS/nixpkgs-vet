@@ -7,7 +7,10 @@ use std::collections::HashMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, TopLevelPackageError, TopLevelPackageMovedOutOfByName};
+use crate::problem::{
+    Problem, TopLevelPackageError, TopLevelPackageMovedOutOfByName,
+    TopLevelPackageMovedOutOfByNameWithCustomArguments,
+};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -153,6 +156,14 @@ impl ToProblem for UsesByName {
             (false, true) => {
                 TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file).into()
             }
+            // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
+            // for custom arguments.
+            (false, false) => TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
+                name,
+                to.relative_path.clone(),
+                file,
+            )
+            .into(),
             _ => Problem::TopLevelPackage(TopLevelPackageError {
                 package_name: name.to_owned(),
                 call_package_path: to.relative_path.clone(),

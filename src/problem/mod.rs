@@ -32,6 +32,7 @@ mod npv_142_package_in_wrong_shard;
 mod npv_143_package_nix_missing;
 mod npv_144_package_nix_is_not_a_file;
 mod npv_160_top_level_package_moved_back_from_by_name;
+mod npv_161_top_level_package_moved_with_custom_arguments;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -58,6 +59,7 @@ pub use npv_142_package_in_wrong_shard::PackageInWrongShard;
 pub use npv_143_package_nix_missing::PackageNixMissing;
 pub use npv_144_package_nix_is_not_a_file::PackageNixIsNotFile;
 pub use npv_160_top_level_package_moved_back_from_by_name::TopLevelPackageMovedOutOfByName;
+pub use npv_161_top_level_package_moved_with_custom_arguments::TopLevelPackageMovedOutOfByNameWithCustomArguments;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -139,6 +141,11 @@ pub enum Problem {
     /// NPV-160: top-level package moved out of by-name
     TopLevelPackageMovedOutOfByName(TopLevelPackageMovedOutOfByName),
 
+    /// NPV-161: top-level package moved out of by-name with custom arguments
+    TopLevelPackageMovedOutOfByNameWithCustomArguments(
+        TopLevelPackageMovedOutOfByNameWithCustomArguments,
+    ),
+
     // By the end of this PR, all these will be gone.
     Path(PathError),
     TopLevelPackage(TopLevelPackageError),
@@ -198,6 +205,9 @@ impl fmt::Display for Problem {
             Self::PackageNixMissing(inner) => fmt::Display::fmt(inner, f),
             Self::PackageNixIsNotFile(inner) => fmt::Display::fmt(inner, f),
             Self::TopLevelPackageMovedOutOfByName(inner) => fmt::Display::fmt(inner, f),
+            Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => {
+                fmt::Display::fmt(inner, f)
+            }
 
             // By the end of this PR, all these cases will vanish.
             Problem::Path(PathError {
@@ -242,8 +252,6 @@ impl fmt::Display for Problem {
                             ",
                         ),
                     (false, false) =>
-                        // This can happen if users mistakenly assume that for custom arguments,
-                        // pkgs/by-name can't be used.
                         writedoc!(
                             f,
                             "
