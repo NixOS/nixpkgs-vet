@@ -5,7 +5,7 @@ use indoc::writedoc;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 
-use crate::structure::{self, PACKAGE_NIX_FILENAME};
+use crate::structure;
 
 mod npv_100_by_name_undefined_attribute;
 mod npv_101_by_name_non_derivation;
@@ -30,6 +30,7 @@ mod npv_140_package_directory_is_not_directory;
 mod npv_141_invalid_package_directory_name;
 mod npv_142_package_in_wrong_shard;
 mod npv_143_package_nix_missing;
+mod npv_144_package_nix_is_not_a_file;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -54,6 +55,7 @@ pub use npv_140_package_directory_is_not_directory::PackageDirectoryIsNotDirecto
 pub use npv_141_invalid_package_directory_name::InvalidPackageDirectoryName;
 pub use npv_142_package_in_wrong_shard::PackageInWrongShard;
 pub use npv_143_package_nix_missing::PackageNixMissing;
+pub use npv_144_package_nix_is_not_a_file::PackageNixIsNotFile;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -129,32 +131,12 @@ pub enum Problem {
     /// NPV-143: `package.nix` is missing
     PackageNixMissing(PackageNixMissing),
 
+    /// NPV-144: `package.nix` is not a file
+    PackageNixIsNotFile(PackageNixIsNotFile),
+
     // By the end of this PR, all these will be gone.
-    Package(PackageError),
     Path(PathError),
     TopLevelPackage(TopLevelPackageError),
-}
-
-/// A file structure error involving the package name and/or path.
-#[derive(Clone)]
-pub struct PackageError {
-    pub relative_package_dir: RelativePathBuf,
-    pub kind: PackageErrorKind,
-}
-
-#[derive(Clone)]
-pub enum PackageErrorKind {
-    PackageNonDir {
-        package_name: String,
-    },
-    InvalidPackageName {
-        invalid_package_name: String,
-    },
-    IncorrectShard {
-        correct_relative_package_dir: RelativePathBuf,
-    },
-    PackageNixNonExistent,
-    PackageNixDir,
 }
 
 /// An error that results from checks that verify a specific path does not reference outside the
@@ -209,42 +191,9 @@ impl fmt::Display for Problem {
             Self::InvalidPackageDirectoryName(inner) => fmt::Display::fmt(inner, f),
             Self::PackageInWrongShard(inner) => fmt::Display::fmt(inner, f),
             Self::PackageNixMissing(inner) => fmt::Display::fmt(inner, f),
+            Self::PackageNixIsNotFile(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
-            Problem::Package(PackageError {
-                relative_package_dir,
-                kind,
-            }) => {
-                match kind {
-                    PackageErrorKind::PackageNonDir { package_name } => {
-                        let relative_package_dir = structure::relative_dir_for_package(package_name);
-                        write!(
-                            f,
-                            "- {relative_package_dir}: This path is a file, but it should be a directory.",
-                        )
-                    }
-                    PackageErrorKind::InvalidPackageName { invalid_package_name } =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: Invalid package directory name \"{invalid_package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
-                        ),
-                    PackageErrorKind::IncorrectShard { correct_relative_package_dir } =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
-                        ),
-                    PackageErrorKind::PackageNixNonExistent =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: Missing required \"{PACKAGE_NIX_FILENAME}\" file.",
-                        ),
-                    PackageErrorKind::PackageNixDir =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",
-                        ),
-                }
-            }
             Problem::Path(PathError {
                 relative_package_dir,
                 subpath,

@@ -9,8 +9,8 @@ use relative_path::RelativePathBuf;
 
 use crate::problem::{
     ByNameShardIsCaseSensitiveDuplicate, ByNameShardIsInvalid, ByNameShardIsNotDirectory,
-    InvalidPackageDirectoryName, PackageDirectoryIsNotDirectory, PackageError, PackageErrorKind,
-    PackageInWrongShard, PackageNixMissing, Problem,
+    InvalidPackageDirectoryName, PackageDirectoryIsNotDirectory, PackageInWrongShard,
+    PackageNixIsNotFile, PackageNixMissing,
 };
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -136,14 +136,6 @@ fn check_package(
     let relative_package_dir =
         RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}/{package_name}"));
 
-    let to_validation = |kind| -> validation::Validation<()> {
-        Problem::Package(PackageError {
-            relative_package_dir: relative_package_dir.clone(),
-            kind,
-        })
-        .into()
-    };
-
     Ok(if !package_path.is_dir() {
         PackageDirectoryIsNotDirectory::new(package_name).into()
     } else {
@@ -171,8 +163,8 @@ fn check_package(
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
         let result = result.and(if !package_nix_path.exists() {
             PackageNixMissing::new(package_name.clone()).into()
-        } else if package_nix_path.is_dir() {
-            to_validation(PackageErrorKind::PackageNixDir)
+        } else if !package_nix_path.is_file() {
+            PackageNixIsNotFile::new(package_name.clone()).into()
         } else {
             Success(())
         });
