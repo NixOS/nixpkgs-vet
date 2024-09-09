@@ -8,8 +8,8 @@ use regex::Regex;
 use relative_path::RelativePathBuf;
 
 use crate::problem::{
-    ByNameShardIsInvalid, ByNameShardIsNotDirectory, PackageError, PackageErrorKind, Problem,
-    ShardError, ShardErrorKind,
+    ByNameShardIsCaseSensitiveDuplicate, ByNameShardIsInvalid, ByNameShardIsNotDirectory,
+    PackageError, PackageErrorKind, Problem,
 };
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -91,13 +91,11 @@ pub fn check_structure(
                         l.file_name().to_ascii_lowercase() == r.file_name().to_ascii_lowercase()
                     })
                     .map(|(l, r)| {
-                        Problem::Shard(ShardError {
-                            shard_name: shard_name.clone(),
-                            kind: ShardErrorKind::CaseSensitiveDuplicate {
-                                first: l.file_name(),
-                                second: r.file_name(),
-                            },
-                        })
+                        ByNameShardIsCaseSensitiveDuplicate::new(
+                            shard_name.clone(),
+                            l.file_name(),
+                            r.file_name(),
+                        )
                         .into()
                     });
 

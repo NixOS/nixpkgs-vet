@@ -1,4 +1,3 @@
-use std::ffi::OsString;
 use std::fmt;
 
 use derive_enum_from_into::EnumFrom;
@@ -19,6 +18,7 @@ mod npv_107_by_name_override_contains_empty_argument;
 mod npv_108_by_name_override_contains_empty_path;
 mod npv_109_by_name_shard_is_not_directory;
 mod npv_110_by_name_shard_is_invalid;
+mod npv_111_by_name_shard_is_case_sensitive_duplicate;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -31,6 +31,7 @@ pub use npv_107_by_name_override_contains_empty_argument::ByNameOverrideContains
 pub use npv_108_by_name_override_contains_empty_path::ByNameOverrideContainsEmptyPath;
 pub use npv_109_by_name_shard_is_not_directory::ByNameShardIsNotDirectory;
 pub use npv_110_by_name_shard_is_invalid::ByNameShardIsInvalid;
+pub use npv_111_by_name_shard_is_case_sensitive_duplicate::ByNameShardIsCaseSensitiveDuplicate;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -70,27 +71,15 @@ pub enum Problem {
     /// NPV-110: by-name shard is invalid
     ByNameShardIsInvalid(ByNameShardIsInvalid),
 
+    /// NPV-111: by-name shard is case-sensitive duplicate
+    ByNameShardIsCaseSensitiveDuplicate(ByNameShardIsCaseSensitiveDuplicate),
+
     // By the end of this PR, all these will be gone.
-    Shard(ShardError),
     Package(PackageError),
     Path(PathError),
     NixFile(NixFileError),
     TopLevelPackage(TopLevelPackageError),
     NixEval(NixEvalError),
-}
-
-/// A file structure error involving a shard (e.g. `fo` is the shard in the path `pkgs/by-name/fo/foo/package.nix`)
-#[derive(Clone)]
-pub struct ShardError {
-    pub shard_name: String,
-    pub kind: ShardErrorKind,
-}
-
-#[derive(Clone)]
-pub enum ShardErrorKind {
-    ShardNonDir,
-    InvalidShardName,
-    CaseSensitiveDuplicate { first: OsString, second: OsString },
 }
 
 /// A file structure error involving the package name and/or path.
@@ -180,31 +169,9 @@ impl fmt::Display for Problem {
             Self::ByNameOverrideContainsEmptyPath(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameShardIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameShardIsInvalid(inner) => fmt::Display::fmt(inner, f),
+            Self::ByNameShardIsCaseSensitiveDuplicate(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
-            Problem::Shard(ShardError {
-                shard_name,
-                kind,
-            }) => {
-                let relative_shard_path = structure::relative_dir_for_shard(shard_name);
-                match kind {
-                    ShardErrorKind::ShardNonDir =>
-                        write!(
-                            f,
-                            "- {relative_shard_path}: This is a file, but it should be a directory.",
-                        ),
-                    ShardErrorKind::InvalidShardName =>
-                        write!(
-                            f,
-                            "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
-                        ),
-                    ShardErrorKind::CaseSensitiveDuplicate { first, second } =>
-                        write!(
-                            f,
-                            "- {relative_shard_path}: Duplicate case-sensitive package directories {first:?} and {second:?}.",
-                        ),
-                }
-            }
             Problem::Package(PackageError {
                 relative_package_dir,
                 kind,
