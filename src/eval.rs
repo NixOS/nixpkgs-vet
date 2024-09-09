@@ -8,10 +8,7 @@ use tempfile::Builder;
 
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
-    ByNameOverrideContainsEmptyArgument, ByNameOverrideContainsEmptyPath,
-    ByNameOverrideContainsWrongCallPackagePath, ByNameOverrideOfNonSyntacticCallPackage,
-    ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError,
+    npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
@@ -223,7 +220,7 @@ pub fn check_values(
 
     if !result.status.success() {
         // Early return in case evaluation fails
-        return Ok(NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
+        return Ok(npv_120::NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
     }
 
     // Parse the resulting JSON value
@@ -279,7 +276,7 @@ fn by_name(
         ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
-            ByNameUndefinedAttribute::new(attribute_name).into()
+            npv_100::ByNameUndefinedAttribute::new(attribute_name).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -293,7 +290,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            ByNameNonDerivation::new(attribute_name).into()
+            npv_101::ByNameNonDerivation::new(attribute_name).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -309,7 +306,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                ByNameNonDerivation::new(attribute_name).into()
+                npv_101::ByNameNonDerivation::new(attribute_name).into()
             };
 
             // If the definition looks correct
@@ -322,7 +319,7 @@ fn by_name(
                         // Such an automatic definition should definitely not have a location.
                         // Having one indicates that somebody is using
                         // `_internalCallByNamePackageFile`,
-                        ByNameInternalCallPackageUsed::new(attribute_name).into()
+                        npv_102::ByNameInternalCallPackageUsed::new(attribute_name).into()
                     } else {
                         Success(Tight)
                     }
@@ -372,7 +369,7 @@ fn by_name(
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
                         // over, e.g. if it's defined in aliases.nix.
                         // We can't verify whether its of the expected `callPackage`, so error out.
-                        ByNameCannotDetermineAttributeLocation::new(attribute_name).into()
+                        npv_103::ByNameCannotDetermineAttributeLocation::new(attribute_name).into()
                     }
                 }
             };
@@ -404,23 +401,32 @@ fn by_name_override(
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
     let Some(syntactic_call_package) = optional_syntactic_call_package else {
         // Something like `<attr> = foo`
-        return ByNameOverrideOfNonSyntacticCallPackage::new(attribute_name, location, definition)
-            .into();
+        return npv_104::ByNameOverrideOfNonSyntacticCallPackage::new(
+            attribute_name,
+            location,
+            definition,
+        )
+        .into();
     };
 
     if !is_semantic_call_package {
         // Something like `<attr> = pythonPackages.callPackage ...`
-        return ByNameOverrideOfNonTopLevelPackage::new(attribute_name, location, definition)
-            .into();
+        return npv_105::ByNameOverrideOfNonTopLevelPackage::new(
+            attribute_name,
+            location,
+            definition,
+        )
+        .into();
     }
 
     let Some(actual_package_path) = syntactic_call_package.relative_path else {
-        return ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition).into();
+        return npv_108::ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition)
+            .into();
     };
 
     let expected_package_path = structure::relative_file_for_package(attribute_name);
     if actual_package_path != expected_package_path {
-        return ByNameOverrideContainsWrongCallPackagePath::new(
+        return npv_106::ByNameOverrideContainsWrongCallPackagePath::new(
             attribute_name,
             actual_package_path,
             location,
@@ -432,7 +438,8 @@ fn by_name_override(
     // continue to be allowed. This is the state to migrate away from.
     if syntactic_call_package.empty_arg {
         Success(Loose(
-            ByNameOverrideContainsEmptyArgument::new(attribute_name, location, definition).into(),
+            npv_107::ByNameOverrideContainsEmptyArgument::new(attribute_name, location, definition)
+                .into(),
         ))
     } else {
         // This is the state to migrate to.

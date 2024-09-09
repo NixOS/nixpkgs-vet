@@ -7,10 +7,7 @@ use std::collections::HashMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{
-    NewTopLevelPackageShouldBeByName, NewTopLevelPackageShouldBeByNameWithCustomArgument, Problem,
-    TopLevelPackageMovedOutOfByName, TopLevelPackageMovedOutOfByNameWithCustomArguments,
-};
+use crate::problem::{npv_160, npv_161, npv_162, npv_163, Problem};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -154,20 +151,22 @@ impl ToProblem for UsesByName {
         let is_empty = to.empty_arg;
         match (is_new, is_empty) {
             (false, true) => {
-                TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file).into()
+                npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
+                    .into()
             }
             // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
             // for custom arguments.
-            (false, false) => TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
+            (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
                 name,
                 to.relative_path.clone(),
                 file,
             )
             .into(),
             (true, true) => {
-                NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file).into()
+                npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file)
+                    .into()
             }
-            (true, false) => NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
+            (true, false) => npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
                 name,
                 to.relative_path.clone(),
                 file,

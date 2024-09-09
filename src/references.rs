@@ -5,11 +5,7 @@ use anyhow::Context;
 use relative_path::RelativePath;
 use rowan::ast::AstNode;
 
-use crate::problem::{
-    NixFileContainsPathInterpolation, NixFileContainsPathOutsideDirectory,
-    NixFileContainsSearchPath, NixFileContainsUnresolvablePath,
-    PackageContainsSymlinkPointingOutside, PackageContainsUnresolvableSymlink,
-};
+use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126};
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
@@ -60,13 +56,18 @@ fn check_path(
                 // No need to handle the case of it being inside the directory,
                 // since we scan through the entire directory recursively in any case.
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
-                    PackageContainsSymlinkPointingOutside::new(relative_package_dir, subpath).into()
+                    npv_125::PackageContainsSymlinkPointingOutside::new(
+                        relative_package_dir,
+                        subpath,
+                    )
+                    .into()
                 } else {
                     Success(())
                 }
             }
             Err(err) => {
-                PackageContainsUnresolvableSymlink::new(relative_package_dir, subpath, err).into()
+                npv_126::PackageContainsUnresolvableSymlink::new(relative_package_dir, subpath, err)
+                    .into()
             }
         }
     } else if path.is_dir() {
@@ -134,21 +135,28 @@ fn check_nix_file(
             use crate::nix_file::ResolvedPath;
 
             match nix_file.static_resolve_path(path, absolute_package_dir) {
-                ResolvedPath::Interpolated => {
-                    NixFileContainsPathInterpolation::new(relative_package_dir, subpath, line, text)
-                        .into()
-                }
-                ResolvedPath::SearchPath => {
-                    NixFileContainsSearchPath::new(relative_package_dir, subpath, line, text).into()
-                }
-                ResolvedPath::Outside => NixFileContainsPathOutsideDirectory::new(
+                ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
                     relative_package_dir,
                     subpath,
                     line,
                     text,
                 )
                 .into(),
-                ResolvedPath::Unresolvable(err) => NixFileContainsUnresolvablePath::new(
+                ResolvedPath::SearchPath => npv_122::NixFileContainsSearchPath::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
+                ResolvedPath::Outside => npv_123::NixFileContainsPathOutsideDirectory::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
+                ResolvedPath::Unresolvable(err) => npv_124::NixFileContainsUnresolvablePath::new(
                     relative_package_dir,
                     subpath,
                     line,
