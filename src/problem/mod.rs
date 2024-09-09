@@ -19,6 +19,7 @@ mod npv_108_by_name_override_contains_empty_path;
 mod npv_109_by_name_shard_is_not_directory;
 mod npv_110_by_name_shard_is_invalid;
 mod npv_111_by_name_shard_is_case_sensitive_duplicate;
+mod npv_120_nix_eval_error;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -32,6 +33,7 @@ pub use npv_108_by_name_override_contains_empty_path::ByNameOverrideContainsEmpt
 pub use npv_109_by_name_shard_is_not_directory::ByNameShardIsNotDirectory;
 pub use npv_110_by_name_shard_is_invalid::ByNameShardIsInvalid;
 pub use npv_111_by_name_shard_is_case_sensitive_duplicate::ByNameShardIsCaseSensitiveDuplicate;
+pub use npv_120_nix_eval_error::NixEvalError;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -74,12 +76,14 @@ pub enum Problem {
     /// NPV-111: by-name shard is case-sensitive duplicate
     ByNameShardIsCaseSensitiveDuplicate(ByNameShardIsCaseSensitiveDuplicate),
 
+    /// NPV-120: Nix evaluation failed
+    NixEvalError(NixEvalError),
+
     // By the end of this PR, all these will be gone.
     Package(PackageError),
     Path(PathError),
     NixFile(NixFileError),
     TopLevelPackage(TopLevelPackageError),
-    NixEval(NixEvalError),
 }
 
 /// A file structure error involving the package name and/or path.
@@ -149,12 +153,6 @@ pub struct TopLevelPackageError {
     pub is_empty: bool,
 }
 
-/// A Nix evaluation error for some package in `pkgs/by-name`
-#[derive(Clone)]
-pub struct NixEvalError {
-    pub stderr: String,
-}
-
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -170,6 +168,7 @@ impl fmt::Display for Problem {
             Self::ByNameShardIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameShardIsInvalid(inner) => fmt::Display::fmt(inner, f),
             Self::ByNameShardIsCaseSensitiveDuplicate(inner) => fmt::Display::fmt(inner, f),
+            Self::NixEvalError(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Package(PackageError {
@@ -317,10 +316,6 @@ impl fmt::Display for Problem {
                             ",
                         ),
                 }
-            },
-            Problem::NixEval(NixEvalError { stderr }) => {
-                f.write_str(stderr)?;
-                write!(f, "- Nix evaluation failed for some package in `pkgs/by-name`, see error above")
             },
        }
     }

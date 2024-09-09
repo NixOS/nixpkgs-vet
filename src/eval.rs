@@ -11,7 +11,7 @@ use crate::problem::{
     ByNameCannotDetermineAttributeLocation, ByNameInternalCallPackageUsed, ByNameNonDerivation,
     ByNameOverrideContainsEmptyArgument, ByNameOverrideContainsEmptyPath,
     ByNameOverrideContainsWrongCallPackagePath, ByNameOverrideOfNonSyntacticCallPackage,
-    ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError, Problem,
+    ByNameOverrideOfNonTopLevelPackage, ByNameUndefinedAttribute, NixEvalError,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
@@ -223,8 +223,7 @@ pub fn check_values(
 
     if !result.status.success() {
         // Early return in case evaluation fails
-        let stderr = String::from_utf8_lossy(&result.stderr).to_string();
-        return Ok(Problem::NixEval(NixEvalError { stderr }).into());
+        return Ok(NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
     }
 
     // Parse the resulting JSON value
