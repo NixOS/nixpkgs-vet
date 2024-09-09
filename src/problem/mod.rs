@@ -22,6 +22,7 @@ mod npv_111_by_name_shard_is_case_sensitive_duplicate;
 mod npv_120_nix_eval_error;
 mod npv_121_nix_file_path_interpolation_unsupported;
 mod npv_122_nix_file_search_path_expression_unsupported;
+mod npv_123_nix_file_path_outside_of_directory;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -38,6 +39,7 @@ pub use npv_111_by_name_shard_is_case_sensitive_duplicate::ByNameShardIsCaseSens
 pub use npv_120_nix_eval_error::NixEvalError;
 pub use npv_121_nix_file_path_interpolation_unsupported::NixFileContainsPathInterpolation;
 pub use npv_122_nix_file_search_path_expression_unsupported::NixFileContainsSearchPath;
+pub use npv_123_nix_file_path_outside_of_directory::NixFileContainsPathOutsideDirectory;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -88,6 +90,9 @@ pub enum Problem {
 
     /// NPV-122: Nix file contains search path
     NixFileContainsSearchPath(NixFileContainsSearchPath),
+
+    /// NPV-123: Nix file contains path expression outside of directory
+    NixFileContainsPathOutsideDirectory(NixFileContainsPathOutsideDirectory),
 
     // By the end of this PR, all these will be gone.
     Package(PackageError),
@@ -181,6 +186,7 @@ impl fmt::Display for Problem {
             Self::NixEvalError(inner) => fmt::Display::fmt(inner, f),
             Self::NixFileContainsPathInterpolation(inner) => fmt::Display::fmt(inner, f),
             Self::NixFileContainsSearchPath(inner) => fmt::Display::fmt(inner, f),
+            Self::NixFileContainsPathOutsideDirectory(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Package(PackageError {

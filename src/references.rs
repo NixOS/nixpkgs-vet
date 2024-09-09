@@ -6,8 +6,8 @@ use relative_path::RelativePath;
 use rowan::ast::AstNode;
 
 use crate::problem::{
-    NixFileContainsPathInterpolation, NixFileContainsSearchPath, NixFileError, NixFileErrorKind,
-    PathError, PathErrorKind, Problem,
+    NixFileContainsPathInterpolation, NixFileContainsPathOutsideDirectory,
+    NixFileContainsSearchPath, NixFileError, NixFileErrorKind, PathError, PathErrorKind, Problem,
 };
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -159,7 +159,13 @@ fn check_nix_file(
                 ResolvedPath::SearchPath => {
                     NixFileContainsSearchPath::new(relative_package_dir, subpath, line, text).into()
                 }
-                ResolvedPath::Outside => to_validation(NixFileErrorKind::OutsidePathReference),
+                ResolvedPath::Outside => NixFileContainsPathOutsideDirectory::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
                 ResolvedPath::Unresolvable(e) => {
                     to_validation(NixFileErrorKind::UnresolvablePathReference {
                         io_error: e.to_string(),
