@@ -1,6 +1,5 @@
-use std::fmt;
-
 use derive_enum_from_into::EnumFrom;
+use derive_more::Display;
 use relative_path::RelativePath;
 
 mod npv_100_by_name_undefined_attribute;
@@ -64,7 +63,7 @@ pub use npv_163_new_top_level_package_with_custom_arguments::NewTopLevelPackageS
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
 /// location
-#[derive(Clone, EnumFrom)]
+#[derive(Clone, Display, EnumFrom)]
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
     ByNameUndefinedAttribute(ByNameUndefinedAttribute),
@@ -153,45 +152,6 @@ pub enum Problem {
     NewTopLevelPackageShouldBeByNameWithCustomArgument(
         NewTopLevelPackageShouldBeByNameWithCustomArgument,
     ),
-}
-
-impl fmt::Display for Problem {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::ByNameUndefinedAttribute(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameNonDerivation(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameInternalCallPackageUsed(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameCannotDetermineAttributeLocation(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameOverrideOfNonSyntacticCallPackage(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameOverrideOfNonTopLevelPackage(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameOverrideContainsWrongCallPackagePath(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameOverrideContainsEmptyArgument(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameOverrideContainsEmptyPath(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameShardIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameShardIsInvalid(inner) => fmt::Display::fmt(inner, f),
-            Self::ByNameShardIsCaseSensitiveDuplicate(inner) => fmt::Display::fmt(inner, f),
-            Self::NixEvalError(inner) => fmt::Display::fmt(inner, f),
-            Self::NixFileContainsPathInterpolation(inner) => fmt::Display::fmt(inner, f),
-            Self::NixFileContainsSearchPath(inner) => fmt::Display::fmt(inner, f),
-            Self::NixFileContainsPathOutsideDirectory(inner) => fmt::Display::fmt(inner, f),
-            Self::NixFileContainsUnresolvablePath(inner) => fmt::Display::fmt(inner, f),
-            Self::PackageContainsSymlinkPointingOutside(inner) => fmt::Display::fmt(inner, f),
-            Self::PackageContainsUnresolvableSymlink(inner) => fmt::Display::fmt(inner, f),
-            Self::PackageDirectoryIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
-            Self::InvalidPackageDirectoryName(inner) => fmt::Display::fmt(inner, f),
-            Self::PackageInWrongShard(inner) => fmt::Display::fmt(inner, f),
-            Self::PackageNixMissing(inner) => fmt::Display::fmt(inner, f),
-            Self::PackageNixIsNotFile(inner) => fmt::Display::fmt(inner, f),
-            Self::TopLevelPackageMovedOutOfByName(inner) => fmt::Display::fmt(inner, f),
-            Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => {
-                fmt::Display::fmt(inner, f)
-            }
-            Self::NewTopLevelPackageShouldBeByName(inner) => fmt::Display::fmt(inner, f),
-            Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(inner) => {
-                fmt::Display::fmt(inner, f)
-            }
-        }
-    }
 }
 
 fn indent_definition(column: usize, definition: &str) -> String {
