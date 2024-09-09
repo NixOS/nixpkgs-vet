@@ -9,7 +9,8 @@ use relative_path::RelativePathBuf;
 
 use crate::problem::{
     ByNameShardIsCaseSensitiveDuplicate, ByNameShardIsInvalid, ByNameShardIsNotDirectory,
-    PackageDirectoryIsNotDirectory, PackageError, PackageErrorKind, Problem,
+    InvalidPackageDirectoryName, PackageDirectoryIsNotDirectory, PackageError, PackageErrorKind,
+    Problem,
 };
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -148,9 +149,8 @@ fn check_package(
     } else {
         let package_name_valid = PACKAGE_NAME_REGEX.is_match(&package_name);
         let result = if !package_name_valid {
-            to_validation(PackageErrorKind::InvalidPackageName {
-                invalid_package_name: package_name.clone(),
-            })
+            InvalidPackageDirectoryName::new(package_name.clone(), relative_package_dir.clone())
+                .into()
         } else {
             Success(())
         };

@@ -27,6 +27,7 @@ mod npv_124_nix_file_contains_unresolvable_path;
 mod npv_125_package_contains_symlink_pointing_outside;
 mod npv_126_package_contains_unresolvable_symlink;
 mod npv_140_package_directory_is_not_directory;
+mod npv_141_invalid_package_directory_name;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -48,6 +49,7 @@ pub use npv_124_nix_file_contains_unresolvable_path::NixFileContainsUnresolvable
 pub use npv_125_package_contains_symlink_pointing_outside::PackageContainsSymlinkPointingOutside;
 pub use npv_126_package_contains_unresolvable_symlink::PackageContainsUnresolvableSymlink;
 pub use npv_140_package_directory_is_not_directory::PackageDirectoryIsNotDirectory;
+pub use npv_141_invalid_package_directory_name::InvalidPackageDirectoryName;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -113,6 +115,9 @@ pub enum Problem {
 
     /// NPV-140: Package directory is not directory
     PackageDirectoryIsNotDirectory(PackageDirectoryIsNotDirectory),
+
+    /// NPV-141: Package has the wrong name
+    InvalidPackageDirectoryName(InvalidPackageDirectoryName),
 
     // By the end of this PR, all these will be gone.
     Package(PackageError),
@@ -191,6 +196,7 @@ impl fmt::Display for Problem {
             Self::PackageContainsSymlinkPointingOutside(inner) => fmt::Display::fmt(inner, f),
             Self::PackageContainsUnresolvableSymlink(inner) => fmt::Display::fmt(inner, f),
             Self::PackageDirectoryIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
+            Self::InvalidPackageDirectoryName(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Package(PackageError {
