@@ -23,6 +23,7 @@ mod npv_120_nix_eval_error;
 mod npv_121_nix_file_path_interpolation_unsupported;
 mod npv_122_nix_file_search_path_expression_unsupported;
 mod npv_123_nix_file_path_outside_of_directory;
+mod npv_124_nix_file_contains_unresolvable_path;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -40,6 +41,7 @@ pub use npv_120_nix_eval_error::NixEvalError;
 pub use npv_121_nix_file_path_interpolation_unsupported::NixFileContainsPathInterpolation;
 pub use npv_122_nix_file_search_path_expression_unsupported::NixFileContainsSearchPath;
 pub use npv_123_nix_file_path_outside_of_directory::NixFileContainsPathOutsideDirectory;
+pub use npv_124_nix_file_contains_unresolvable_path::NixFileContainsUnresolvablePath;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -94,10 +96,12 @@ pub enum Problem {
     /// NPV-123: Nix file contains path expression outside of directory
     NixFileContainsPathOutsideDirectory(NixFileContainsPathOutsideDirectory),
 
+    /// NPV-124: Nix file contains unresolvable path expression
+    NixFileContainsUnresolvablePath(NixFileContainsUnresolvablePath),
+
     // By the end of this PR, all these will be gone.
     Package(PackageError),
     Path(PathError),
-    NixFile(NixFileError),
     TopLevelPackage(TopLevelPackageError),
 }
 
@@ -138,25 +142,6 @@ pub enum PathErrorKind {
     UnresolvableSymlink { io_error: String },
 }
 
-/// An error that results from checks that verify a nix file that contains a path expression does
-/// not reference outside the package.
-#[derive(Clone)]
-pub struct NixFileError {
-    pub relative_package_dir: RelativePathBuf,
-    pub subpath: RelativePathBuf,
-    pub line: usize,
-    pub text: String,
-    pub kind: NixFileErrorKind,
-}
-
-#[derive(Clone)]
-pub enum NixFileErrorKind {
-    PathInterpolation,
-    SearchPath,
-    OutsidePathReference,
-    UnresolvablePathReference { io_error: String },
-}
-
 /// An error related to the introduction/move of a top-level package not using `pkgs/by-name`, but
 /// it should.
 #[derive(Clone)]
@@ -187,6 +172,7 @@ impl fmt::Display for Problem {
             Self::NixFileContainsPathInterpolation(inner) => fmt::Display::fmt(inner, f),
             Self::NixFileContainsSearchPath(inner) => fmt::Display::fmt(inner, f),
             Self::NixFileContainsPathOutsideDirectory(inner) => fmt::Display::fmt(inner, f),
+            Self::NixFileContainsUnresolvablePath(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Package(PackageError {
@@ -238,44 +224,6 @@ impl fmt::Display for Problem {
                         write!(
                             f,
                             "- {relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
-                        ),
-                }
-            },
-            Problem::NixFile(NixFileError {
-                relative_package_dir,
-                subpath,
-                line,
-                text,
-                kind
-            }) => {
-                match kind {
-                    NixFileErrorKind::PathInterpolation =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\", which is not yet supported and may point outside the directory of that package.",
-                        ),
-                    NixFileErrorKind::SearchPath =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
-                        ),
-                    NixFileErrorKind::OutsidePathReference =>
-                        writedoc!(
-                            f,
-                            "
-                            - {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.
-                              This is undesirable because it creates dependencies between internal paths, making it harder to reorganise Nixpkgs in the future.
-                              Alternatives include:
-                              - If you are creating a new version of a package with a common file between versions, consider following the recommendation in https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name#recommendation-for-new-packages-with-multiple-versions.
-                              - If the path being referenced could be considered a stable interface with multiple uses, consider exposing it via a `pkgs` attribute, then taking it as a attribute argument in {PACKAGE_NIX_FILENAME}.
-                              - If the path being referenced is internal and has multiple uses, consider passing the file as an explicit `callPackage` argument in `pkgs/top-level/all-packages.nix`.
-                              - If the path being referenced is internal and will need to be modified independently of the original, consider copying it into the {relative_package_dir} directory.
-                            "
-                        ),
-                    NixFileErrorKind::UnresolvablePathReference { io_error } =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
                         ),
                 }
             },

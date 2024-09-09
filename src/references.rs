@@ -7,7 +7,7 @@ use rowan::ast::AstNode;
 
 use crate::problem::{
     NixFileContainsPathInterpolation, NixFileContainsPathOutsideDirectory,
-    NixFileContainsSearchPath, NixFileError, NixFileErrorKind, PathError, PathErrorKind, Problem,
+    NixFileContainsSearchPath, NixFileContainsUnresolvablePath, PathError, PathErrorKind, Problem,
 };
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -138,17 +138,6 @@ fn check_nix_file(
                 return Success(());
             };
 
-            let to_validation = |kind| -> validation::Validation<()> {
-                Problem::NixFile(NixFileError {
-                    relative_package_dir: relative_package_dir.to_owned(),
-                    subpath: subpath.to_owned(),
-                    line,
-                    text: text.clone(),
-                    kind,
-                })
-                .into()
-            };
-
             use crate::nix_file::ResolvedPath;
 
             match nix_file.static_resolve_path(path, absolute_package_dir) {
@@ -166,11 +155,14 @@ fn check_nix_file(
                     text,
                 )
                 .into(),
-                ResolvedPath::Unresolvable(e) => {
-                    to_validation(NixFileErrorKind::UnresolvablePathReference {
-                        io_error: e.to_string(),
-                    })
-                }
+                ResolvedPath::Unresolvable(err) => NixFileContainsUnresolvablePath::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                    err,
+                )
+                .into(),
                 ResolvedPath::Within(..) => {
                     // No need to handle the case of it being inside the directory, since we scan
                     // through the entire directory recursively in any case.
