@@ -29,6 +29,7 @@ mod npv_126_package_contains_unresolvable_symlink;
 mod npv_140_package_directory_is_not_directory;
 mod npv_141_invalid_package_directory_name;
 mod npv_142_package_in_wrong_shard;
+mod npv_143_package_nix_missing;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -52,6 +53,7 @@ pub use npv_126_package_contains_unresolvable_symlink::PackageContainsUnresolvab
 pub use npv_140_package_directory_is_not_directory::PackageDirectoryIsNotDirectory;
 pub use npv_141_invalid_package_directory_name::InvalidPackageDirectoryName;
 pub use npv_142_package_in_wrong_shard::PackageInWrongShard;
+pub use npv_143_package_nix_missing::PackageNixMissing;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -118,11 +120,14 @@ pub enum Problem {
     /// NPV-140: Package directory is not directory
     PackageDirectoryIsNotDirectory(PackageDirectoryIsNotDirectory),
 
-    /// NPV-141: Package has the wrong name
+    /// NPV-141: Package name is not valid
     InvalidPackageDirectoryName(InvalidPackageDirectoryName),
 
     /// NPV-142: Package is in the wrong by-name shard
     PackageInWrongShard(PackageInWrongShard),
+
+    /// NPV-143: `package.nix` is missing
+    PackageNixMissing(PackageNixMissing),
 
     // By the end of this PR, all these will be gone.
     Package(PackageError),
@@ -203,6 +208,7 @@ impl fmt::Display for Problem {
             Self::PackageDirectoryIsNotDirectory(inner) => fmt::Display::fmt(inner, f),
             Self::InvalidPackageDirectoryName(inner) => fmt::Display::fmt(inner, f),
             Self::PackageInWrongShard(inner) => fmt::Display::fmt(inner, f),
+            Self::PackageNixMissing(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Package(PackageError {

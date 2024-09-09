@@ -10,7 +10,7 @@ use relative_path::RelativePathBuf;
 use crate::problem::{
     ByNameShardIsCaseSensitiveDuplicate, ByNameShardIsInvalid, ByNameShardIsNotDirectory,
     InvalidPackageDirectoryName, PackageDirectoryIsNotDirectory, PackageError, PackageErrorKind,
-    PackageInWrongShard, Problem,
+    PackageInWrongShard, PackageNixMissing, Problem,
 };
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -170,7 +170,7 @@ fn check_package(
 
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
         let result = result.and(if !package_nix_path.exists() {
-            to_validation(PackageErrorKind::PackageNixNonExistent)
+            PackageNixMissing::new(package_name.clone()).into()
         } else if package_nix_path.is_dir() {
             to_validation(PackageErrorKind::PackageNixDir)
         } else {
