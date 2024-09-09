@@ -120,9 +120,11 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
     use std::fs;
     use std::path::Path;
+
+    use anyhow::Context;
+    use pretty_assertions::StrComparison;
     use tempfile::{tempdir_in, TempDir};
 
     use super::{process, utils::BASE_SUBPATH};
@@ -245,9 +247,8 @@ mod tests {
 
         if !expected_errors_regex.is_match(&actual_errors) {
             panic!(
-                "Failed test case {name}, expected these errors:\n=======\n{}\n=======\n\
-                but got these:\n=======\n{}\n=======",
-                expected_errors, actual_errors
+                "Failed test case {name}: {}",
+                StrComparison::new(expected_errors, &actual_errors)
             );
         }
     }
