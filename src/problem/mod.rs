@@ -1,11 +1,7 @@
 use std::fmt;
 
 use derive_enum_from_into::EnumFrom;
-use indoc::writedoc;
 use relative_path::RelativePath;
-use relative_path::RelativePathBuf;
-
-use crate::structure;
 
 mod npv_100_by_name_undefined_attribute;
 mod npv_101_by_name_non_derivation;
@@ -34,6 +30,7 @@ mod npv_144_package_nix_is_not_a_file;
 mod npv_160_top_level_package_moved_back_from_by_name;
 mod npv_161_top_level_package_moved_with_custom_arguments;
 mod npv_162_new_top_level_package_should_be_by_name;
+mod npv_163_new_top_level_package_with_custom_arguments;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -62,6 +59,7 @@ pub use npv_144_package_nix_is_not_a_file::PackageNixIsNotFile;
 pub use npv_160_top_level_package_moved_back_from_by_name::TopLevelPackageMovedOutOfByName;
 pub use npv_161_top_level_package_moved_with_custom_arguments::TopLevelPackageMovedOutOfByNameWithCustomArguments;
 pub use npv_162_new_top_level_package_should_be_by_name::NewTopLevelPackageShouldBeByName;
+pub use npv_163_new_top_level_package_with_custom_arguments::NewTopLevelPackageShouldBeByNameWithCustomArgument;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -151,35 +149,10 @@ pub enum Problem {
     /// NPV-162: new top-level package should be in by-name
     NewTopLevelPackageShouldBeByName(NewTopLevelPackageShouldBeByName),
 
-    // By the end of this PR, all these will be gone.
-    Path(PathError),
-    TopLevelPackage(TopLevelPackageError),
-}
-
-/// An error that results from checks that verify a specific path does not reference outside the
-/// package directory.
-#[derive(Clone)]
-pub struct PathError {
-    pub relative_package_dir: RelativePathBuf,
-    pub subpath: RelativePathBuf,
-    pub kind: PathErrorKind,
-}
-
-#[derive(Clone)]
-pub enum PathErrorKind {
-    OutsideSymlink,
-    UnresolvableSymlink { io_error: String },
-}
-
-/// An error related to the introduction/move of a top-level package not using `pkgs/by-name`, but
-/// it should.
-#[derive(Clone)]
-pub struct TopLevelPackageError {
-    pub package_name: String,
-    pub call_package_path: Option<RelativePathBuf>,
-    pub file: RelativePathBuf,
-    pub is_new: bool,
-    pub is_empty: bool,
+    /// NPV-163: new top-level package should be in by-name with a custom argument
+    NewTopLevelPackageShouldBeByNameWithCustomArgument(
+        NewTopLevelPackageShouldBeByNameWithCustomArgument,
+    ),
 }
 
 impl fmt::Display for Problem {
@@ -214,78 +187,8 @@ impl fmt::Display for Problem {
                 fmt::Display::fmt(inner, f)
             }
             Self::NewTopLevelPackageShouldBeByName(inner) => fmt::Display::fmt(inner, f),
-
-            // By the end of this PR, all these cases will vanish.
-            Problem::Path(PathError {
-                relative_package_dir,
-                subpath,
-                kind,
-            }) => {
-                match kind {
-                    PathErrorKind::OutsideSymlink =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
-                        ),
-                    PathErrorKind::UnresolvableSymlink { io_error } =>
-                        write!(
-                            f,
-                            "- {relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
-                        ),
-                }
-            },
-            Problem::TopLevelPackage(TopLevelPackageError {
-                package_name,
-                call_package_path,
-                file,
-                is_new,
-                is_empty,
-            }) => {
-                let call_package_arg = if let Some(path) = &call_package_path {
-                    format!("./{}", path)
-                } else {
-                    "...".into()
-                };
-                let relative_package_file = structure::relative_file_for_package(package_name);
-
-                match (is_new, is_empty) {
-                    (false, true) =>
-                        writedoc!(
-                            f,
-                            "
-                            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
-                              Please move the package back and remove the manual `callPackage`.
-                            ",
-                        ),
-                    (false, false) =>
-                        writedoc!(
-                            f,
-                            "
-                            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ ... }}` in {file}.
-                              While the manual `callPackage` is still needed, it's not necessary to move the package files.
-                            ",
-                        ),
-                    (true, true) =>
-                        writedoc!(
-                            f,
-                            "
-                            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
-                              Please define it in {relative_package_file} instead.
-                              See `pkgs/by-name/README.md` for more details.
-                              Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
-                            ",
-                        ),
-                    (true, false) =>
-                        writedoc!(
-                            f,
-                            "
-                            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
-                              Please define it in {relative_package_file} instead.
-                              See `pkgs/by-name/README.md` for more details.
-                              Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.
-                            ",
-                        ),
-                }
+            Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(inner) => {
+                fmt::Display::fmt(inner, f)
             }
         }
     }
