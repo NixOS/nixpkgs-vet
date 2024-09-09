@@ -8,8 +8,8 @@ use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    Problem, TopLevelPackageError, TopLevelPackageMovedOutOfByName,
-    TopLevelPackageMovedOutOfByNameWithCustomArguments,
+    NewTopLevelPackageShouldBeByName, Problem, TopLevelPackageError,
+    TopLevelPackageMovedOutOfByName, TopLevelPackageMovedOutOfByNameWithCustomArguments,
 };
 use crate::validation::{self, Validation, Validation::Success};
 
@@ -164,6 +164,9 @@ impl ToProblem for UsesByName {
                 file,
             )
             .into(),
+            (true, true) => {
+                NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file).into()
+            }
             _ => Problem::TopLevelPackage(TopLevelPackageError {
                 package_name: name.to_owned(),
                 call_package_path: to.relative_path.clone(),

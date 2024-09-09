@@ -33,6 +33,7 @@ mod npv_143_package_nix_missing;
 mod npv_144_package_nix_is_not_a_file;
 mod npv_160_top_level_package_moved_back_from_by_name;
 mod npv_161_top_level_package_moved_with_custom_arguments;
+mod npv_162_new_top_level_package_should_be_by_name;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -60,6 +61,7 @@ pub use npv_143_package_nix_missing::PackageNixMissing;
 pub use npv_144_package_nix_is_not_a_file::PackageNixIsNotFile;
 pub use npv_160_top_level_package_moved_back_from_by_name::TopLevelPackageMovedOutOfByName;
 pub use npv_161_top_level_package_moved_with_custom_arguments::TopLevelPackageMovedOutOfByNameWithCustomArguments;
+pub use npv_162_new_top_level_package_should_be_by_name::NewTopLevelPackageShouldBeByName;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -146,6 +148,9 @@ pub enum Problem {
         TopLevelPackageMovedOutOfByNameWithCustomArguments,
     ),
 
+    /// NPV-162: new top-level package should be in by-name
+    NewTopLevelPackageShouldBeByName(NewTopLevelPackageShouldBeByName),
+
     // By the end of this PR, all these will be gone.
     Path(PathError),
     TopLevelPackage(TopLevelPackageError),
@@ -208,6 +213,7 @@ impl fmt::Display for Problem {
             Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => {
                 fmt::Display::fmt(inner, f)
             }
+            Self::NewTopLevelPackageShouldBeByName(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Path(PathError {
