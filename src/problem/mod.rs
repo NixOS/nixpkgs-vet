@@ -31,6 +31,7 @@ mod npv_141_invalid_package_directory_name;
 mod npv_142_package_in_wrong_shard;
 mod npv_143_package_nix_missing;
 mod npv_144_package_nix_is_not_a_file;
+mod npv_160_top_level_package_moved_back_from_by_name;
 
 pub use npv_100_by_name_undefined_attribute::ByNameUndefinedAttribute;
 pub use npv_101_by_name_non_derivation::ByNameNonDerivation;
@@ -56,6 +57,7 @@ pub use npv_141_invalid_package_directory_name::InvalidPackageDirectoryName;
 pub use npv_142_package_in_wrong_shard::PackageInWrongShard;
 pub use npv_143_package_nix_missing::PackageNixMissing;
 pub use npv_144_package_nix_is_not_a_file::PackageNixIsNotFile;
+pub use npv_160_top_level_package_moved_back_from_by_name::TopLevelPackageMovedOutOfByName;
 
 /// Any problem that can occur when checking Nixpkgs
 /// All paths are relative to Nixpkgs such that the error messages can't be influenced by Nixpkgs absolute
@@ -134,6 +136,9 @@ pub enum Problem {
     /// NPV-144: `package.nix` is not a file
     PackageNixIsNotFile(PackageNixIsNotFile),
 
+    /// NPV-160: top-level package moved out of by-name
+    TopLevelPackageMovedOutOfByName(TopLevelPackageMovedOutOfByName),
+
     // By the end of this PR, all these will be gone.
     Path(PathError),
     TopLevelPackage(TopLevelPackageError),
@@ -192,6 +197,7 @@ impl fmt::Display for Problem {
             Self::PackageInWrongShard(inner) => fmt::Display::fmt(inner, f),
             Self::PackageNixMissing(inner) => fmt::Display::fmt(inner, f),
             Self::PackageNixIsNotFile(inner) => fmt::Display::fmt(inner, f),
+            Self::TopLevelPackageMovedOutOfByName(inner) => fmt::Display::fmt(inner, f),
 
             // By the end of this PR, all these cases will vanish.
             Problem::Path(PathError {

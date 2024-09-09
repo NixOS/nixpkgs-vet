@@ -2,11 +2,13 @@
 //!
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
-use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, TopLevelPackageError};
-use crate::validation::{self, Validation, Validation::Success};
-use relative_path::RelativePathBuf;
 use std::collections::HashMap;
+
+use relative_path::RelativePathBuf;
+
+use crate::nix_file::CallPackageArgumentInfo;
+use crate::problem::{Problem, TopLevelPackageError, TopLevelPackageMovedOutOfByName};
+use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
 #[derive(Default)]
@@ -145,12 +147,19 @@ impl ToProblem for UsesByName {
     type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
 
     fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
-        Problem::TopLevelPackage(TopLevelPackageError {
-            package_name: name.to_owned(),
-            call_package_path: to.relative_path.clone(),
-            file: file.to_owned(),
-            is_new: optional_from.is_none(),
-            is_empty: to.empty_arg,
-        })
+        let is_new = optional_from.is_none();
+        let is_empty = to.empty_arg;
+        match (is_new, is_empty) {
+            (false, true) => {
+                TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file).into()
+            }
+            _ => Problem::TopLevelPackage(TopLevelPackageError {
+                package_name: name.to_owned(),
+                call_package_path: to.relative_path.clone(),
+                file: file.to_owned(),
+                is_new: optional_from.is_none(),
+                is_empty: to.empty_arg,
+            }),
+        }
     }
 }
