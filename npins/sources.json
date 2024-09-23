@@ -3,8 +3,8 @@
     "nixpkgs": {
       "type": "Channel",
       "name": "nixpkgs-unstable",
-      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-24.11pre681909.039b72d0c738/nixexprs.tar.xz",
-      "hash": "0c3q85wfgp0v7hhbv7yv7g9xhijrfi6167lkdli6wqkp66v7fw7r"
+      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-24.11pre683804.a1d92660c6b3/nixexprs.tar.xz",
+      "hash": "0lzd1g9x7ihscdajc2g9f0jyykymw6r1lq2ir5g0shjzjf0jc5la"
     },
     "treefmt-nix": {
       "type": "Git",
@@ -14,9 +14,9 @@
         "repo": "treefmt-nix"
       },
       "branch": "main",
-      "revision": "9fb342d14b69aefdf46187f6bb80a4a0d97007cd",
-      "url": "https://github.com/numtide/treefmt-nix/archive/9fb342d14b69aefdf46187f6bb80a4a0d97007cd.tar.gz",
-      "hash": "04afdry3plv1w1bdqs2diwdv5hz0dgyqvlv4g4d07zhf7mcv3jjm"
+      "revision": "35dfece10c642eb52928a48bee7ac06a59f93e9a",
+      "url": "https://github.com/numtide/treefmt-nix/archive/35dfece10c642eb52928a48bee7ac06a59f93e9a.tar.gz",
+      "hash": "16wii3pqgjbhdzcj2bm2fnpy7kjjs7lk95797la2089l0yn6i6c2"
     }
   },
   "version": 3
