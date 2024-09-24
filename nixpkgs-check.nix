@@ -49,7 +49,7 @@ let
         ${initNix}
         # This is what nixpkgs-vet uses
         export NIXPKGS_VET_NIX_PACKAGE=${lib.getBin nix}
-        ${nixpkgs-vet}/bin/.nixpkgs-vet-wrapped --base "${nixpkgs}" "${nixpkgs}"
+        time ${nixpkgs-vet}/bin/.nixpkgs-vet-wrapped --base "${nixpkgs}" "${nixpkgs}"
         touch $out
       '';
 in

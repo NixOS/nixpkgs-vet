@@ -80,6 +80,11 @@ The following checks are performed when calling the binary:
 Evaluate Nixpkgs with `system` set to `x86_64-linux` and check that:
 - For each package directory, the `pkgs.${name}` attribute must be defined as `callPackage pkgs/by-name/${shard}/${name}/package.nix args` for some `args`.
 - For each package directory, `pkgs.lib.isDerivation pkgs.${name}` must be `true`.
+- For each top-level attribute, `meta.description` must:
+  - Start with a capital letter
+  - Not start with an article (a/an/the)
+  - Not start with the package name
+  - Not end with punctuation
 
 ### Ratchet checks
 

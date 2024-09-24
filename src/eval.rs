@@ -79,9 +79,19 @@ pub enum AttributeVariant {
     NonAttributeSet,
     AttributeSet {
         /// Whether the attribute is a derivation (`lib.isDerivation`)
-        is_derivation: bool,
+        derivation: Derivation,
         /// The type of `callPackage` used.
         definition_variant: DefinitionVariant,
+    },
+}
+
+/// Info about a derivation
+#[derive(Deserialize)]
+pub enum Derivation {
+    NonDerivation,
+    Derivation {
+        pname: String,
+        description: Option<String>,
     },
 }
 
@@ -261,6 +271,61 @@ pub fn check_values(
     }))
 }
 
+/// Check the validity of a package description
+fn check_description(pname: &str, description: &Option<String>) -> ratchet::PackageDescription {
+    if let Some(text) = description {
+        let lowercased = text.to_lowercase();
+        ratchet::PackageDescription {
+            not_capitalised: {
+                if let Some(first) = text.chars().next() {
+                    if first.is_lowercase() {
+                        Loose(text.to_owned())
+                    } else {
+                        Tight
+                    }
+                } else {
+                    Tight
+                }
+            },
+            starts_with_article: {
+                if lowercased.starts_with("a ")
+                    || lowercased.starts_with("an ")
+                    || lowercased.starts_with("the ")
+                {
+                    Loose(text.to_owned())
+                } else {
+                    Tight
+                }
+            },
+            starts_with_package_name: {
+                if lowercased.starts_with(&pname.to_lowercase()) {
+                    Loose(text.to_owned())
+                } else {
+                    Tight
+                }
+            },
+            ends_with_punctuation: {
+                if let Some(last) = text.chars().last() {
+                    if last.is_ascii_punctuation() {
+                        Loose(text.to_owned())
+                    } else {
+                        Tight
+                    }
+                } else {
+                    Tight
+                }
+            },
+        }
+    } else {
+        ratchet::PackageDescription {
+            not_capitalised: Tight,
+            starts_with_article: Tight,
+            starts_with_package_name: Tight,
+            ends_with_punctuation: Tight,
+        }
+    }
+}
+
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
     nix_file_store: &mut NixFileStore,
@@ -277,6 +342,27 @@ fn by_name(
             kind,
         })
         .into()
+    };
+
+    let description_ratchet = match by_name_attribute {
+        Existing(AttributeInfo {
+            attribute_variant:
+                AttributeVariant::AttributeSet {
+                    derivation:
+                        Derivation::Derivation {
+                            pname: ref name,
+                            ref description,
+                        },
+                    ..
+                },
+            ..
+        }) => check_description(name, description),
+        _ => ratchet::PackageDescription {
+            not_capitalised: NonApplicable,
+            starts_with_article: NonApplicable,
+            starts_with_package_name: NonApplicable,
+            ends_with_punctuation: NonApplicable,
+        },
     };
 
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.  This match
@@ -308,16 +394,17 @@ fn by_name(
             // And it's an attribute set, which allows us to get more information about it
             attribute_variant:
                 AttributeVariant::AttributeSet {
-                    is_derivation,
+                    derivation,
                     definition_variant,
                 },
             location,
         }) => {
             // Only derivations are allowed in `pkgs/by-name`.
-            let is_derivation_result = if is_derivation {
-                Success(())
-            } else {
-                to_validation(ByNameErrorKind::NonDerivation).map(|_| ())
+            let is_derivation_result = match derivation {
+                Derivation::Derivation { .. } => Success(()),
+                Derivation::NonDerivation => {
+                    to_validation(ByNameErrorKind::NonDerivation).map(|_| ())
+                }
             };
 
             // If the definition looks correct
@@ -399,6 +486,7 @@ fn by_name(
         // once at the end with a map.
         manual_definition_result.map(|manual_definition| ratchet::Package {
             manual_definition,
+            description: description_ratchet,
             uses_by_name: Tight,
         }),
     )
@@ -477,6 +565,27 @@ fn handle_non_by_name_attribute(
     use ratchet::RatchetState::*;
     use NonByNameAttribute::*;
 
+    let description_ratchet = match non_by_name_attribute {
+        EvalSuccess(AttributeInfo {
+            attribute_variant:
+                AttributeVariant::AttributeSet {
+                    derivation:
+                        Derivation::Derivation {
+                            pname: ref name,
+                            ref description,
+                        },
+                    ..
+                },
+            ..
+        }) => check_description(name, description),
+        _ => ratchet::PackageDescription {
+            not_capitalised: NonApplicable,
+            starts_with_article: NonApplicable,
+            starts_with_package_name: NonApplicable,
+            ends_with_punctuation: NonApplicable,
+        },
+    };
+
     // The ratchet state whether this attribute uses `pkgs/by-name`.
     //
     // This is never `Tight`, because we only either:
@@ -504,7 +613,7 @@ fn handle_non_by_name_attribute(
             // are. Anything else can't be in `pkgs/by-name`.
             attribute_variant: AttributeVariant::AttributeSet {
                 // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
-                is_derivation: true,
+                derivation: Derivation::Derivation { .. },
                 // Of the two definition variants, really only the manual one makes sense here.
                 //
                 // Special cases are:
@@ -601,5 +710,6 @@ fn handle_non_by_name_attribute(
         // ourselves all the time to define `manual_definition`, just set it once at the end here.
         manual_definition: Tight,
         uses_by_name,
+        description: description_ratchet,
     }))
 }

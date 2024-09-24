@@ -59,7 +59,18 @@ let
       else
         {
           AttributeSet = {
-            is_derivation = pkgs.lib.isDerivation value;
+            derivation =
+              if pkgs.lib.isDerivation value then
+                {
+                  Derivation = {
+                    pname = pkgs.lib.getName value;
+                    description = value.meta.description or null;
+                  };
+                }
+              else
+                {
+                  NonDerivation = null;
+                };
             definition_variant =
               if !value ? _callPackageVariant then
                 { ManualDefinition.is_semantic_call_package = false; }

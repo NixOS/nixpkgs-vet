@@ -1,0 +1,5 @@
+- Description for package foo ("a test.") is not capitalised
+- Description for package foo ("a test.") starts with an article (the/a/an)
+- Description for package foo ("a test.") ends with punctuation
+- Description for package foo2 ("Foo2 is a test") starts with the package name
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.

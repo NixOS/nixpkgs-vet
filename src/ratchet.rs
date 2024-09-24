@@ -3,7 +3,8 @@
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::{NixpkgsProblem, TopLevelPackageError};
+use crate::nixpkgs_problem::DescriptionErrorKind;
+use crate::nixpkgs_problem::{DescriptionError, NixpkgsProblem, TopLevelPackageError};
 use crate::validation::{self, Validation, Validation::Success};
 use relative_path::RelativePathBuf;
 use std::collections::HashMap;
@@ -37,6 +38,9 @@ pub struct Package {
 
     /// The ratchet value for the check for new packages using pkgs/by-name
     pub uses_by_name: RatchetState<UsesByName>,
+
+    /// The package description is valid
+    pub description: PackageDescription,
 }
 
 impl Package {
@@ -52,6 +56,11 @@ impl Package {
                 name,
                 optional_from.map(|x| &x.uses_by_name),
                 &to.uses_by_name,
+            ),
+            PackageDescription::compare(
+                name,
+                optional_from.map(|x| &x.description),
+                &to.description,
             ),
         ])
     }
@@ -163,6 +172,95 @@ impl ToNixpkgsProblem for UsesByName {
             file: file.to_owned(),
             is_new: optional_from.is_none(),
             is_empty: to.empty_arg,
+        })
+    }
+}
+
+/// The ratchet value of an attribute for the check that the description is valid for new packages.
+///
+/// This checks that new packages don't use an indefinite article in `meta.description`.
+pub struct PackageDescription {
+    pub not_capitalised: RatchetState<DescriptionNotCapitalised>,
+    pub starts_with_article: RatchetState<DescriptionStartsWithArticle>,
+    pub starts_with_package_name: RatchetState<DescriptionStartsWithPackageName>,
+    pub ends_with_punctuation: RatchetState<DescriptionEndsWithPunctuation>,
+}
+
+impl PackageDescription {
+    pub fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+        validation::sequence_([
+            RatchetState::<DescriptionNotCapitalised>::compare(
+                name,
+                optional_from.map(|x| &x.not_capitalised),
+                &to.not_capitalised,
+            ),
+            RatchetState::<DescriptionStartsWithArticle>::compare(
+                name,
+                optional_from.map(|x| &x.starts_with_article),
+                &to.starts_with_article,
+            ),
+            RatchetState::<DescriptionStartsWithPackageName>::compare(
+                name,
+                optional_from.map(|x| &x.starts_with_package_name),
+                &to.starts_with_package_name,
+            ),
+            RatchetState::<DescriptionEndsWithPunctuation>::compare(
+                name,
+                optional_from.map(|x| &x.ends_with_punctuation),
+                &to.ends_with_punctuation,
+            ),
+        ])
+    }
+}
+
+pub enum DescriptionNotCapitalised {}
+pub enum DescriptionStartsWithArticle {}
+pub enum DescriptionStartsWithPackageName {}
+pub enum DescriptionEndsWithPunctuation {}
+
+impl ToDescriptionErrorKind for DescriptionNotCapitalised {
+    fn to_description_error_kind() -> DescriptionErrorKind {
+        DescriptionErrorKind::NotCapitalised
+    }
+}
+
+impl ToDescriptionErrorKind for DescriptionStartsWithArticle {
+    fn to_description_error_kind() -> DescriptionErrorKind {
+        DescriptionErrorKind::StartsWithArticle
+    }
+}
+
+impl ToDescriptionErrorKind for DescriptionStartsWithPackageName {
+    fn to_description_error_kind() -> DescriptionErrorKind {
+        DescriptionErrorKind::StartsWithPackageName
+    }
+}
+
+impl ToDescriptionErrorKind for DescriptionEndsWithPunctuation {
+    fn to_description_error_kind() -> DescriptionErrorKind {
+        DescriptionErrorKind::EndsWithPunctuation
+    }
+}
+
+pub trait ToDescriptionErrorKind {
+    fn to_description_error_kind() -> DescriptionErrorKind;
+}
+
+impl<T> ToNixpkgsProblem for T
+where
+    T: ToDescriptionErrorKind,
+{
+    type ToContext = String;
+
+    fn to_nixpkgs_problem(
+        name: &str,
+        _optional_from: Option<()>,
+        description: &Self::ToContext,
+    ) -> NixpkgsProblem {
+        NixpkgsProblem::Description(DescriptionError {
+            package_name: name.to_owned(),
+            description: description.to_owned(),
+            kind: T::to_description_error_kind(),
         })
     }
 }
