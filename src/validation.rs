@@ -1,4 +1,4 @@
-use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::problem::Problem;
 use itertools::concat;
 use itertools::{
     Either::{Left, Right},
@@ -12,14 +12,14 @@ use Validation::*;
 ///
 /// This leans on <https://hackage.haskell.org/package/validation>.
 pub enum Validation<A> {
-    Failure(Vec<NixpkgsProblem>),
+    Failure(Vec<Problem>),
     Success(A),
 }
 
-impl<A> From<NixpkgsProblem> for Validation<A> {
+impl<A, P: Into<Problem>> From<P> for Validation<A> {
     /// Create a `Validation<A>` from a single check problem
-    fn from(value: NixpkgsProblem) -> Self {
-        Failure(vec![value])
+    fn from(value: P) -> Self {
+        Failure(vec![value.into()])
     }
 }
 
@@ -29,7 +29,7 @@ impl<A> From<NixpkgsProblem> for Validation<A> {
 ///   Such failures are not caused by the files in Nixpkgs.
 ///   This hints at a bug in the code or a problem with the deployment.
 ///
-/// - Ok(Failure(Vec<NixpkgsProblem>)): A non-fatal validation problem with the Nixpkgs files.
+/// - Ok(Failure(Vec<Problem>)): A non-fatal validation problem with the Nixpkgs files.
 ///   Further checks can be run even with this result type.
 ///   Such problems can be fixed by changing the Nixpkgs files.
 ///
@@ -74,7 +74,7 @@ impl<A> Validation<A> {
 
 impl Validation<()> {
     /// Combine two validations, both of which need to be successful for the return value to be
-    /// successful. The `NixpkgsProblem`s of both sides are returned concatenated.
+    /// successful. The `Problem`s of both sides are returned concatenated.
     pub fn and<A>(self, other: Validation<A>) -> Validation<A> {
         match (self, other) {
             (Success(_), Success(right_value)) => Success(right_value),
@@ -91,14 +91,15 @@ impl Validation<()> {
 /// successful, in which case the returned validation value contains a `Vec` of each individual
 /// value.
 ///
-/// Otherwise, the `NixpkgsProblem`s of all validations are returned concatenated.
+/// Otherwise, the `Problem`s of all validations are returned concatenated.
 pub fn sequence<A>(check_results: impl IntoIterator<Item = Validation<A>>) -> Validation<Vec<A>> {
-    let (errors, values): (Vec<Vec<NixpkgsProblem>>, Vec<A>) = check_results
-        .into_iter()
-        .partition_map(|validation| match validation {
-            Failure(err) => Left(err),
-            Success(value) => Right(value),
-        });
+    let (errors, values): (Vec<Vec<Problem>>, Vec<A>) =
+        check_results
+            .into_iter()
+            .partition_map(|validation| match validation {
+                Failure(err) => Left(err),
+                Success(value) => Right(value),
+            });
 
     // To combine the errors from the results we flatten all the error Vec's into a new Vec
     // This is not very efficient, but doesn't matter because generally we should have no errors

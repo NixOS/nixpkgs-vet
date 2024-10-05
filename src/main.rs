@@ -1,11 +1,11 @@
 mod eval;
+mod location;
 mod nix_file;
-mod nixpkgs_problem;
+mod problem;
 mod ratchet;
 mod references;
 mod status;
 mod structure;
-mod utils;
 mod validation;
 
 use anyhow::Context as _;
@@ -102,7 +102,7 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
         )
     })?;
 
-    if !nixpkgs_path.join(utils::BASE_SUBPATH).exists() {
+    if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
         // No pkgs/by-name directory, always valid
         return Ok(Success(ratchet::Nixpkgs::default()));
     }
@@ -120,12 +120,14 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
     use std::fs;
     use std::path::Path;
+
+    use anyhow::Context;
+    use pretty_assertions::StrComparison;
     use tempfile::{tempdir_in, TempDir};
 
-    use super::{process, utils::BASE_SUBPATH};
+    use super::{process, structure::BASE_SUBPATH};
 
     #[test]
     fn tests_dir() -> anyhow::Result<()> {
@@ -245,9 +247,8 @@ mod tests {
 
         if !expected_errors_regex.is_match(&actual_errors) {
             panic!(
-                "Failed test case {name}, expected these errors:\n=======\n{}\n=======\n\
-                but got these:\n=======\n{}\n=======",
-                expected_errors, actual_errors
+                "Failed test case {name}: {}",
+                StrComparison::new(expected_errors, &actual_errors)
             );
         }
     }

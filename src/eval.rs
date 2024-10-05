@@ -1,22 +1,21 @@
-use crate::nix_file::CallPackageArgumentInfo;
-use crate::nixpkgs_problem::{
-    ByNameError, ByNameErrorKind, ByNameOverrideError, ByNameOverrideErrorKind, NixEvalError,
-    NixpkgsProblem,
-};
-use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::ratchet::{self, ManualDefinition, RatchetState};
-use crate::structure;
-use crate::utils;
-use crate::validation::ResultIteratorExt as _;
-use crate::validation::{self, Validation::Success};
-use crate::NixFileStore;
-use relative_path::RelativePathBuf;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
 use anyhow::Context;
+use relative_path::RelativePathBuf;
 use serde::Deserialize;
 use tempfile::Builder;
+
+use crate::nix_file::CallPackageArgumentInfo;
+use crate::problem::{
+    npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
+};
+use crate::ratchet::RatchetState::{Loose, Tight};
+use crate::structure::{self, BASE_SUBPATH};
+use crate::validation::ResultIteratorExt as _;
+use crate::validation::{self, Validation::Success};
+use crate::NixFileStore;
+use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 
@@ -59,16 +58,18 @@ struct Location {
 }
 
 impl Location {
-    /// Returns the [file] field, but relative to Nixpkgs.
-    fn relative_file(&self, nixpkgs_path: &Path) -> anyhow::Result<RelativePathBuf> {
-        let path = self.file.strip_prefix(nixpkgs_path).with_context(|| {
+    /// Returns the location, but relative to the given Nixpkgs root.
+    fn relative(self, nixpkgs_path: &Path) -> anyhow::Result<location::Location> {
+        let Self { file, line, column } = self;
+        let path = file.strip_prefix(nixpkgs_path).with_context(|| {
             format!(
                 "The file ({}) is outside Nixpkgs ({})",
-                self.file.display(),
+                file.display(),
                 nixpkgs_path.display()
             )
         })?;
-        Ok(RelativePathBuf::from_path(path).expect("relative path"))
+        let relative_file = RelativePathBuf::from_path(path).expect("relative path");
+        Ok(location::Location::new(relative_file, line, column))
     }
 }
 
@@ -219,8 +220,7 @@ pub fn check_values(
 
     if !result.status.success() {
         // Early return in case evaluation fails
-        let stderr = String::from_utf8_lossy(&result.stderr).to_string();
-        return Ok(NixpkgsProblem::NixEval(NixEvalError { stderr }).into());
+        return Ok(npv_120::NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
     }
 
     // Parse the resulting JSON value
@@ -268,29 +268,18 @@ fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
-    use ratchet::RatchetState::*;
-    use ByNameAttribute::*;
-
-    let to_validation = |kind| -> validation::Validation<RatchetState<ManualDefinition>> {
-        NixpkgsProblem::ByName(ByNameError {
-            attribute_name: attribute_name.to_owned(),
-            kind,
-        })
-        .into()
-    };
-
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.  This match
     // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
     // definition could be removed.
     let manual_definition_result = match by_name_attribute {
         // The attribute is missing.
-        Missing => {
+        ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically defined attributes in `pkgs/by-name`
-            to_validation(ByNameErrorKind::UndefinedAttr)
+            npv_100::ByNameUndefinedAttribute::new(attribute_name).into()
         }
         // The attribute exists
-        Existing(AttributeInfo {
+        ByNameAttribute::Existing(AttributeInfo {
             // But it's not an attribute set, which limits the amount of information we can get
             // about this attribute (see ./eval.nix)
             attribute_variant: AttributeVariant::NonAttributeSet,
@@ -301,10 +290,10 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            to_validation(ByNameErrorKind::NonDerivation)
+            npv_101::ByNameNonDerivation::new(attribute_name).into()
         }
         // The attribute exists
-        Existing(AttributeInfo {
+        ByNameAttribute::Existing(AttributeInfo {
             // And it's an attribute set, which allows us to get more information about it
             attribute_variant:
                 AttributeVariant::AttributeSet {
@@ -317,7 +306,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                to_validation(ByNameErrorKind::NonDerivation).map(|_| ())
+                npv_101::ByNameNonDerivation::new(attribute_name).into()
             };
 
             // If the definition looks correct
@@ -330,7 +319,7 @@ fn by_name(
                         // Such an automatic definition should definitely not have a location.
                         // Having one indicates that somebody is using
                         // `_internalCallByNamePackageFile`,
-                        to_validation(ByNameErrorKind::InternalCallPackageUsed)
+                        npv_102::ByNameInternalCallPackageUsed::new(attribute_name).into()
                     } else {
                         Success(Tight)
                     }
@@ -348,13 +337,11 @@ fn by_name(
                         let nix_file = nix_file_store.get(&location.file)?;
 
                         // The relative path of the Nix file, for error messages
-                        let relative_location_file =
-                            location.relative_file(nixpkgs_path).with_context(|| {
-                                format!(
-                                    "Failed to resolve the file where attribute {} is defined",
-                                    attribute_name
-                                )
-                            })?;
+                        let location = location.relative(nixpkgs_path).with_context(|| {
+                            format!(
+                                "Failed to resolve the file where attribute {attribute_name} is defined"
+                            )
+                        })?;
 
                         // Figure out whether it's an attribute definition of the form
                         // `= callPackage <arg1> <arg2>`, returning the arguments if so.
@@ -377,13 +364,12 @@ fn by_name(
                             optional_syntactic_call_package,
                             definition,
                             location,
-                            relative_location_file,
                         )
                     } else {
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
                         // over, e.g. if it's defined in aliases.nix.
                         // We can't verify whether its of the expected `callPackage`, so error out.
-                        to_validation(ByNameErrorKind::CannotDetermineAttributeLocation)
+                        npv_103::ByNameCannotDetermineAttributeLocation::new(attribute_name).into()
                     }
                 }
             };
@@ -411,58 +397,53 @@ fn by_name_override(
     is_semantic_call_package: bool,
     optional_syntactic_call_package: Option<CallPackageArgumentInfo>,
     definition: String,
-    location: Location,
-    relative_location_file: RelativePathBuf,
+    location: location::Location,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
-    let expected_package_path = structure::relative_file_for_package(attribute_name);
-
-    let to_problem = |kind| {
-        NixpkgsProblem::ByNameOverride(ByNameOverrideError {
-            package_name: attribute_name.to_owned(),
-            expected_package_path: expected_package_path.to_owned(),
-            file: relative_location_file,
-            line: location.line,
-            column: location.column,
+    let Some(syntactic_call_package) = optional_syntactic_call_package else {
+        // Something like `<attr> = foo`
+        return npv_104::ByNameOverrideOfNonSyntacticCallPackage::new(
+            attribute_name,
+            location,
             definition,
-            kind,
-        })
+        )
+        .into();
     };
 
-    // At this point, we completed two different checks for whether it's a `callPackage`
-    match (is_semantic_call_package, optional_syntactic_call_package) {
-        // Something like `<attr> = foo`
-        (_, None) => to_problem(ByNameOverrideErrorKind::NonSyntacticCallPackage).into(),
-
+    if !is_semantic_call_package {
         // Something like `<attr> = pythonPackages.callPackage ...`
-        (false, Some(_)) => to_problem(ByNameOverrideErrorKind::NonToplevelCallPackage).into(),
+        return npv_105::ByNameOverrideOfNonTopLevelPackage::new(
+            attribute_name,
+            location,
+            definition,
+        )
+        .into();
+    }
 
-        // Something like `<attr> = pkgs.callPackage ...`
-        (true, Some(syntactic_call_package)) => {
-            if let Some(actual_package_path) = syntactic_call_package.relative_path {
-                if actual_package_path != expected_package_path {
-                    // Wrong path
-                    to_problem(ByNameOverrideErrorKind::WrongCallPackagePath {
-                        actual_path: actual_package_path,
-                    })
-                    .into()
-                } else {
-                    // Manual definitions with empty arguments are not allowed anymore,
-                    // but existing ones should continue to be allowed.
-                    let manual_definition_ratchet = if syntactic_call_package.empty_arg {
-                        // This is the state to migrate away from.
-                        Loose(to_problem(ByNameOverrideErrorKind::EmptyArgument))
-                    } else {
-                        // This is the state to migrate to.
-                        Tight
-                    };
+    let Some(actual_package_path) = syntactic_call_package.relative_path else {
+        return npv_108::ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition)
+            .into();
+    };
 
-                    Success(manual_definition_ratchet)
-                }
-            } else {
-                // No path...
-                to_problem(ByNameOverrideErrorKind::NonPath).into()
-            }
-        }
+    let expected_package_path = structure::relative_file_for_package(attribute_name);
+    if actual_package_path != expected_package_path {
+        return npv_106::ByNameOverrideContainsWrongCallPackagePath::new(
+            attribute_name,
+            actual_package_path,
+            location,
+        )
+        .into();
+    }
+
+    // Manual definitions with empty arguments are not allowed anymore, but existing ones should
+    // continue to be allowed. This is the state to migrate away from.
+    if syntactic_call_package.empty_arg {
+        Success(Loose(
+            npv_107::ByNameOverrideContainsEmptyArgument::new(attribute_name, location, definition)
+                .into(),
+        ))
+    } else {
+        // This is the state to migrate to.
+        Success(Tight)
     }
 }
 
@@ -530,8 +511,8 @@ fn handle_non_by_name_attribute(
         // Parse the Nix file in the location
         let nix_file = nix_file_store.get(&location.file)?;
 
-        // The relative path of the Nix file, for error messages
-        let relative_location_file = location.relative_file(nixpkgs_path).with_context(|| {
+        // The relative location of the Nix file, for error messages
+        let location = location.relative(nixpkgs_path).with_context(|| {
             format!("Failed to resolve the file where attribute {attribute_name} is defined")
         })?;
 
@@ -567,7 +548,7 @@ fn handle_non_by_name_attribute(
             (true, Some(syntactic_call_package)) => {
                 // It's only possible to migrate such a definitions if..
                 match syntactic_call_package.relative_path {
-                    Some(ref rel_path) if rel_path.starts_with(utils::BASE_SUBPATH) => {
+                    Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
                         // ..the path is not already within `pkgs/by-name` like
                         //
                         //   foo-variant = callPackage ../by-name/fo/foo/package.nix {
@@ -585,7 +566,7 @@ fn handle_non_by_name_attribute(
                     _ => {
                         // Otherwise, the path is outside `pkgs/by-name`, which means it can be
                         // migrated.
-                        Loose((syntactic_call_package, relative_location_file))
+                        Loose((syntactic_call_package, location.file))
                     }
                 }
             }

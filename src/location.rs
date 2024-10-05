@@ -1,24 +1,21 @@
-use anyhow::Context;
-use std::fs;
-use std::io;
-use std::path::Path;
+use relative_path::RelativePathBuf;
 
-pub const BASE_SUBPATH: &str = "pkgs/by-name";
-pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
+/// A location that's suitable for error messages.
+#[derive(Clone, Debug)]
+pub struct Location {
+    pub file: RelativePathBuf,
+    pub line: usize,
+    pub column: usize,
+}
 
-/// Deterministic file listing so that tests are reproducible.
-pub fn read_dir_sorted(base_dir: &Path) -> anyhow::Result<Vec<fs::DirEntry>> {
-    let listing = base_dir
-        .read_dir()
-        .with_context(|| format!("Could not list directory {}", base_dir.display()))?;
-
-    let mut shard_entries = listing
-        .collect::<io::Result<Vec<_>>>()
-        .with_context(|| format!("Could not list directory {}", base_dir.display()))?;
-
-    shard_entries.sort_by_key(|entry| entry.file_name());
-
-    Ok(shard_entries)
+impl Location {
+    pub fn new(file: impl Into<RelativePathBuf>, line: usize, column: usize) -> Self {
+        Self {
+            file: file.into(),
+            line,
+            column,
+        }
+    }
 }
 
 /// A simple utility for calculating the line for a string offset.

@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use colored::Colorize as _;
 
-use crate::nixpkgs_problem::NixpkgsProblem;
+use crate::problem::Problem;
 
 pub enum Status {
     /// It's all green.
@@ -14,22 +14,22 @@ pub enum Status {
 
     /// The base branch fails, the PR doesn't fix it, and the PR may also introduce additional
     /// problems.
-    BranchStillBroken(Vec<NixpkgsProblem>),
+    BranchStillBroken(Vec<Problem>),
 
     /// This PR introduces the problems listed. Please fix them before merging, otherwise the base
     /// branch would break.
-    ProblemsIntroduced(Vec<NixpkgsProblem>),
+    ProblemsIntroduced(Vec<Problem>),
 
     /// This PR introduces additional instances of discouraged patterns. Merging is discouraged but
     /// would not break the base branch.
-    DiscouragedPatternedIntroduced(Vec<NixpkgsProblem>),
+    DiscouragedPatternedIntroduced(Vec<Problem>),
 
     /// Some other error occurred.
     Error(anyhow::Error),
 }
 
 impl Status {
-    fn errors(&self) -> Option<&Vec<NixpkgsProblem>> {
+    fn errors(&self) -> Option<&Vec<Problem>> {
         match self {
             Self::ValidatedSuccessfully | Self::BranchHealed | Self::Error(..) => None,
             Self::BranchStillBroken(errors)

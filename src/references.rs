@@ -1,15 +1,14 @@
-use crate::nixpkgs_problem::{
-    NixFileError, NixFileErrorKind, NixpkgsProblem, PathError, PathErrorKind,
-};
-use crate::utils;
-use crate::validation::{self, ResultIteratorExt, Validation::Success};
-use crate::NixFileStore;
-use relative_path::RelativePath;
-
-use anyhow::Context;
-use rowan::ast::AstNode;
 use std::ffi::OsStr;
 use std::path::Path;
+
+use anyhow::Context;
+use relative_path::RelativePath;
+use rowan::ast::AstNode;
+
+use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126};
+use crate::structure::read_dir_sorted;
+use crate::validation::{self, ResultIteratorExt, Validation::Success};
+use crate::NixFileStore;
 
 /// Check that every package directory in pkgs/by-name doesn't link to outside that directory.
 /// Both symlinks and Nix path expressions are checked.
@@ -49,35 +48,32 @@ fn check_path(
     subpath: &RelativePath,
 ) -> validation::Result<()> {
     let path = subpath.to_path(absolute_package_dir);
-    let to_validation = |kind| -> validation::Validation<()> {
-        NixpkgsProblem::Path(PathError {
-            relative_package_dir: relative_package_dir.to_owned(),
-            subpath: subpath.to_owned(),
-            kind,
-        })
-        .into()
-    };
 
     Ok(if path.is_symlink() {
         // Check whether the symlink resolves to outside the package directory.
         match path.canonicalize() {
             Ok(target) => {
-                // No need to handle the case of it being inside the directory, since we scan
-                // through the entire directory recursively in any case.
+                // No need to handle the case of it being inside the directory,
+                // since we scan through the entire directory recursively in any case.
                 if let Err(_prefix_error) = target.strip_prefix(absolute_package_dir) {
-                    to_validation(PathErrorKind::OutsideSymlink)
+                    npv_125::PackageContainsSymlinkPointingOutside::new(
+                        relative_package_dir,
+                        subpath,
+                    )
+                    .into()
                 } else {
                     Success(())
                 }
             }
-            Err(io_error) => to_validation(PathErrorKind::UnresolvableSymlink {
-                io_error: io_error.to_string(),
-            }),
+            Err(err) => {
+                npv_126::PackageContainsUnresolvableSymlink::new(relative_package_dir, subpath, err)
+                    .into()
+            }
         }
     } else if path.is_dir() {
         // Recursively check each entry
         validation::sequence_(
-            utils::read_dir_sorted(&path)?
+            read_dir_sorted(&path)?
                 .into_iter()
                 .map(|entry| {
                     check_path(
@@ -136,28 +132,38 @@ fn check_nix_file(
                 return Success(());
             };
 
-            let to_validation = |kind| -> validation::Validation<()> {
-                NixpkgsProblem::NixFile(NixFileError {
-                    relative_package_dir: relative_package_dir.to_owned(),
-                    subpath: subpath.to_owned(),
-                    line,
-                    text,
-                    kind,
-                })
-                .into()
-            };
-
             use crate::nix_file::ResolvedPath;
 
             match nix_file.static_resolve_path(path, absolute_package_dir) {
-                ResolvedPath::Interpolated => to_validation(NixFileErrorKind::PathInterpolation),
-                ResolvedPath::SearchPath => to_validation(NixFileErrorKind::SearchPath),
-                ResolvedPath::Outside => to_validation(NixFileErrorKind::OutsidePathReference),
-                ResolvedPath::Unresolvable(e) => {
-                    to_validation(NixFileErrorKind::UnresolvablePathReference {
-                        io_error: e.to_string(),
-                    })
-                }
+                ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
+                ResolvedPath::SearchPath => npv_122::NixFileContainsSearchPath::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
+                ResolvedPath::Outside => npv_123::NixFileContainsPathOutsideDirectory::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
+                ResolvedPath::Unresolvable(err) => npv_124::NixFileContainsUnresolvablePath::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                    err,
+                )
+                .into(),
                 ResolvedPath::Within(..) => {
                     // No need to handle the case of it being inside the directory, since we scan
                     // through the entire directory recursively in any case.

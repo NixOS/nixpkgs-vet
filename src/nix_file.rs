@@ -1,6 +1,6 @@
 //! This is a utility module for interacting with the syntax of Nix files
 
-use crate::utils::LineIndex;
+use crate::location::LineIndex;
 use anyhow::Context;
 use itertools::Either::{self, Left, Right};
 use relative_path::RelativePathBuf;
