@@ -137,14 +137,14 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 
     // Wire it up so that it can be imported as `import <test-nixpkgs> { }`.
     command.arg("-I");
-    command.arg(&format!("test-nixpkgs={}", mock_nixpkgs_path.display()));
+    command.arg(format!("test-nixpkgs={}", mock_nixpkgs_path.display()));
 
     // Retrieve the path to the real nixpkgs lib, then wire it up to `import <test-nixpkgs/lib>`.
     let nixpkgs_lib = env::var("NIXPKGS_VET_NIXPKGS_LIB")
         .with_context(|| "Could not get environment variable NIXPKGS_VET_NIXPKGS_LIB")?;
 
     command.arg("-I");
-    command.arg(&format!("test-nixpkgs/lib={nixpkgs_lib}"));
+    command.arg(format!("test-nixpkgs/lib={nixpkgs_lib}"));
 
     Ok(())
 }
