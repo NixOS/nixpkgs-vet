@@ -4,7 +4,6 @@ use std::{env, fs, process};
 use anyhow::Context;
 use relative_path::RelativePathBuf;
 use serde::Deserialize;
-use tempfile::Builder;
 
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
@@ -157,7 +156,7 @@ pub fn check_values(
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
 ) -> validation::Result<ratchet::Nixpkgs> {
-    let work_dir = Builder::new()
+    let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
         .tempdir()
         .with_context(|| "Failed to create a working directory")?;
