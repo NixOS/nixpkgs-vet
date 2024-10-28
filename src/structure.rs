@@ -27,7 +27,7 @@ pub fn read_dir_sorted(base_dir: &Path) -> anyhow::Result<Vec<DirEntry>> {
 
     process_results(listing, |listing| {
         use itertools::Itertools;
-        Itertools::collect_vec(listing.sorted_by_key(|entry| entry.file_name()))
+        Itertools::collect_vec(listing.sorted_by_key(DirEntry::file_name))
     })
     .with_context(ctx)
 }

@@ -45,8 +45,7 @@ impl LineIndex {
     pub fn line(&self, index: usize) -> usize {
         match self.newlines.binary_search(&index) {
             // +1 because lines are 1-indexed
-            Ok(x) => x + 1,
-            Err(x) => x + 1,
+            Ok(x) | Err(x) => x + 1,
         }
     }
 

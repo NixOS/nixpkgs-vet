@@ -566,7 +566,7 @@ mod tests {
             (
                 Position { line, column },
                 result
-                    .map(|node| node.to_string())
+                    .map(ToString::to_string)
                     .map_right(|node| node.to_string()),
             )
         }));
@@ -589,7 +589,7 @@ mod tests {
     fn detects_call_package() -> anyhow::Result<()> {
         let temp_dir = tests::tempdir()?;
         let file = temp_dir.path().join("file.nix");
-        let contents = indoc! {r#"
+        let contents = indoc! {r"
             self: with self; {
               a.sub = null;
               b = null;
@@ -601,7 +601,7 @@ mod tests {
               h = callPackage ./file.nix { x = 0; };
               i = callPackage ({ }: { }) (let in { });
             }
-        "#};
+        "};
 
         std::fs::write(&file, contents)?;
 

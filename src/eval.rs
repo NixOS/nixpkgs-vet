@@ -155,7 +155,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    package_names: Vec<String>,
+    package_names: &[String],
 ) -> validation::Result<ratchet::Nixpkgs> {
     let work_dir = Builder::new()
         .prefix("nixpkgs-vet")
@@ -534,11 +534,7 @@ fn handle_non_by_name_attribute(
         // At this point, we completed two different checks for whether it's a `callPackage`.
         match (is_semantic_call_package, optional_syntactic_call_package) {
             // Something like `<attr> = { }`
-            (false, None)
-            // Something like `<attr> = pythonPackages.callPackage ...`
-            | (false, Some(_))
-            // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
-            | (true, None) => {
+            (_, None) | (false, Some(_)) => {
                 // In all of these cases, it's not possible to migrate the package to
                 // `pkgs/by-name`.
                 NonApplicable

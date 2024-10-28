@@ -78,9 +78,8 @@ impl Validation<()> {
     pub fn and<A>(self, other: Validation<A>) -> Validation<A> {
         match (self, other) {
             (Success(_), Success(right_value)) => Success(right_value),
-            (Failure(errors), Success(_)) => Failure(errors),
-            (Success(_), Failure(errors)) => Failure(errors),
             (Failure(errors_l), Failure(errors_r)) => Failure(concat([errors_l, errors_r])),
+            (Failure(errors), Success(_)) | (Success(_), Failure(errors)) => Failure(errors),
         }
     }
 }

@@ -1,3 +1,10 @@
+// #![warn(clippy::pedantic)]
+// #![allow(clippy::uninlined_format_args)]
+// #![allow(clippy::enum_glob_use)]
+// #![allow(clippy::module_name_repetitions)]
+// #![allow(clippy::doc_markdown)]
+// #![allow(clippy::if_not_else)]
+// #![allow(clippy::ignored_unit_patterns)]
 mod eval;
 mod location;
 mod nix_file;
@@ -112,7 +119,7 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
     // Only if we could successfully parse the structure, we do the evaluation checks
     let result = structure.result_map(|package_names| {
-        eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names)
+        eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
     })?;
 
     Ok(result)
@@ -209,7 +216,7 @@ mod tests {
                 "symlinked_tmpdir",
                 Path::new("tests/success"),
                 "Validated successfully\n",
-            )
+            );
         });
         Ok(())
     }
@@ -245,12 +252,10 @@ mod tests {
 
         let actual_errors = format!("{status}\n");
 
-        if !expected_errors_regex.is_match(&actual_errors) {
-            panic!(
-                "Failed test case {name}: {}",
-                StrComparison::new(expected_errors, &actual_errors)
-            );
-        }
+        assert!(expected_errors_regex.is_match(&actual_errors),
+            "Failed test case {name}: {}",
+            StrComparison::new(expected_errors, &actual_errors)
+        );
     }
 
     /// Check whether a path is in a case-insensitive filesystem
