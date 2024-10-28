@@ -252,7 +252,8 @@ mod tests {
 
         let actual_errors = format!("{status}\n");
 
-        assert!(expected_errors_regex.is_match(&actual_errors),
+        assert!(
+            expected_errors_regex.is_match(&actual_errors),
             "Failed test case {name}: {}",
             StrComparison::new(expected_errors, &actual_errors)
         );
