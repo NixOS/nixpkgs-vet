@@ -533,7 +533,11 @@ fn handle_non_by_name_attribute(
         // At this point, we completed two different checks for whether it's a `callPackage`.
         match (is_semantic_call_package, optional_syntactic_call_package) {
             // Something like `<attr> = { }`
-            (_, None) | (false, Some(_)) => {
+            (false, None)
+            // Something like `<attr> = pythonPackages.callPackage ...`
+            | (false, Some(_))
+            // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
+            | (true, None) => {
                 // In all of these cases, it's not possible to migrate the package to
                 // `pkgs/by-name`.
                 NonApplicable
