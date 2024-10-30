@@ -453,8 +453,8 @@ fn handle_non_by_name_attribute(
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
-    use ratchet::RatchetState::*;
-    use NonByNameAttribute::*;
+    use ratchet::RatchetState::{Loose, NonApplicable, Tight};
+    use NonByNameAttribute::EvalSuccess;
 
     // The ratchet state whether this attribute uses `pkgs/by-name`.
     //
