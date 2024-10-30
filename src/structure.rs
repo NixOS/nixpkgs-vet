@@ -73,10 +73,10 @@ pub fn check_structure(
                 npv_109::ByNameShardIsNotDirectory::new(shard_name).into()
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
-                let result = if !shard_name_valid {
-                    npv_110::ByNameShardIsInvalid::new(shard_name.clone()).into()
-                } else {
+                let result = if shard_name_valid {
                     Success(())
+                } else {
+                    npv_110::ByNameShardIsInvalid::new(shard_name.clone()).into()
                 };
 
                 let entries = read_dir_sorted(&shard_path)?;
@@ -132,22 +132,22 @@ fn check_package(
     let relative_package_dir =
         RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}/{package_name}"));
 
-    Ok(if !package_path.is_dir() {
-        npv_140::PackageDirectoryIsNotDirectory::new(package_name).into()
-    } else {
+    Ok(if package_path.is_dir() {
         let package_name_valid = PACKAGE_NAME_REGEX.is_match(&package_name);
-        let result = if !package_name_valid {
+        let result = if package_name_valid {
+            Success(())
+        } else {
             npv_141::InvalidPackageDirectoryName::new(
                 package_name.clone(),
                 relative_package_dir.clone(),
             )
             .into()
-        } else {
-            Success(())
         };
 
         let correct_relative_package_dir = relative_dir_for_package(&package_name);
-        let result = result.and(if relative_package_dir != correct_relative_package_dir {
+        let result = result.and(if relative_package_dir == correct_relative_package_dir {
+            Success(())
+        } else {
             // Only show this error if we have a valid shard and package name.
             // If one of those is wrong, you should fix that first.
             if shard_name_valid && package_name_valid {
@@ -159,8 +159,6 @@ fn check_package(
             } else {
                 Success(())
             }
-        } else {
-            Success(())
         });
 
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
@@ -179,5 +177,7 @@ fn check_package(
         )?);
 
         result.map(|_| package_name)
+    } else {
+        npv_140::PackageDirectoryIsNotDirectory::new(package_name).into()
     })
 }
