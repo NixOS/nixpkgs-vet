@@ -352,8 +352,7 @@ fn by_name(
                             )
                             .with_context(|| {
                                 format!(
-                                    "Failed to get the definition info for attribute {}",
-                                    attribute_name
+                                    "Failed to get the definition info for attribute {attribute_name}"
                                 )
                             })?;
 
@@ -527,7 +526,7 @@ fn handle_non_by_name_attribute(
                 nixpkgs_path
             )
             .with_context(|| {
-                format!("Failed to get the definition info for attribute {}", attribute_name)
+                format!("Failed to get the definition info for attribute {attribute_name}")
             })?;
 
         // At this point, we completed two different checks for whether it's a `callPackage`.

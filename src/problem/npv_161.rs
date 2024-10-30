@@ -25,7 +25,7 @@ impl fmt::Display for TopLevelPackageMovedOutOfByNameWithCustomArguments {
         } = self;
         let relative_package_file = structure::relative_file_for_package(package_name);
         let call_package_arg = if let Some(path) = call_package_path {
-            format!("./{}", path)
+            format!("./{path}")
         } else {
             "...".into()
         };

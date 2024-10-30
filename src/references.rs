@@ -30,8 +30,7 @@ pub fn check_references(
     )
     .with_context(|| {
         format!(
-            "While checking the references in package directory {}",
-            relative_package_dir
+            "While checking the references in package directory {relative_package_dir}"
         )
     })
 }
@@ -85,7 +84,7 @@ fn check_path(
                     )
                 })
                 .collect_vec()
-                .with_context(|| format!("Error while recursing into {}", subpath))?,
+                .with_context(|| format!("Error while recursing into {subpath}"))?,
         )
     } else if path.is_file() {
         // Only check Nix files
@@ -97,7 +96,7 @@ fn check_path(
                     absolute_package_dir,
                     subpath,
                 )
-                .with_context(|| format!("Error while checking Nix file {}", subpath))?
+                .with_context(|| format!("Error while checking Nix file {subpath}"))?
             } else {
                 Success(())
             }
