@@ -13,7 +13,7 @@ use crate::NixFileStore;
 
 /// Check that every package directory in pkgs/by-name doesn't link to outside that directory.
 /// Both symlinks and Nix path expressions are checked.
-pub fn check_references(
+pub fn check(
     nix_file_store: &mut NixFileStore,
     relative_package_dir: &RelativePath,
     absolute_package_dir: &Path,

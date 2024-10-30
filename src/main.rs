@@ -23,7 +23,6 @@ use std::{panic, thread};
 
 use crate::nix_file::NixFileStore;
 use crate::status::{ColoredStatus, Status};
-use crate::structure::check_structure;
 use crate::validation::Validation::Failure;
 use crate::validation::Validation::Success;
 
@@ -115,7 +114,7 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
     }
 
     let mut nix_file_store = NixFileStore::default();
-    let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
+    let structure = structure::check(&nixpkgs_path, &mut nix_file_store)?;
 
     // Only if we could successfully parse the structure, we do the evaluation checks
     let result = structure.result_map(|package_names| {

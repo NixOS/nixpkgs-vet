@@ -52,7 +52,7 @@ pub fn relative_file_for_package(package_name: &str) -> RelativePathBuf {
 
 /// Check the structure of Nixpkgs, returning the attribute names that are defined in
 /// `pkgs/by-name`
-pub fn check_structure(
+pub fn check(
     path: &Path,
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<Vec<String>> {
@@ -170,7 +170,7 @@ fn check_package(
             Success(())
         });
 
-        let result = result.and(references::check_references(
+        let result = result.and(references::check(
             nix_file_store,
             &relative_package_dir,
             &relative_package_dir.to_path(path),
