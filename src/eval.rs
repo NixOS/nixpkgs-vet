@@ -315,14 +315,15 @@ fn by_name(
                 // Though this gets detected by checking whether the internal
                 // `_internalCallByNamePackageFile` was used
                 DefinitionVariant::AutoDefinition => {
-                    if let Some(_location) = location {
-                        // Such an automatic definition should definitely not have a location.
-                        // Having one indicates that somebody is using
-                        // `_internalCallByNamePackageFile`,
-                        npv_102::ByNameInternalCallPackageUsed::new(attribute_name).into()
-                    } else {
-                        Success(Tight)
-                    }
+                    location.map_or_else(
+                        || Success(Tight),
+                        |_location| {
+                            // Such an automatic definition should definitely not have a location.
+                            // Having one indicates that somebody is using
+                            // `_internalCallByNamePackageFile`,
+                            npv_102::ByNameInternalCallPackageUsed::new(attribute_name).into()
+                        },
+                    )
                 }
                 // The attribute is manually defined, e.g. in `all-packages.nix`.
                 // This means we need to enforce it to look like this:
