@@ -78,7 +78,7 @@ impl NixFile {
 }
 
 /// Information about `callPackage` arguments.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct CallPackageArgumentInfo {
     /// The relative path of the first argument, or `None` if it's not a path.
     pub relative_path: Option<RelativePathBuf>,
