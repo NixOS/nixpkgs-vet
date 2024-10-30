@@ -101,6 +101,7 @@ impl fmt::Display for Status {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct ColoredStatus(Status);
 
 impl From<Status> for ColoredStatus {
