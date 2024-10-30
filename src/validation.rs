@@ -77,9 +77,9 @@ impl Validation<()> {
     /// successful. The `Problem`s of both sides are returned concatenated.
     pub fn and<A>(self, other: Validation<A>) -> Validation<A> {
         match (self, other) {
-            (Success(_), Success(right_value)) => Success(right_value),
+            (Success(()), Success(right_value)) => Success(right_value),
             (Failure(errors_l), Failure(errors_r)) => Failure(concat([errors_l, errors_r])),
-            (Failure(errors), Success(_)) | (Success(_), Failure(errors)) => Failure(errors),
+            (Failure(errors), Success(_)) | (Success(()), Failure(errors)) => Failure(errors),
         }
     }
 }

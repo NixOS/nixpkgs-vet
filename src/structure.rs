@@ -176,7 +176,7 @@ fn check_package(
             &relative_package_dir.to_path(path),
         )?);
 
-        result.map(|_| package_name)
+        result.map(|()| package_name)
     } else {
         npv_140::PackageDirectoryIsNotDirectory::new(package_name).into()
     })
