@@ -565,9 +565,7 @@ mod tests {
         let expected = BTreeMap::from_iter(cases.map(|(line, column, result)| {
             (
                 Position { line, column },
-                result
-                    .map(ToString::to_string)
-                    .map_right(|node| node.to_string()),
+                result.map(std::string::ToString::to_string),
             )
         }));
         let actual = BTreeMap::from_iter(cases.map(|(line, column, _)| {
