@@ -6,7 +6,6 @@ use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::nix_file::Store;
 use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
@@ -14,6 +13,7 @@ use crate::ratchet::State::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
+use crate::NixFileStore;
 use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
@@ -154,7 +154,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 /// achieved on the Nix side.
 pub fn check_values(
     nixpkgs_path: &Path,
-    nix_file_store: &mut Store,
+    nix_file_store: &mut NixFileStore,
     package_names: &[String],
 ) -> validation::Result<ratchet::Nixpkgs> {
     let work_dir = tempfile::Builder::new()
@@ -263,7 +263,7 @@ pub fn check_values(
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
-    nix_file_store: &mut Store,
+    nix_file_store: &mut NixFileStore,
     nixpkgs_path: &Path,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
@@ -451,7 +451,7 @@ fn by_name_override(
 /// validation result.
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
-    nix_file_store: &mut Store,
+    nix_file_store: &mut NixFileStore,
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {

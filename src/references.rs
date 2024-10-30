@@ -6,15 +6,15 @@ use relative_path::RelativePath;
 use rowan::ast::AstNode;
 
 use crate::nix_file::ResolvedPath;
-use crate::nix_file::Store;
 use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126};
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
+use crate::NixFileStore;
 
 /// Check that every package directory in pkgs/by-name doesn't link to outside that directory.
 /// Both symlinks and Nix path expressions are checked.
 pub fn check(
-    nix_file_store: &mut Store,
+    nix_file_store: &mut NixFileStore,
     relative_package_dir: &RelativePath,
     absolute_package_dir: &Path,
 ) -> validation::Result<()> {
@@ -40,7 +40,7 @@ pub fn check(
 /// A relative path so that the error messages don't get absolute paths (which are messy in CI).
 /// The absolute package directory gets prepended before doing anything with it though.
 fn check_path(
-    nix_file_store: &mut Store,
+    nix_file_store: &mut NixFileStore,
     relative_package_dir: &RelativePath,
     absolute_package_dir: &Path,
     subpath: &RelativePath,
@@ -111,7 +111,7 @@ fn check_path(
 /// Check whether a Nix file contains path expression references pointing outside the package
 /// directory.
 fn check_nix_file(
-    nix_file_store: &mut Store,
+    nix_file_store: &mut NixFileStore,
     relative_package_dir: &RelativePath,
     absolute_package_dir: &Path,
     subpath: &RelativePath,
