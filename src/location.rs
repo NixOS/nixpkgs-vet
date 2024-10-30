@@ -28,7 +28,7 @@ pub struct LineIndex {
 }
 
 impl LineIndex {
-    pub fn new(s: &str) -> LineIndex {
+    pub fn new(s: &str) -> Self {
         let mut newlines = vec![];
         let mut index = 0;
         // Iterates over all newline-split parts of the string, adding the index of the newline to
@@ -37,7 +37,7 @@ impl LineIndex {
             index += split.len();
             newlines.push(index - 1);
         }
-        LineIndex { newlines }
+        Self { newlines }
     }
 
     /// Returns the line number for a string index.

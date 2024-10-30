@@ -49,7 +49,7 @@ pub struct NixFile {
 
 impl NixFile {
     /// Creates a new `NixFile`, failing for I/O or parse errors.
-    fn new(path: impl AsRef<Path>) -> anyhow::Result<NixFile> {
+    fn new(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let Some(parent_dir) = path.as_ref().parent() else {
             anyhow::bail!("Could not get parent of path {}", path.as_ref().display())
         };
@@ -67,7 +67,7 @@ impl NixFile {
             // rnix's `rnix::Parse::ok` returns `Result<_, _>`, so no error is thrown away like it
             // would be with `std::result::Result::ok`.
             .ok()
-            .map(|syntax_root| NixFile {
+            .map(|syntax_root| Self {
                 parent_dir: parent_dir.to_path_buf(),
                 path: path.as_ref().to_owned(),
                 syntax_root,

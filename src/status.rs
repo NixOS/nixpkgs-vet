@@ -86,18 +86,18 @@ impl From<anyhow::Error> for Status {
 impl From<Status> for ExitCode {
     fn from(status: Status) -> Self {
         match status {
-            Status::ValidatedSuccessfully | Status::BranchHealed => ExitCode::SUCCESS,
+            Status::ValidatedSuccessfully | Status::BranchHealed => Self::SUCCESS,
             Status::BranchStillBroken(..)
             | Status::ProblemsIntroduced(..)
-            | Status::DiscouragedPatternedIntroduced(..) => ExitCode::from(1),
-            Status::Error(..) => ExitCode::from(2),
+            | Status::DiscouragedPatternedIntroduced(..) => Self::from(1),
+            Status::Error(..) => Self::from(2),
         }
     }
 }
 
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Status::fmt(self, f, /* use_color */ false)
+        Self::fmt(self, f, /* use_color */ false)
     }
 }
 

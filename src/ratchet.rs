@@ -92,12 +92,12 @@ impl<Context: ToProblem> State<Context> {
     fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         match (optional_from, to) {
             // Loosening a ratchet is not allowed.
-            (Some(State::Tight), State::Loose(loose_context)) => {
+            (Some(Self::Tight), Self::Loose(loose_context)) => {
                 Context::to_problem(name, Some(()), loose_context).into()
             }
 
             // Introducing a loose ratchet is also not allowed.
-            (None, State::Loose(loose_context)) => {
+            (None, Self::Loose(loose_context)) => {
                 Context::to_problem(name, None, loose_context).into()
             }
 
