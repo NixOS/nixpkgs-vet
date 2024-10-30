@@ -52,10 +52,7 @@ pub fn relative_file_for_package(package_name: &str) -> RelativePathBuf {
 
 /// Check the structure of Nixpkgs, returning the attribute names that are defined in
 /// `pkgs/by-name`
-pub fn check(
-    path: &Path,
-    nix_file_store: &mut NixFileStore,
-) -> validation::Result<Vec<String>> {
+pub fn check(path: &Path, nix_file_store: &mut NixFileStore) -> validation::Result<Vec<String>> {
     let base_dir = path.join(BASE_SUBPATH);
 
     let shard_results = read_dir_sorted(&base_dir)?

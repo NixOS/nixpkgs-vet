@@ -9,7 +9,7 @@ use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
-use crate::ratchet::RatchetState::{Loose, Tight};
+use crate::ratchet::State::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
@@ -397,7 +397,7 @@ fn by_name_override(
     optional_syntactic_call_package: Option<CallPackageArgumentInfo>,
     definition: String,
     location: location::Location,
-) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
+) -> validation::Validation<ratchet::State<ratchet::ManualDefinition>> {
     let Some(syntactic_call_package) = optional_syntactic_call_package else {
         // Something like `<attr> = foo`
         return npv_104::ByNameOverrideOfNonSyntacticCallPackage::new(
@@ -454,7 +454,7 @@ fn handle_non_by_name_attribute(
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
-    use ratchet::RatchetState::{Loose, NonApplicable, Tight};
+    use ratchet::State::{Loose, NonApplicable, Tight};
     use NonByNameAttribute::EvalSuccess;
 
     // The ratchet state whether this attribute uses `pkgs/by-name`.

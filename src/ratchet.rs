@@ -35,22 +35,22 @@ impl Nixpkgs {
 /// The ratchet value for a top-level package
 pub struct Package {
     /// The ratchet value for the check for non-auto-called empty arguments
-    pub manual_definition: RatchetState<ManualDefinition>,
+    pub manual_definition: State<ManualDefinition>,
 
     /// The ratchet value for the check for new packages using pkgs/by-name
-    pub uses_by_name: RatchetState<UsesByName>,
+    pub uses_by_name: State<UsesByName>,
 }
 
 impl Package {
     /// Validates the ratchet checks for a top-level package
     pub fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         validation::sequence_([
-            RatchetState::<ManualDefinition>::compare(
+            State::<ManualDefinition>::compare(
                 name,
                 optional_from.map(|x| &x.manual_definition),
                 &to.manual_definition,
             ),
-            RatchetState::<UsesByName>::compare(
+            State::<UsesByName>::compare(
                 name,
                 optional_from.map(|x| &x.uses_by_name),
                 &to.uses_by_name,
@@ -60,7 +60,7 @@ impl Package {
 }
 
 /// The ratchet state of a generic ratchet check.
-pub enum RatchetState<Ratchet: ToProblem> {
+pub enum State<Ratchet: ToProblem> {
     /// The ratchet is loose. It can be tightened more. In other words, this is the legacy state
     /// we're trying to move away from.
     ///
@@ -86,18 +86,18 @@ pub trait ToProblem {
     fn to_problem(name: &str, optional_from: Option<()>, to: &Self::ToContext) -> Problem;
 }
 
-impl<Context: ToProblem> RatchetState<Context> {
+impl<Context: ToProblem> State<Context> {
     /// Compare the previous ratchet state of an attribute to the new state.
     /// The previous state may be `None` in case the attribute is new.
     fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         match (optional_from, to) {
             // Loosening a ratchet is not allowed.
-            (Some(RatchetState::Tight), RatchetState::Loose(loose_context)) => {
+            (Some(State::Tight), State::Loose(loose_context)) => {
                 Context::to_problem(name, Some(()), loose_context).into()
             }
 
             // Introducing a loose ratchet is also not allowed.
-            (None, RatchetState::Loose(loose_context)) => {
+            (None, State::Loose(loose_context)) => {
                 Context::to_problem(name, None, loose_context).into()
             }
 
