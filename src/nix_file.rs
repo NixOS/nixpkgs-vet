@@ -19,11 +19,11 @@ use std::path::PathBuf;
 /// A structure to store parse results of Nix files in memory, making sure that the same file never
 /// has to be parsed twice.
 #[derive(Default)]
-pub struct NixFileStore {
+pub struct Store {
     entries: HashMap<PathBuf, NixFile>,
 }
 
-impl NixFileStore {
+impl Store {
     /// Get the store entry for a Nix file if it exists, otherwise parse the file, insert it into
     /// the store, and return the value.
     ///
@@ -116,7 +116,7 @@ impl NixFile {
     ///
     ///   results in `{ file = ./default.nix; line = 2; column = 3; }`
     ///
-    /// - Get the `NixFile` for `.file` from a `NixFileStore`
+    /// - Get the `NixFile` for `.file` from a `nix_file::Store`
     ///
     /// - Call this function with `.line`, `.column` and `relative_to` as the (absolute) current
     ///   directory.

@@ -10,7 +10,7 @@ use relative_path::RelativePathBuf;
 use crate::problem::{npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_143, npv_144};
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
-use crate::NixFileStore;
+use crate::nix_file::Store;
 
 pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
@@ -52,7 +52,7 @@ pub fn relative_file_for_package(package_name: &str) -> RelativePathBuf {
 
 /// Check the structure of Nixpkgs, returning the attribute names that are defined in
 /// `pkgs/by-name`
-pub fn check(path: &Path, nix_file_store: &mut NixFileStore) -> validation::Result<Vec<String>> {
+pub fn check(path: &Path, nix_file_store: &mut Store) -> validation::Result<Vec<String>> {
     let base_dir = path.join(BASE_SUBPATH);
 
     let shard_results = read_dir_sorted(&base_dir)?
@@ -118,7 +118,7 @@ pub fn check(path: &Path, nix_file_store: &mut NixFileStore) -> validation::Resu
 }
 
 fn check_package(
-    nix_file_store: &mut NixFileStore,
+    nix_file_store: &mut Store,
     path: &Path,
     shard_name: &str,
     shard_name_valid: bool,

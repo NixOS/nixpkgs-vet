@@ -13,7 +13,7 @@ use crate::ratchet::State::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
-use crate::NixFileStore;
+use crate::nix_file::Store;
 use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
@@ -154,7 +154,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 /// achieved on the Nix side.
 pub fn check_values(
     nixpkgs_path: &Path,
-    nix_file_store: &mut NixFileStore,
+    nix_file_store: &mut Store,
     package_names: &[String],
 ) -> validation::Result<ratchet::Nixpkgs> {
     let work_dir = tempfile::Builder::new()
@@ -263,7 +263,7 @@ pub fn check_values(
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
-    nix_file_store: &mut NixFileStore,
+    nix_file_store: &mut Store,
     nixpkgs_path: &Path,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
@@ -450,7 +450,7 @@ fn by_name_override(
 /// validation result.
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
-    nix_file_store: &mut NixFileStore,
+    nix_file_store: &mut Store,
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
