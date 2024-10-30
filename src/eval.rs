@@ -531,6 +531,10 @@ fn handle_non_by_name_attribute(
             })?;
 
         // At this point, we completed two different checks for whether it's a `callPackage`.
+
+        // Allow pedantic lint: https://rust-lang.github.io/rust-clippy/master/index.html#unnested_or_patterns
+        // fixing it hurts readability of code due to comment restructuring
+        #[allow(clippy::unnested_or_patterns)]
         match (is_semantic_call_package, optional_syntactic_call_package) {
             // Something like `<attr> = { }`
             (false, None)
