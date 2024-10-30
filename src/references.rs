@@ -30,9 +30,7 @@ pub fn check_references(
         subpath,
     )
     .with_context(|| {
-        format!(
-            "While checking the references in package directory {relative_package_dir}"
-        )
+        format!("While checking the references in package directory {relative_package_dir}")
     })
 }
 
