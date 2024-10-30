@@ -1,9 +1,9 @@
 use std::fs::DirEntry;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use anyhow::Context;
 use itertools::{concat, process_results};
-use lazy_static::lazy_static;
 use regex::Regex;
 use relative_path::RelativePathBuf;
 
@@ -15,10 +15,10 @@ use crate::NixFileStore;
 pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
-lazy_static! {
-    static ref SHARD_NAME_REGEX: Regex = Regex::new(r"^[a-z0-9_-]{1,2}$").unwrap();
-    static ref PACKAGE_NAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
-}
+static SHARD_NAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-z0-9_-]{1,2}$").unwrap());
+static PACKAGE_NAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap());
 
 /// Deterministic file listing so that tests are reproducible.
 pub fn read_dir_sorted(base_dir: &Path) -> anyhow::Result<Vec<DirEntry>> {
