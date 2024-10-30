@@ -29,7 +29,7 @@ pub enum Status {
 }
 
 impl Status {
-    fn errors(&self) -> Option<&Vec<Problem>> {
+    const fn errors(&self) -> Option<&Vec<Problem>> {
         match self {
             Self::ValidatedSuccessfully | Self::BranchHealed | Self::Error(..) => None,
             Self::BranchStillBroken(errors)
