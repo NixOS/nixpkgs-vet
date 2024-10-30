@@ -133,7 +133,7 @@ fn check_nix_file(
 
             use crate::nix_file::ResolvedPath;
 
-            match nix_file.static_resolve_path(path, absolute_package_dir) {
+            match nix_file.static_resolve_path(&path, absolute_package_dir) {
                 ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
                     relative_package_dir,
                     subpath,

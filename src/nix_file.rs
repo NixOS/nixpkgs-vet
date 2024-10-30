@@ -143,7 +143,7 @@ impl NixFile {
             Right(attrpath_value) => {
                 let definition = attrpath_value.to_string();
                 let attrpath_value =
-                    self.attrpath_value_call_package_argument_info(attrpath_value, relative_to)?;
+                    self.attrpath_value_call_package_argument_info(&attrpath_value, relative_to)?;
                 (attrpath_value, definition)
             }
         })
@@ -252,7 +252,7 @@ impl NixFile {
     // Internal function mainly to make `attrpath_value_at` independently testable.
     fn attrpath_value_call_package_argument_info(
         &self,
-        attrpath_value: ast::AttrpathValue,
+        attrpath_value: &ast::AttrpathValue,
         relative_to: &Path,
     ) -> anyhow::Result<Option<CallPackageArgumentInfo>> {
         let Some(attrpath) = attrpath_value.attrpath() else {
@@ -326,7 +326,7 @@ impl NixFile {
         // Check that <arg2> is a path expression.
         let path = if let Expr::Path(actual_path) = arg2 {
             // Try to statically resolve the path and turn it into a nixpkgs-relative path.
-            if let ResolvedPath::Within(p) = self.static_resolve_path(actual_path, relative_to) {
+            if let ResolvedPath::Within(p) = self.static_resolve_path(&actual_path, relative_to) {
                 Some(p)
             } else {
                 // We can't statically know an existing path inside Nixpkgs used as <arg2>.
@@ -417,7 +417,7 @@ impl NixFile {
     ///
     /// Given the path expression `./bar.nix` in `./foo.nix` and an absolute path of the
     /// current directory, the function returns `ResolvedPath::Within(./bar.nix)`.
-    pub fn static_resolve_path(&self, node: ast::Path, relative_to: &Path) -> ResolvedPath {
+    pub fn static_resolve_path(&self, node: &ast::Path, relative_to: &Path) -> ResolvedPath {
         if node.parts().count() != 1 {
             // If there's more than 1 interpolated part, it's of the form `./foo/${bar}/baz`.
             return ResolvedPath::Interpolated;
