@@ -6,6 +6,7 @@ use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
 use crate::nix_file::CallPackageArgumentInfo;
+use crate::nix_file::Store;
 use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
@@ -13,7 +14,6 @@ use crate::ratchet::State::{Loose, Tight};
 use crate::structure::{self, BASE_SUBPATH};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
-use crate::nix_file::Store;
 use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");

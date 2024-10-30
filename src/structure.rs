@@ -7,10 +7,10 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use relative_path::RelativePathBuf;
 
+use crate::nix_file::Store;
 use crate::problem::{npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_143, npv_144};
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
-use crate::nix_file::Store;
 
 pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
