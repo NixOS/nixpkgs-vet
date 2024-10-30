@@ -1,4 +1,4 @@
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 
 mod eval;
 mod location;
