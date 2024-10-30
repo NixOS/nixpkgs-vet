@@ -115,6 +115,7 @@ fn pass_through_environment_variables_for_nix_eval_in_nix_build(command: &mut pr
 }
 
 #[cfg(not(test))]
+#[allow(clippy::unnecessary_wraps)]
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     _work_dir_path: &Path,
     command: &mut process::Command,
