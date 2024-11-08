@@ -1,10 +1,14 @@
+// Temporarily uncomment to view more pedantic or new nursery lints.
 // #![warn(clippy::pedantic)]
-// #![allow(clippy::uninlined_format_args)]
-// #![allow(clippy::enum_glob_use)]
-// #![allow(clippy::module_name_repetitions)]
-// #![allow(clippy::doc_markdown)]
 // #![allow(clippy::if_not_else)]
 // #![allow(clippy::ignored_unit_patterns)]
+// #![allow(clippy::module_name_repetitions)]
+// #![allow(clippy::uninlined_format_args)]
+// #![allow(clippy::unnested_or_patterns)]
+// #![warn(clippy::nursery)]
+// #![allow(clippy::use_self)]
+// #![allow(clippy::missing_const_for_fn)]
+
 mod eval;
 mod location;
 mod nix_file;
