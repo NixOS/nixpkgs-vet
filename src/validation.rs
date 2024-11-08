@@ -25,7 +25,7 @@ impl<A, P: Into<Problem>> From<P> for Validation<A> {
 
 /// A type alias representing the result of a check, either:
 ///
-/// - Err(anyhow::Error): A fatal failure, typically I/O errors.
+/// - `Err(anyhow::Error)`: A fatal failure, typically I/O errors.
 ///   Such failures are not caused by the files in Nixpkgs.
 ///   This hints at a bug in the code or a problem with the deployment.
 ///

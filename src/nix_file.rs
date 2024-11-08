@@ -48,7 +48,7 @@ pub struct NixFile {
 }
 
 impl NixFile {
-    /// Creates a new NixFile, failing for I/O or parse errors.
+    /// Creates a new `NixFile`, failing for I/O or parse errors.
     fn new(path: impl AsRef<Path>) -> anyhow::Result<NixFile> {
         let Some(parent_dir) = path.as_ref().parent() else {
             anyhow::bail!("Could not get parent of path {}", path.as_ref().display())
@@ -116,7 +116,7 @@ impl NixFile {
     ///
     ///   results in `{ file = ./default.nix; line = 2; column = 3; }`
     ///
-    /// - Get the NixFile for `.file` from a `NixFileStore`
+    /// - Get the `NixFile` for `.file` from a `NixFileStore`
     ///
     /// - Call this function with `.line`, `.column` and `relative_to` as the (absolute) current
     ///   directory.
