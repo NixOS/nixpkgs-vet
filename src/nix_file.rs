@@ -160,7 +160,7 @@ impl NixFile {
         let token_at_offset = self
             .syntax_root
             .syntax()
-            .token_at_offset(TextSize::from(index as u32));
+            .token_at_offset(TextSize::from(u32::try_from(index)?));
 
         // The token_at_offset function takes indices to mean a location _between_ characters,
         // which in this case is some spacing followed by the attribute name:
