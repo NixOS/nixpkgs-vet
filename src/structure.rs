@@ -106,7 +106,7 @@ pub fn check_structure(
                             path,
                             &shard_name,
                             shard_name_valid,
-                            package_entry,
+                            &package_entry,
                         )
                     })
                     .collect_vec()?;
@@ -125,7 +125,7 @@ fn check_package(
     path: &Path,
     shard_name: &str,
     shard_name_valid: bool,
-    package_entry: DirEntry,
+    package_entry: &DirEntry,
 ) -> validation::Result<String> {
     let package_path = package_entry.path();
     let package_name = package_entry.file_name().to_string_lossy().into_owned();

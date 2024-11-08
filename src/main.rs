@@ -54,7 +54,7 @@ pub struct Args {
 
 fn main() -> ExitCode {
     let args = Args::parse();
-    let status: ColoredStatus = process(args.base, args.nixpkgs).into();
+    let status: ColoredStatus = process(args.base, &args.nixpkgs).into();
     eprintln!("{status}");
     status.into()
 }
@@ -64,10 +64,10 @@ fn main() -> ExitCode {
 /// # Arguments
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
-fn process(base_nixpkgs: PathBuf, main_nixpkgs: PathBuf) -> Status {
+fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
     // Very easy to parallelise this, since both operations are totally independent of each other.
     let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs));
-    let main_result = match check_nixpkgs(&main_nixpkgs) {
+    let main_result = match check_nixpkgs(main_nixpkgs) {
         Ok(result) => result,
         Err(error) => {
             return error.into();
@@ -88,7 +88,7 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: PathBuf) -> Status {
         (Failure(..), Success(..)) => Status::BranchHealed,
         (Success(base), Success(main)) => {
             // Both base and main branch succeed. Check ratchet state between them...
-            match ratchet::Nixpkgs::compare(base, main) {
+            match ratchet::Nixpkgs::compare(&base, main) {
                 Failure(errors) => Status::DiscouragedPatternedIntroduced(errors),
                 Success(..) => Status::ValidatedSuccessfully,
             }
@@ -247,7 +247,7 @@ mod tests {
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
 
         let status = temp_env::with_var("NIX_CONF_DIR", Some(nix_conf_dir), || {
-            process(base_nixpkgs, path)
+            process(base_nixpkgs, &path)
         });
 
         let actual_errors = format!("{status}\n");

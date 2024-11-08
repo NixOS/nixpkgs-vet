@@ -21,7 +21,7 @@ pub struct Nixpkgs {
 
 impl Nixpkgs {
     /// Validates the ratchet checks for Nixpkgs
-    pub fn compare(from: Self, to: Self) -> Validation<()> {
+    pub fn compare(from: &Self, to: Self) -> Validation<()> {
         validation::sequence_(
             // We only loop over the current attributes,
             // we don't need to check ones that were removed
