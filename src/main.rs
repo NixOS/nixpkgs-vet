@@ -1,8 +1,3 @@
-#![warn(clippy::pedantic, clippy::nursery)]
-// too many false-positives. discussion:
-// https://github.com/NixOS/nixpkgs-vet/pull/124#pullrequestreview-2405109643
-#![allow(clippy::module_name_repetitions)]
-
 mod eval;
 mod location;
 mod nix_file;

@@ -17,10 +17,17 @@ The most important tools and commands in this environment are:
   ```bash
   cargo test
   ```
-- Linting and formatting:
+- Formatting:
+  ```bash
+  treefmt
+  ```
+- Linting:
   ```bash
   cargo clippy --all-targets
-  treefmt
+  ```
+  Or optionally:
+  ```bash
+  cargo clippy --all-targets -- -W clippy::nursery -W clippy::pedantic
   ```
 - Running the [main CI checks](./.github/workflows/main.yml) locally:
   ```bash
