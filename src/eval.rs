@@ -314,16 +314,13 @@ fn by_name(
                 // An automatic `callPackage` by the `pkgs/by-name` overlay.
                 // Though this gets detected by checking whether the internal
                 // `_internalCallByNamePackageFile` was used
-                DefinitionVariant::AutoDefinition => {
-                    if let Some(_location) = location {
-                        // Such an automatic definition should definitely not have a location.
-                        // Having one indicates that somebody is using
-                        // `_internalCallByNamePackageFile`,
-                        npv_102::ByNameInternalCallPackageUsed::new(attribute_name).into()
-                    } else {
-                        Success(Tight)
-                    }
-                }
+                DefinitionVariant::AutoDefinition => location.map_or_else(
+                    || Success(Tight),
+                    // Such an automatic definition should definitely not have a location.
+                    // Having one indicates that somebody is using
+                    // `_internalCallByNamePackageFile`,
+                    |_location| npv_102::ByNameInternalCallPackageUsed::new(attribute_name).into(),
+                ),
                 // The attribute is manually defined, e.g. in `all-packages.nix`.
                 // This means we need to enforce it to look like this:
                 //   callPackage ../pkgs/by-name/fo/foo/package.nix { ... }
