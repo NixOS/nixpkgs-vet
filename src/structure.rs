@@ -7,7 +7,9 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use relative_path::RelativePathBuf;
 
-use crate::problem::{npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_143, npv_144};
+use crate::problem::{
+    npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_143, npv_144, npv_170,
+};
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 use crate::NixFileStore;
@@ -16,8 +18,9 @@ pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
 lazy_static! {
-    static ref SHARD_NAME_REGEX: Regex = Regex::new(r"^[a-z0-9_-]{1,2}$").unwrap();
-    static ref PACKAGE_NAME_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
+    static ref SHARD_NAME_REGEX: Regex = Regex::new(r"^((_[0-9])|([a-z][a-z0-9_-]?))$").unwrap();
+    static ref PACKAGE_NAME_REGEX: Regex =
+        Regex::new(r"^((_[0-9])|[a-zA-Z])[a-zA-Z0-9_-]*$").unwrap();
 }
 
 /// Deterministic file listing so that tests are reproducible.
@@ -137,11 +140,19 @@ fn check_package(
     } else {
         let package_name_valid = PACKAGE_NAME_REGEX.is_match(&package_name);
         let result = if !package_name_valid {
-            npv_141::InvalidPackageDirectoryName::new(
-                package_name.clone(),
-                relative_package_dir.clone(),
-            )
-            .into()
+            if package_name.starts_with(|c: char| c.is_ascii_digit()) {
+                npv_170::ByNamePackegPrefixedWithNumber::new(
+                    package_name.clone(),
+                    relative_package_dir.clone(),
+                )
+                .into()
+            } else {
+                npv_141::InvalidPackageDirectoryName::new(
+                    package_name.clone(),
+                    relative_package_dir.clone(),
+                )
+                .into()
+            }
         } else {
             Success(())
         };

@@ -1,0 +1,2 @@
+- pkgs/by-name/_1/10foo: Attribute `10foo` should not be number-prefixed. Prefix with `_`, or wrap in quotes
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
