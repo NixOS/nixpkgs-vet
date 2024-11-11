@@ -48,7 +48,7 @@ pub struct NixFile {
 }
 
 impl NixFile {
-    /// Creates a new NixFile, failing for I/O or parse errors.
+    /// Creates a new `NixFile`, failing for I/O or parse errors.
     fn new(path: impl AsRef<Path>) -> anyhow::Result<NixFile> {
         let Some(parent_dir) = path.as_ref().parent() else {
             anyhow::bail!("Could not get parent of path {}", path.as_ref().display())
@@ -78,7 +78,7 @@ impl NixFile {
 }
 
 /// Information about `callPackage` arguments.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct CallPackageArgumentInfo {
     /// The relative path of the first argument, or `None` if it's not a path.
     pub relative_path: Option<RelativePathBuf>,
@@ -116,7 +116,7 @@ impl NixFile {
     ///
     ///   results in `{ file = ./default.nix; line = 2; column = 3; }`
     ///
-    /// - Get the NixFile for `.file` from a `NixFileStore`
+    /// - Get the `NixFile` for `.file` from a `NixFileStore`
     ///
     /// - Call this function with `.line`, `.column` and `relative_to` as the (absolute) current
     ///   directory.
@@ -143,7 +143,7 @@ impl NixFile {
             Right(attrpath_value) => {
                 let definition = attrpath_value.to_string();
                 let attrpath_value =
-                    self.attrpath_value_call_package_argument_info(attrpath_value, relative_to)?;
+                    self.attrpath_value_call_package_argument_info(&attrpath_value, relative_to)?;
                 (attrpath_value, definition)
             }
         })
@@ -160,7 +160,7 @@ impl NixFile {
         let token_at_offset = self
             .syntax_root
             .syntax()
-            .token_at_offset(TextSize::from(index as u32));
+            .token_at_offset(TextSize::from(u32::try_from(index)?));
 
         // The token_at_offset function takes indices to mean a location _between_ characters,
         // which in this case is some spacing followed by the attribute name:
@@ -252,7 +252,7 @@ impl NixFile {
     // Internal function mainly to make `attrpath_value_at` independently testable.
     fn attrpath_value_call_package_argument_info(
         &self,
-        attrpath_value: ast::AttrpathValue,
+        attrpath_value: &ast::AttrpathValue,
         relative_to: &Path,
     ) -> anyhow::Result<Option<CallPackageArgumentInfo>> {
         let Some(attrpath) = attrpath_value.attrpath() else {
@@ -326,7 +326,7 @@ impl NixFile {
         // Check that <arg2> is a path expression.
         let path = if let Expr::Path(actual_path) = arg2 {
             // Try to statically resolve the path and turn it into a nixpkgs-relative path.
-            if let ResolvedPath::Within(p) = self.static_resolve_path(actual_path, relative_to) {
+            if let ResolvedPath::Within(p) = self.static_resolve_path(&actual_path, relative_to) {
                 Some(p)
             } else {
                 // We can't statically know an existing path inside Nixpkgs used as <arg2>.
@@ -417,7 +417,7 @@ impl NixFile {
     ///
     /// Given the path expression `./bar.nix` in `./foo.nix` and an absolute path of the
     /// current directory, the function returns `ResolvedPath::Within(./bar.nix)`.
-    pub fn static_resolve_path(&self, node: ast::Path, relative_to: &Path) -> ResolvedPath {
+    pub fn static_resolve_path(&self, node: &ast::Path, relative_to: &Path) -> ResolvedPath {
         if node.parts().count() != 1 {
             // If there's more than 1 interpolated part, it's of the form `./foo/${bar}/baz`.
             return ResolvedPath::Interpolated;
@@ -563,12 +563,7 @@ mod tests {
             (24, 11, Left("testL")),
         ];
         let expected = BTreeMap::from_iter(cases.map(|(line, column, result)| {
-            (
-                Position { line, column },
-                result
-                    .map(ToString::to_string)
-                    .map_right(|node| node.to_string()),
-            )
+            (Position { line, column }, result.map(ToString::to_string))
         }));
         let actual = BTreeMap::from_iter(cases.map(|(line, column, _)| {
             (

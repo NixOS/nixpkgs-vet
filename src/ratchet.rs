@@ -13,7 +13,7 @@ use crate::validation::{self, Validation, Validation::Success};
 /// The ratchet value for the entirety of Nixpkgs.
 #[derive(Default)]
 pub struct Nixpkgs {
-    /// Sorted list of packages in package_map
+    /// Sorted list of packages in `package_map`
     pub package_names: Vec<String>,
     /// The ratchet values for all packages
     pub package_map: HashMap<String, Package>,
@@ -21,7 +21,7 @@ pub struct Nixpkgs {
 
 impl Nixpkgs {
     /// Validates the ratchet checks for Nixpkgs
-    pub fn compare(from: Self, to: Self) -> Validation<()> {
+    pub fn compare(from: &Self, to: Self) -> Validation<()> {
         validation::sequence_(
             // We only loop over the current attributes,
             // we don't need to check ones that were removed
@@ -73,7 +73,7 @@ pub enum RatchetState<Ratchet: ToProblem> {
     /// use the latest state, or because the ratchet isn't relevant.
     Tight,
 
-    /// This ratchet can't be applied. State transitions from/to NonApplicable are always allowed.
+    /// This ratchet can't be applied. State transitions from/to `NonApplicable` are always allowed.
     NonApplicable,
 }
 

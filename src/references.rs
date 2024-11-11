@@ -5,6 +5,7 @@ use anyhow::Context;
 use relative_path::RelativePath;
 use rowan::ast::AstNode;
 
+use crate::nix_file::ResolvedPath;
 use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126};
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -132,9 +133,7 @@ fn check_nix_file(
                 return Success(());
             };
 
-            use crate::nix_file::ResolvedPath;
-
-            match nix_file.static_resolve_path(path, absolute_package_dir) {
+            match nix_file.static_resolve_path(&path, absolute_package_dir) {
                 ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
                     relative_package_dir,
                     subpath,

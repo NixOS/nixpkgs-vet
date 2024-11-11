@@ -12,16 +12,33 @@ nix-shell
 ```
 
 The most important tools and commands in this environment are:
+
 - [rust-analyzer](https://rust-analyzer.github.io/) to have an IDE-like experience for your own editor.
+
 - Running tests:
+
   ```bash
   cargo test
   ```
-- Linting and formatting:
+
+- Formatting:
+
   ```bash
-  cargo clippy --all-targets
   treefmt
   ```
+
+- Linting:
+
+  ```bash
+  cargo clippy --all-targets
+  ```
+
+  Optionally, check out extra lints or uncomment them at the top of `main.rs`.
+
+  ```bash
+  cargo clippy --all-targets -- -W clippy::nursery -W clippy::pedantic
+  ```
+
 - Running the [main CI checks](./.github/workflows/main.yml) locally:
   ```bash
   nix-build -A ci
