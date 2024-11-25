@@ -302,7 +302,6 @@ dependencies = [
  "derive_more",
  "indoc",
  "itertools",
- "lazy_static",
  "pretty_assertions",
  "regex",
  "relative-path",
