@@ -132,7 +132,8 @@ let
           githubActions = pkgs.writeShellApplication {
             name = "update-github-actions";
             runtimeInputs = with pkgs; [
-              dependabot-cli
+              dependabot-cli.withDockerImages
+              docker
               jq
               github-cli
               coreutils
