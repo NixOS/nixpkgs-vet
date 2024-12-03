@@ -25,7 +25,7 @@ jobs:
           echo "after=$(<pkgs/test/check-by-name/pinned-version.txt)" >> $GITHUB_ENV
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           # To trigger CI for automated PRs, we use a separate machine account
           # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
