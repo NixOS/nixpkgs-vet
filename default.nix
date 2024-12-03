@@ -108,8 +108,7 @@ let
               echo ""
               echo "### cargo upgrade"
               printf "\n\`\`\`\n"
-              # --incompatible allows jumping to the next major version.
-              cargo upgrade --incompatible --manifest-path "$1/Cargo.toml" 2>&1
+              cargo upgrade --manifest-path "$1/Cargo.toml" 2>&1
               printf "\n\`\`\`\n"
 
               echo "### cargo update"
