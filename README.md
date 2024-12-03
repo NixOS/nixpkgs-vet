@@ -15,7 +15,7 @@ See [the `pkgs/by-name` Readme](https://github.com/NixOS/nixpkgs/blob/master/pkg
 The source code contains a `default.nix` file, which defines a Nix function.
 
 The function takes an attribute set with at least these attributes as its argument:
-- `system` (String, defaults to [`builtins.currentSystem`](https://nixos.org/manual/nix/stable/language/builtin-constants.html#builtins-currentSystem)):
+- `system` (String, defaults to [`builtins.currentSystem`](https://nix.dev/manual/nix/stable/language/builtin-constants#builtins-currentSystem)):
   The [`system`](https://nixos.org/manual/nix/stable/language/derivations#attr-system)
   to build the resulting derivation with.
 
