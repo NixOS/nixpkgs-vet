@@ -13,7 +13,7 @@ jobs:
         with:
           path: repo
 
-      - uses: cachix/install-nix-action@V27
+      - uses: cachix/install-nix-action@v30
 
       - name: Run update script
         run: |
@@ -35,7 +35,7 @@ jobs:
 
       - name: Create Pull Request
         if: ${{ github.event_name != 'pull_request' }}
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           # To trigger CI for automated PRs, we use a separate machine account
           # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
