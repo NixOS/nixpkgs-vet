@@ -45,3 +45,7 @@ jobs:
       # While this has a Nix build available, it needs to evaluate and build so much
       # that I don't think it's worth adding it to the nix-build.
       - uses: serokell/xrefcheck-action@v1
+        with: # Invalid symlinks for testing purposes.
+          xrefcheck-args: >
+            --ignore tests/symlink-invalid/pkgs/by-name/fo/foo/foo
+            --ignore tests/multiple-failures/pkgs/by-name/A/fo@/foo
