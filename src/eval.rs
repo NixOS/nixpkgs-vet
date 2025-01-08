@@ -256,8 +256,7 @@ pub fn check_values(
     );
 
     Ok(check_result.map(|elems| ratchet::Nixpkgs {
-        package_names: elems.iter().map(|(name, _)| name.to_owned()).collect(),
-        package_map: elems.into_iter().collect(),
+        packages: elems.into_iter().collect(),
     }))
 }
 
