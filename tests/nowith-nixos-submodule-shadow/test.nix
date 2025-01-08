@@ -1,10 +1,12 @@
-{ config
-, lib
+{
+  config,
+  lib,
 }:
 
 let
   cfg = config.foo;
-in {
+in
+{
   options.foo = lib.mkOption {
     type = # random example from nixpkgs
       with lib.types;
@@ -33,6 +35,5 @@ in {
           };
         })
       );
-    };
+  };
 }
-

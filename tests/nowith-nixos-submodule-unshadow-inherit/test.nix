@@ -1,5 +1,6 @@
-{ config
-, lib
+{
+  config,
+  lib,
 }:
 
 let
@@ -8,7 +9,7 @@ let
   inherit (lib)
     mkOption
     elem
-  ;
+    ;
 
   inherit (lib.types)
     attrsOf
@@ -18,8 +19,9 @@ let
     nullOr
     str
     addCheck
-  ;
-in {
+    ;
+in
+{
   options.foo = mkOption {
     type = # random example from nixpkgs
       attrsOf (
@@ -47,6 +49,5 @@ in {
           };
         })
       );
-    };
+  };
 }
-
