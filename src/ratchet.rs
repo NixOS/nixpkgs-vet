@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{npv_160, npv_161, npv_162, npv_163, Problem};
+use crate::problem::{npv_160, npv_161, npv_162, npv_163, npv_169, Problem};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -189,5 +189,18 @@ impl ToProblem for UsesByName {
             )
             .into(),
         }
+    }
+}
+
+// The ratchet value of an attribute for the check that new nixpkgs changes do not
+// introduce top level with or withs that could shadow scope.
+
+pub enum DoesNotIntroduceToplevelWiths {}
+
+impl ToProblem for DoesNotIntroduceToplevelWiths {
+    type ToContext = ();
+
+    fn to_problem(_name: &str, _optional_from: Option<()>, _to: &Self::ToContext) -> Problem {
+        npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new("").into()
     }
 }
