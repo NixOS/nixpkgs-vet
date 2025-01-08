@@ -34,6 +34,8 @@ pub mod npv_161;
 pub mod npv_162;
 pub mod npv_163;
 
+pub mod npv_170;
+
 #[derive(Clone, Display, EnumFrom)]
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
@@ -123,6 +125,8 @@ pub enum Problem {
     NewTopLevelPackageShouldBeByNameWithCustomArgument(
         npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument,
     ),
+
+    FileIsAString(npv_170::FileIsAString),
 }
 
 fn indent_definition(column: usize, definition: &str) -> String {

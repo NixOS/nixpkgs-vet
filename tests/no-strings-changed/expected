@@ -1,0 +1,3 @@
+- File lib/minver.nix is a string, which is not allowed anymore
+
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.
