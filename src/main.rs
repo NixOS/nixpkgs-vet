@@ -178,7 +178,7 @@ mod tests {
             return Ok(());
         }
 
-        let base = path.join(BASE_SUBPATH);
+        let base = path.join("main").join(BASE_SUBPATH);
 
         fs::create_dir_all(base.join("fo/foo"))?;
         fs::write(base.join("fo/foo/package.nix"), "{ someDrv }: someDrv")?;
@@ -237,7 +237,7 @@ mod tests {
             .build()
             .expect("valid regex");
 
-        let path = path.to_owned();
+        let main_path = path.join("main");
         let base_path = path.join("base");
         let base_nixpkgs = if base_path.exists() {
             base_path
@@ -251,7 +251,7 @@ mod tests {
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
 
         let status = temp_env::with_var("NIX_CONF_DIR", Some(nix_conf_dir), || {
-            process(base_nixpkgs, &path)
+            process(base_nixpkgs, &main_path)
         });
 
         let actual_errors = format!("{status}\n");
