@@ -3,9 +3,10 @@ use std::path::Path;
 
 use anyhow::Context;
 use relative_path::RelativePath;
+use rnix::SyntaxNode;
 use rowan::ast::AstNode;
 
-use crate::nix_file::ResolvedPath;
+use crate::nix_file::{NixFile, ResolvedPath};
 use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126};
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
@@ -111,6 +112,55 @@ fn check_path(
     })
 }
 
+fn check_nix_path(
+    node: SyntaxNode,
+    nix_file: &NixFile,
+    relative_package_dir: &RelativePath,
+    absolute_package_dir: &Path,
+    subpath: &RelativePath,
+) -> validation::Validation<()> {
+    let line = nix_file.line_index.line(node.text_range().start().into());
+    let text = node.text().to_string();
+    // We're only interested in Path expressions
+    let Some(path) = rnix::ast::Path::cast(node) else {
+        return Success(());
+    };
+
+    match nix_file.static_resolve_path(&path, absolute_package_dir) {
+        ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
+            relative_package_dir,
+            subpath,
+            line,
+            text,
+        )
+        .into(),
+        ResolvedPath::SearchPath => {
+            npv_122::NixFileContainsSearchPath::new(relative_package_dir, subpath, line, text)
+                .into()
+        }
+        ResolvedPath::Outside => npv_123::NixFileContainsPathOutsideDirectory::new(
+            relative_package_dir,
+            subpath,
+            line,
+            text,
+        )
+        .into(),
+        ResolvedPath::Unresolvable(err) => npv_124::NixFileContainsUnresolvablePath::new(
+            relative_package_dir,
+            subpath,
+            line,
+            text,
+            err,
+        )
+        .into(),
+        ResolvedPath::Within(..) => {
+            // No need to handle the case of it being inside the directory, since we scan
+            // through the entire directory recursively in any case.
+            Success(())
+        }
+    }
+}
+
 /// Check whether a Nix file contains path expression references pointing outside the package
 /// directory.
 fn check_nix_file(
@@ -125,50 +175,17 @@ fn check_nix_file(
 
     Ok(validation::sequence_(
         nix_file.syntax_root.syntax().descendants().map(|node| {
-            let line = nix_file.line_index.line(node.text_range().start().into());
-            let text = node.text().to_string();
-
-            // We're only interested in Path expressions
-            let Some(path) = rnix::ast::Path::cast(node) else {
-                return Success(());
+            match check_nix_path(
+                node,
+                nix_file,
+                relative_package_dir,
+                absolute_package_dir,
+                subpath,
+            ) {
+                Success(()) => Success(()),
+                value => return value,
             };
-
-            match nix_file.static_resolve_path(&path, absolute_package_dir) {
-                ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
-                    relative_package_dir,
-                    subpath,
-                    line,
-                    text,
-                )
-                .into(),
-                ResolvedPath::SearchPath => npv_122::NixFileContainsSearchPath::new(
-                    relative_package_dir,
-                    subpath,
-                    line,
-                    text,
-                )
-                .into(),
-                ResolvedPath::Outside => npv_123::NixFileContainsPathOutsideDirectory::new(
-                    relative_package_dir,
-                    subpath,
-                    line,
-                    text,
-                )
-                .into(),
-                ResolvedPath::Unresolvable(err) => npv_124::NixFileContainsUnresolvablePath::new(
-                    relative_package_dir,
-                    subpath,
-                    line,
-                    text,
-                    err,
-                )
-                .into(),
-                ResolvedPath::Within(..) => {
-                    // No need to handle the case of it being inside the directory, since we scan
-                    // through the entire directory recursively in any case.
-                    Success(())
-                }
-            }
+            Success(())
         }),
     ))
 }
