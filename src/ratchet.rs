@@ -2,6 +2,7 @@
 //!
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
+use relative_path::RelativePath;
 use std::collections::BTreeMap;
 
 use relative_path::RelativePathBuf;
@@ -15,6 +16,7 @@ use crate::validation::{self, Validation, Validation::Success};
 pub struct Nixpkgs {
     /// The ratchet values for all packages
     pub packages: BTreeMap<String, Package>,
+    pub files: BTreeMap<RelativePathBuf, File>,
 }
 
 impl Nixpkgs {
@@ -27,6 +29,9 @@ impl Nixpkgs {
                 .into_iter()
                 .map(|(name, pkg)| Package::compare(&name, from.packages.get(&name), &pkg)),
         )
+        .and_(validation::sequence_(to.files.into_iter().map(
+            |(name, file)| File::compare(&name, from.files.get(&name), &file),
+        )))
     }
 }
 
@@ -54,6 +59,19 @@ impl Package {
                 &to.uses_by_name,
             ),
         ])
+    }
+}
+
+pub struct File {}
+
+impl File {
+    /// Validates the ratchet checks for a top-level package
+    pub fn compare(
+        _name: &RelativePath,
+        _optional_from: Option<&Self>,
+        _to: &Self,
+    ) -> Validation<()> {
+        Success(())
     }
 }
 
