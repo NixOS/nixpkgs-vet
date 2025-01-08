@@ -372,7 +372,7 @@ fn by_name(
 
             // Independently report problems about whether it's a derivation and the callPackage
             // variant.
-            is_derivation_result.and(variant_result)
+            is_derivation_result.and_(variant_result)
         }
     };
     Ok(
