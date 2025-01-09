@@ -1,3 +1,4 @@
+use crate::problem::npv_169;
 use crate::problem::npv_170;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
@@ -10,11 +11,50 @@ use crate::validation::ResultIteratorExt;
 use crate::validation::Validation::Success;
 use crate::{nix_file, ratchet, structure, validation};
 
+fn find_invalid_withs(syntax: SyntaxNode<NixLanguage>) -> Option<SyntaxNode<NixLanguage>> {
+    syntax
+        .descendants()
+        .filter(|node| node.kind() == rnix::SyntaxKind::NODE_WITH)
+        .filter(|node| {
+            node.descendants()
+                .map(|child| {
+                    if child == *node {
+                        return None;
+                    }
+                    let node_if_invalid = match child.kind() {
+                        SyntaxKind::NODE_WITH => Some(node),
+                        SyntaxKind::NODE_LET_IN => Some(node),
+                        SyntaxKind::NODE_ATTR_SET => Some(node),
+                        _ => None,
+                    };
+                    println!(
+                        "validate with={:?} subexpr={:?} invalid={:?}",
+                        node.to_string(),
+                        child.to_string(),
+                        node_if_invalid
+                    );
+                    node_if_invalid
+                })
+                .any(|cond| cond != None)
+        })
+        .take(1)
+        .last()
+}
+
 pub fn check_files(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
     process_nix_files(nixpkgs_path, nix_file_store, |nix_file| {
+        if let Some(open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root) {
+            // TODO: what do I return
+            // return ratchet::RatchetState::Loose(
+            //     npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
+            //         nix_file.relative_path,
+            //     )
+            //     .into(),
+            // );
+        }
         Ok(Success(ratchet::File {}))
     })
 }
