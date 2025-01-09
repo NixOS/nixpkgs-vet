@@ -1,8 +1,9 @@
 use crate::problem::npv_169;
-use crate::problem::npv_170;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
-use rnix::ast::Expr::Str;
+
+use rnix::SyntaxKind;
+use rowan::ast::AstNode;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -11,7 +12,7 @@ use crate::validation::ResultIteratorExt;
 use crate::validation::Validation::Success;
 use crate::{nix_file, ratchet, structure, validation};
 
-fn find_invalid_withs(syntax: SyntaxNode<NixLanguage>) -> Option<SyntaxNode<NixLanguage>> {
+fn find_invalid_withs(syntax: &rnix::SyntaxNode) -> Option<rnix::SyntaxNode> {
     syntax
         .descendants()
         .filter(|node| node.kind() == rnix::SyntaxKind::NODE_WITH)
@@ -46,14 +47,16 @@ pub fn check_files(
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
     process_nix_files(nixpkgs_path, nix_file_store, |nix_file| {
-        if let Some(open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root) {
-            // TODO: what do I return
-            // return ratchet::RatchetState::Loose(
-            //     npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
-            //         nix_file.relative_path,
-            //     )
-            //     .into(),
-            // );
+        if let Some(_open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root.syntax()) {
+            return Ok(validation::Validation::Failure(vec![
+                npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
+                    RelativePathBuf::from_path(
+                        nix_file.path.clone(), /* .strip_prefix(nixpkgs_path).unwrap()*/
+                    )
+                    .unwrap(),
+                )
+                .into(),
+            ]));
         }
         Ok(Success(ratchet::File {}))
     })
