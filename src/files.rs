@@ -29,12 +29,6 @@ fn find_invalid_withs(syntax: &rnix::SyntaxNode) -> Option<rnix::SyntaxNode> {
                         SyntaxKind::NODE_ATTR_SET => Some(node),
                         _ => None,
                     };
-                    println!(
-                        "validate with={:?} subexpr={:?} invalid={:?}",
-                        node.to_string(),
-                        child.to_string(),
-                        node_if_invalid
-                    );
                     node_if_invalid
                 })
                 .any(|node| node.is_some())
