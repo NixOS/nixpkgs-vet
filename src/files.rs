@@ -37,7 +37,7 @@ fn find_invalid_withs(syntax: &rnix::SyntaxNode) -> Option<rnix::SyntaxNode> {
                     );
                     node_if_invalid
                 })
-                .any(|cond| cond != None)
+                .any(|node| node.is_some())
         })
         .take(1)
         .last()

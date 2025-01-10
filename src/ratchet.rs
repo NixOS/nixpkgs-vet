@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{npv_160, npv_161, npv_162, npv_163, npv_169, Problem};
+use crate::problem::{npv_160, npv_161, npv_162, npv_163, Problem};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
