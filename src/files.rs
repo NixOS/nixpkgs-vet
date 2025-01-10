@@ -23,13 +23,12 @@ fn find_invalid_withs(syntax: &rnix::SyntaxNode) -> Option<rnix::SyntaxNode> {
                     if child == *node {
                         return None;
                     }
-                    let node_if_invalid = match child.kind() {
+                    match child.kind() {
                         SyntaxKind::NODE_WITH => Some(node),
                         SyntaxKind::NODE_LET_IN => Some(node),
                         SyntaxKind::NODE_ATTR_SET => Some(node),
                         _ => None,
-                    };
-                    node_if_invalid
+                    }
                 })
                 .any(|node| node.is_some())
         })
