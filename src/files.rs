@@ -1,4 +1,5 @@
 use crate::problem::npv_169;
+use crate::ratchet::RatchetState;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 
@@ -48,17 +49,21 @@ pub fn check_files(
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
     process_nix_files(nixpkgs_path, nix_file_store, |nix_file| {
         if let Some(_open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root.syntax()) {
-            return Ok(validation::Validation::Failure(vec![
-                npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
-                    RelativePathBuf::from_path(
-                        nix_file.path.clone(), /* .strip_prefix(nixpkgs_path).unwrap()*/
+            let path = RelativePathBuf::from_path(
+                nix_file.path.clone().strip_prefix(nixpkgs_path).unwrap(),
+            )
+            .unwrap();
+            return Ok(Success(ratchet::File {
+                file_is_str: Some(
+                    RatchetState::Loose(
+                        npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(path)
+                            .into(),
                     )
-                    .unwrap(),
-                )
-                .into(),
-            ]));
+                    .into(),
+                ),
+            }));
         }
-        Ok(Success(ratchet::File {}))
+        Ok(Success(ratchet::File { file_is_str: None }))
     })
 }
 

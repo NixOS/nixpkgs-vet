@@ -62,7 +62,9 @@ impl Package {
     }
 }
 
-pub struct File {}
+pub struct File {
+    pub file_is_str: Option<RatchetState<DoesNotIntroduceToplevelWiths>>,
+}
 
 impl File {
     /// Validates the ratchet checks for a top-level package
@@ -198,9 +200,9 @@ impl ToProblem for UsesByName {
 pub enum DoesNotIntroduceToplevelWiths {}
 
 impl ToProblem for DoesNotIntroduceToplevelWiths {
-    type ToContext = ();
+    type ToContext = Problem;
 
-    fn to_problem(_name: &str, _optional_from: Option<()>, _to: &Self::ToContext) -> Problem {
-        npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new("").into()
+    fn to_problem(_name: &str, _optional_from: Option<()>, to: &Self::ToContext) -> Problem {
+        to.clone()
     }
 }
