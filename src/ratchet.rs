@@ -63,17 +63,17 @@ impl Package {
 }
 
 pub struct File {
-    pub file_is_str: Option<RatchetState<DoesNotIntroduceToplevelWiths>>,
+    pub top_level_with: RatchetState<DoesNotIntroduceToplevelWiths>,
 }
 
 impl File {
     /// Validates the ratchet checks for a top-level package
-    pub fn compare(
-        _name: &RelativePath,
-        _optional_from: Option<&Self>,
-        _to: &Self,
-    ) -> Validation<()> {
-        Success(())
+    pub fn compare(name: &RelativePath, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+        validation::sequence_([RatchetState::compare(
+            name.as_str(),
+            optional_from.map(|x| &x.top_level_with),
+            &to.top_level_with,
+        )])
     }
 }
 

@@ -1,1 +1,2 @@
 - test.nix: Top level with is discouraged as it may shadow variables and break static checks.
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.

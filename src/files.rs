@@ -48,23 +48,29 @@ pub fn check_files(
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
     process_nix_files(nixpkgs_path, nix_file_store, |nix_file| {
-        if let Some(_open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root.syntax()) {
-            let path = RelativePathBuf::from_path(
-                nix_file.path.clone().strip_prefix(nixpkgs_path).unwrap(),
-            )
-            .unwrap();
-            return Ok(Success(ratchet::File {
-                file_is_str: Some(
-                    RatchetState::Loose(
-                        npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(path)
-                            .into(),
-                    )
-                    .into(),
-                ),
-            }));
-        }
-        Ok(Success(ratchet::File { file_is_str: None }))
+        Ok(Success(ratchet::File {
+            top_level_with: check_files_top_level_with_lib(nixpkgs_path, nix_file),
+        }))
     })
+}
+
+fn check_files_top_level_with_lib(
+    nixpkgs_path: &Path,
+    nix_file: &nix_file::NixFile,
+) -> RatchetState<ratchet::DoesNotIntroduceToplevelWiths> {
+    if let Some(_open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root.syntax()) {
+        RatchetState::Loose(
+            npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
+                RelativePathBuf::from_path(
+                    nix_file.path.clone().strip_prefix(nixpkgs_path).unwrap(),
+                )
+                .unwrap(),
+            )
+            .into(),
+        )
+    } else {
+        RatchetState::Tight
+    }
 }
 
 fn collect_nix_files(
