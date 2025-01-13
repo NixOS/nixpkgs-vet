@@ -2,7 +2,7 @@
 //!
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use relative_path::RelativePathBuf;
 
@@ -13,10 +13,8 @@ use crate::validation::{self, Validation, Validation::Success};
 /// The ratchet value for the entirety of Nixpkgs.
 #[derive(Default)]
 pub struct Nixpkgs {
-    /// Sorted list of packages in `package_map`
-    pub package_names: Vec<String>,
     /// The ratchet values for all packages
-    pub package_map: HashMap<String, Package>,
+    pub packages: BTreeMap<String, Package>,
 }
 
 impl Nixpkgs {
@@ -25,9 +23,9 @@ impl Nixpkgs {
         validation::sequence_(
             // We only loop over the current attributes,
             // we don't need to check ones that were removed
-            to.package_names.into_iter().map(|name| {
-                Package::compare(&name, from.package_map.get(&name), &to.package_map[&name])
-            }),
+            to.packages
+                .into_iter()
+                .map(|(name, pkg)| Package::compare(&name, from.packages.get(&name), &pkg)),
         )
     }
 }
