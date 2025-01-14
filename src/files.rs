@@ -13,9 +13,25 @@ pub fn check_files(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
-    process_nix_files(nixpkgs_path, nix_file_store, |_nix_file| {
-        // Noop for now, only boilerplate to make it easier to add future file-based checks
-        Ok(Success(ratchet::File {}))
+    process_nix_files(nixpkgs_path, nix_file_store, |nix_file| {
+        // Bogus ratchet check towards enforcing that no files are strings
+        let file_is_str = match nix_file.syntax_root.expr() {
+            // This happens if the file can't be parsed, in which case we can't really decide
+            // whether it's a string or not
+            None => ratchet::RatchetState::NonApplicable,
+            // The expression is a string, not allowed for new files and for existing files to be
+            // changed to a string
+            Some(Str(_)) => ratchet::RatchetState::Loose(
+                npv_170::FileIsAString::new(
+                    RelativePathBuf::from_path(nix_file.path.strip_prefix(nixpkgs_path).unwrap())
+                        .unwrap(),
+                )
+                .into(),
+            ),
+            // This is good
+            Some(_) => ratchet::RatchetState::Tight,
+        };
+        Ok(Success(ratchet::File { file_is_str }))
     })
 }
 

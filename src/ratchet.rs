@@ -62,16 +62,19 @@ impl Package {
     }
 }
 
-pub struct File {}
+pub struct File {
+    pub file_is_str: RatchetState<FileIsStr>,
+}
 
 impl File {
     /// Validates the ratchet checks for a top-level package
-    pub fn compare(
-        _name: &RelativePath,
-        _optional_from: Option<&Self>,
-        _to: &Self,
-    ) -> Validation<()> {
-        Success(())
+    pub fn compare(name: &RelativePath, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+        // TODO: It's not great how RatchetState::compare requires a str, it should be more generic
+        RatchetState::<FileIsStr>::compare(
+            name.as_str(),
+            optional_from.map(|x| &x.file_is_str),
+            &to.file_is_str,
+        )
     }
 }
 
@@ -123,6 +126,16 @@ impl<Context: ToProblem> RatchetState<Context> {
             // - Anything involving NotApplicable, where we can't really make any good calls
             _ => Success(()),
         }
+    }
+}
+
+pub enum FileIsStr {}
+
+impl ToProblem for FileIsStr {
+    type ToContext = Problem;
+
+    fn to_problem(_name: &str, _optional_from: Option<()>, to: &Self::ToContext) -> Problem {
+        (*to).clone()
     }
 }
 
