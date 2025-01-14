@@ -1,11 +1,16 @@
-# Generated using `xrefcheck dump-config -t GitHub` at version 0.3.1
+# Initially generated using `xrefcheck dump-config -t GitHub` at version 0.3.1
+# Then adjusted as necessary
 
 # Exclusion parameters.
 exclusions:
   # Ignore these files. References to them will fail verification,
   # and references from them will not be verified.
   # List of glob patterns.
-  ignore: []
+  ignore: [
+    # Intentionally invalid symlinks for testing
+    "tests/multiple-failures/pkgs/by-name/A/fo@/foo",
+    "tests/symlink-invalid/pkgs/by-name/fo/foo/foo",
+  ]
 
   # References from these files will not be verified.
   # List of glob patterns.
