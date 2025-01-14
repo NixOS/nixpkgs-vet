@@ -47,31 +47,32 @@ The most important tools and commands in this environment are:
 ### Integration tests
 
 Integration tests are declared in [`./tests`](./tests) as subdirectories imitating Nixpkgs with these files:
-- `default.nix`:
-  Always contains
-  ```nix
-  import <test-nixpkgs> { root = ./.; }
-  ```
-  which makes
-  ```
-  nix-instantiate <subdir> --eval -A <attr> --arg overlays <overlays>
-  ```
-  work very similarly to the real Nixpkgs, just enough for the program to be able to test it.
-- `pkgs/by-name`:
-  The `pkgs/by-name` directory to check.
+- `main`: A Nixpkgs root directory with:
+  - `default.nix`:
+    Always contains
+    ```nix
+    import <test-nixpkgs> { root = ./.; }
+    ```
+    which makes
+    ```
+    nix-instantiate <subdir> --eval -A <attr> --arg overlays <overlays>
+    ```
+    work very similarly to the real Nixpkgs, just enough for the program to be able to test it.
+  - `pkgs/by-name`:
+    The `pkgs/by-name` directory to check.
 
-- `pkgs/top-level/all-packages.nix` (optional):
-  Contains an overlay of the form
-  ```nix
-  self: super: {
-    # ...
-  }
-  ```
-  allowing the simulation of package overrides to the real [`pkgs/top-level/all-packages.nix`](https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/all-packages.nix).
-  The default is an empty overlay.
+  - `pkgs/top-level/all-packages.nix` (optional):
+    Contains an overlay of the form
+    ```nix
+    self: super: {
+      # ...
+    }
+    ```
+    allowing the simulation of package overrides to the real [`pkgs/top-level/all-packages.nix`](https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/all-packages.nix).
+    The default is an empty overlay.
 
 - `base` (optional):
-  Contains another subdirectory imitating Nixpkgs with potentially any of the above structures.
+  Contains another Nixpkgs root directory with potentially any of the above structures.
   This is used to test [ratchet checks](./README.md#ratchet-checks).
 
 - `expected` (optional):
