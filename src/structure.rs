@@ -96,7 +96,7 @@ pub fn check_structure(
                         .into()
                     });
 
-                let result = result.and(validation::sequence_(duplicate_results));
+                let result = result.and_(validation::sequence_(duplicate_results));
 
                 let package_results = entries
                     .into_iter()
@@ -111,7 +111,7 @@ pub fn check_structure(
                     })
                     .collect_vec()?;
 
-                result.and(validation::sequence(package_results))
+                result.and_(validation::sequence(package_results))
             })
         })
         .collect_vec()?;
@@ -147,7 +147,7 @@ fn check_package(
         };
 
         let correct_relative_package_dir = relative_dir_for_package(&package_name);
-        let result = result.and(if relative_package_dir != correct_relative_package_dir {
+        let result = result.and_(if relative_package_dir != correct_relative_package_dir {
             // Only show this error if we have a valid shard and package name.
             // If one of those is wrong, you should fix that first.
             if shard_name_valid && package_name_valid {
@@ -164,7 +164,7 @@ fn check_package(
         });
 
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
-        let result = result.and(if !package_nix_path.exists() {
+        let result = result.and_(if !package_nix_path.exists() {
             npv_143::PackageNixMissing::new(package_name.clone()).into()
         } else if !package_nix_path.is_file() {
             npv_144::PackageNixIsNotFile::new(package_name.clone()).into()
@@ -172,7 +172,7 @@ fn check_package(
             Success(())
         });
 
-        let result = result.and(references::check_references(
+        let result = result.and_(references::check_references(
             nix_file_store,
             &relative_package_dir,
             &relative_package_dir.to_path(path),

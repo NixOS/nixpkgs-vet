@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
@@ -156,7 +157,7 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
-) -> validation::Result<ratchet::Nixpkgs> {
+) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
         .tempdir()
@@ -255,9 +256,7 @@ pub fn check_values(
             .collect_vec()?,
     );
 
-    Ok(check_result.map(|elems| ratchet::Nixpkgs {
-        packages: elems.into_iter().collect(),
-    }))
+    Ok(check_result.map(|elems| elems.into_iter().collect()))
 }
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
@@ -372,7 +371,7 @@ fn by_name(
 
             // Independently report problems about whether it's a derivation and the callPackage
             // variant.
-            is_derivation_result.and(variant_result)
+            is_derivation_result.and_(variant_result)
         }
     };
     Ok(
