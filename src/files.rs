@@ -51,14 +51,17 @@ fn check_files_top_level_with_lib(
     nixpkgs_path: &Path,
     nix_file: &nix_file::NixFile,
 ) -> RatchetState<ratchet::DoesNotIntroduceToplevelWiths> {
-    if let Some(_open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root.syntax()) {
+    if let Some(open_scope_with_lib) = find_invalid_withs(nix_file.syntax_root.syntax()) {
         RatchetState::Loose(
-            npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
-                RelativePathBuf::from_path(
-                    nix_file.path.clone().strip_prefix(nixpkgs_path).unwrap(),
+            {
+                npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks::new(
+                    RelativePathBuf::from_path(
+                        nix_file.path.clone().strip_prefix(nixpkgs_path).unwrap(),
+                    )
+                    .unwrap(),
+                    open_scope_with_lib.to_string(),
                 )
-                .unwrap(),
-            )
+            }
             .into(),
         )
     } else {
