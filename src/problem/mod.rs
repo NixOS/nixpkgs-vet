@@ -34,6 +34,8 @@ pub mod npv_161;
 pub mod npv_162;
 pub mod npv_163;
 
+pub mod npv_169;
+
 #[derive(Clone, Display, EnumFrom)]
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
@@ -122,6 +124,11 @@ pub enum Problem {
     /// NPV-163: new top-level package should be in by-name with a custom argument
     NewTopLevelPackageShouldBeByNameWithCustomArgument(
         npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument,
+    ),
+
+    /// NPV-169: top-level with may shadow variables and break static checks
+    TopLevelWithMayShadowVariablesAndBreakStaticChecks(
+        npv_169::TopLevelWithMayShadowVariablesAndBreakStaticChecks,
     ),
 }
 
