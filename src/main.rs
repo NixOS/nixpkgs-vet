@@ -10,6 +10,7 @@
 // #![allow(clippy::missing_const_for_fn)]
 
 mod eval;
+mod files;
 mod location;
 mod nix_file;
 mod problem;
@@ -21,6 +22,7 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::{panic, thread};
@@ -113,20 +115,30 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
         )
     })?;
 
-    if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
-        // No pkgs/by-name directory, always valid
-        return Ok(Success(ratchet::Nixpkgs::default()));
-    }
-
     let mut nix_file_store = NixFileStore::default();
-    let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
 
-    // Only if we could successfully parse the structure, we do the evaluation checks
-    let result = structure.result_map(|package_names| {
-        eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
-    })?;
+    let package_result = {
+        if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
+            // No pkgs/by-name directory, always valid
+            Success(BTreeMap::new())
+        } else {
+            let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
 
-    Ok(result)
+            // Only if we could successfully parse the structure, we do the evaluation checks
+            structure.result_map(|package_names| {
+                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
+            })?
+        }
+    };
+
+    let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
+
+    Ok(
+        package_result.and(file_result, |packages, files| ratchet::Nixpkgs {
+            packages,
+            files,
+        }),
+    )
 }
 
 #[cfg(test)]
@@ -178,7 +190,7 @@ mod tests {
             return Ok(());
         }
 
-        let base = path.join(BASE_SUBPATH);
+        let base = path.join("main").join(BASE_SUBPATH);
 
         fs::create_dir_all(base.join("fo/foo"))?;
         fs::write(base.join("fo/foo/package.nix"), "{ someDrv }: someDrv")?;
@@ -237,7 +249,7 @@ mod tests {
             .build()
             .expect("valid regex");
 
-        let path = path.to_owned();
+        let main_path = path.join("main");
         let base_path = path.join("base");
         let base_nixpkgs = if base_path.exists() {
             base_path
@@ -251,7 +263,7 @@ mod tests {
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
 
         let status = temp_env::with_var("NIX_CONF_DIR", Some(nix_conf_dir), || {
-            process(base_nixpkgs, &path)
+            process(base_nixpkgs, &main_path)
         });
 
         let actual_errors = format!("{status}\n");

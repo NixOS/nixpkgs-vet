@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
@@ -152,11 +153,13 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 /// Check that the Nixpkgs attribute values corresponding to the packages in `pkgs/by-name` are of
 /// the form `callPackage <package_file> { ... }`. See the `./eval.nix` file for how this is
 /// achieved on the Nix side.
+///
+/// The validation result is a map from package names to a package ratchet state.
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
-) -> validation::Result<ratchet::Nixpkgs> {
+) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
         .tempdir()
@@ -255,9 +258,7 @@ pub fn check_values(
             .collect_vec()?,
     );
 
-    Ok(check_result.map(|elems| ratchet::Nixpkgs {
-        packages: elems.into_iter().collect(),
-    }))
+    Ok(check_result.map(|elems| elems.into_iter().collect()))
 }
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
@@ -372,7 +373,7 @@ fn by_name(
 
             // Independently report problems about whether it's a derivation and the callPackage
             // variant.
-            is_derivation_result.and(variant_result)
+            is_derivation_result.and_(variant_result)
         }
     };
     Ok(

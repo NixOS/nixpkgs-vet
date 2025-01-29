@@ -75,9 +75,17 @@ impl<A> Validation<A> {
 impl Validation<()> {
     /// Combine two validations, both of which need to be successful for the return value to be
     /// successful. The `Problem`s of both sides are returned concatenated.
-    pub fn and<A>(self, other: Validation<A>) -> Validation<A> {
+    pub fn and_<B>(self, other: Validation<B>) -> Validation<B> {
+        self.and(other, |(), b| b)
+    }
+}
+
+impl<A> Validation<A> {
+    /// Combine two validations, both of which need to be successful for the return value to be
+    /// successful. The `Problem`s of both sides are returned concatenated.
+    pub fn and<B, C, F: FnOnce(A, B) -> C>(self, other: Validation<B>, f: F) -> Validation<C> {
         match (self, other) {
-            (Success(_), Success(right_value)) => Success(right_value),
+            (Success(a), Success(b)) => Success(f(a, b)),
             (Failure(errors_l), Failure(errors_r)) => Failure(concat([errors_l, errors_r])),
             (Failure(errors), Success(_)) | (Success(_), Failure(errors)) => Failure(errors),
         }
