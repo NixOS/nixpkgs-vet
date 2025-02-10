@@ -84,9 +84,7 @@ pub fn check_structure(
                 let duplicate_results = entries
                     .iter()
                     .zip(entries.iter().skip(1))
-                    .filter(|(l, r)| {
-                        l.file_name().to_ascii_lowercase() == r.file_name().to_ascii_lowercase()
-                    })
+                    .filter(|(l, r)| l.file_name().eq_ignore_ascii_case(r.file_name()))
                     .map(|(l, r)| {
                         npv_111::ByNameShardIsCaseSensitiveDuplicate::new(
                             shard_name.clone(),
