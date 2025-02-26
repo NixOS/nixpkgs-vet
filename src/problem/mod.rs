@@ -22,6 +22,7 @@ pub mod npv_123;
 pub mod npv_124;
 pub mod npv_125;
 pub mod npv_126;
+pub mod npv_127;
 
 pub mod npv_140;
 pub mod npv_141;
@@ -92,6 +93,9 @@ pub enum Problem {
 
     /// NPV-126: Package contains unresolvable symlink
     PackageContainsUnresolvableSymlink(npv_126::PackageContainsUnresolvableSymlink),
+
+    /// NPV-127: Package contains an invalid reference
+    PackageContainsInvalidReference(npv_127::PackageContainsInvalidReference),
 
     /// NPV-140: Package directory is not directory
     PackageDirectoryIsNotDirectory(npv_140::PackageDirectoryIsNotDirectory),

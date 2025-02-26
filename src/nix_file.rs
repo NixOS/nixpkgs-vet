@@ -3,6 +3,9 @@
 use crate::location::LineIndex;
 use anyhow::Context;
 use itertools::Either::{self, Left, Right};
+use relative_path::Component;
+use relative_path::FromPathError;
+use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 use rnix::ast;
 use rnix::ast::Expr;
@@ -404,6 +407,9 @@ pub enum ResolvedPath {
     /// have the right permissions.
     Unresolvable(std::io::Error),
 
+    // The reference is not relative or another `FromPathError` problem
+    RelativeFromPathError(FromPathError),
+
     /// The path is outside the given absolute path.
     Outside,
 
@@ -431,12 +437,34 @@ impl NixFile {
             return ResolvedPath::SearchPath;
         }
 
-        // Join the file's parent directory and the path expression, then resolve it.
-        //
-        // FIXME: Expressions like `../../../../foo/bar/baz/qux` or absolute paths
-        // may resolve close to the original file, but may have left the relative_to.
-        // That should be checked more strictly.
-        match self.parent_dir.join(Path::new(&text)).canonicalize() {
+        let components = match RelativePath::from_path(Path::new(&text)) {
+            Ok(raw_rel_path) => raw_rel_path.components(),
+            Err(e) => return ResolvedPath::RelativeFromPathError(e),
+        };
+
+        let mut target = self.parent_dir.clone();
+
+        for component in components {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    let Some(parent) = target.parent() else {
+                        return ResolvedPath::Outside;
+                    };
+
+                    if !parent.starts_with(relative_to) {
+                        return ResolvedPath::Outside;
+                    }
+
+                    target = parent.to_path_buf();
+                }
+                Component::Normal(segment) => {
+                    target = target.join(segment);
+                }
+            }
+        }
+
+        match target.canonicalize() {
             Err(resolution_error) => ResolvedPath::Unresolvable(resolution_error),
             Ok(resolved) => {
                 // Check if it's within relative_to.
