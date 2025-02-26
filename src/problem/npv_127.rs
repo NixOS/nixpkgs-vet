@@ -1,5 +1,5 @@
-use relative_path::RelativePathBuf;
 use relative_path::FromPathError;
+use relative_path::RelativePathBuf;
 use std::fmt;
 
 use derive_new::new;

@@ -9,8 +9,14 @@
 // #![allow(clippy::use_self)]
 // #![allow(clippy::missing_const_for_fn)]
 
+use ignore::DirEntry;
+use relative_path::RelativePathBuf;
+use std::collections::HashSet;
+use std::io::Write;
+use std::process::Command;
 mod eval;
 mod files;
+mod index;
 mod location;
 mod nix_file;
 mod problem;
@@ -22,6 +28,7 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
+use ignore::Walk;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -117,6 +124,35 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
     let mut nix_file_store = NixFileStore::default();
 
+    let all_paths = {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(nixpkgs_path.as_os_str())
+            .arg("ls-files")
+            .arg("-z")
+            .output()
+            .expect("failed to execute `git ls-files`");
+
+        let mut subpaths: HashSet<RelativePathBuf> = HashSet::new();
+
+        for file in output.stdout.rsplit(|i| *i == 0).skip(1) {
+            let f = std::str::from_utf8(file).unwrap();
+            let mut x = RelativePathBuf::from(f);
+            subpaths.insert(x.clone());
+            while x.pop() {
+                subpaths.insert(x.clone());
+            }
+        }
+        subpaths
+    };
+
+    //let index = index::GlobalIndex::new(&nixpkgs_path, &all_paths, &mut nix_file_store);
+
+    eprintln!("Index calculated");
+    //let mut file = std::fs::File::create("index")?;
+    //writeln!(file, "{:#?}", index)?;
+    //eprintln!("Done writing");
+
     let package_result = {
         if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
             // No pkgs/by-name directory, always valid
@@ -131,7 +167,7 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
         }
     };
 
-    let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
+    let file_result = files::check_files(&nixpkgs_path, &all_paths, &mut nix_file_store)?;
 
     Ok(
         package_result.and(file_result, |packages, files| ratchet::Nixpkgs {
