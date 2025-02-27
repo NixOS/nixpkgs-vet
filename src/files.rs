@@ -1,3 +1,5 @@
+use rnix::SyntaxKind::NODE_PATH;
+use rowan::ast::AstNode;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 use std::collections::BTreeMap;
@@ -13,7 +15,17 @@ pub fn check_files(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
-    process_nix_files(nixpkgs_path, nix_file_store, |_nix_file| {
+    process_nix_files(nixpkgs_path, nix_file_store, |nix_file| {
+        let p = nix_file.path.strip_prefix(nixpkgs_path).unwrap();
+        let s = nix_file.syntax_root.syntax();
+        for d in s.descendants() {
+            let line = nix_file.line_index.line(d.text_range().start().into());
+            if d.kind() == NODE_PATH {
+                if d.text().to_string().starts_with("/") {
+                    eprintln!("- [{}#L{}](https://github.com/NixOS/nixpkgs/blob/576f2c930108b9ff47e58623ea77836fa648b137/{}#L{})", p.to_string_lossy(), line, p.to_string_lossy(), line);
+                }
+            }
+        }
         // Noop for now, only boilerplate to make it easier to add future file-based checks
         Ok(Success(ratchet::File {}))
     })
@@ -58,6 +70,9 @@ fn collect_nix_files(
     files: &mut Vec<RelativePathBuf>,
 ) -> anyhow::Result<()> {
     for entry in structure::read_dir_sorted(&dir.to_path(base))? {
+        if entry.file_name() == ".git" {
+            continue;
+        }
         let mut relative_path = dir.to_relative_path_buf();
         relative_path.push(entry.file_name().to_string_lossy().into_owned());
 
