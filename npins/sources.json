@@ -1,10 +1,17 @@
 {
   "pins": {
     "nixpkgs": {
-      "type": "Channel",
-      "name": "nixpkgs-unstable",
-      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-25.05pre796313.b3582c75c7f2/nixexprs.tar.xz",
-      "hash": "1hy9mx89v6vcb2jwqa1dfpqnalc2pak27r7d82v3w6j5fhbbh34j"
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "nixos",
+        "repo": "nixpkgs"
+      },
+      "branch": "master",
+      "submodules": false,
+      "revision": "2f7500238f6e2eafa64fb121b3893c3d6597b3fd",
+      "url": "https://github.com/nixos/nixpkgs/archive/2f7500238f6e2eafa64fb121b3893c3d6597b3fd.tar.gz",
+      "hash": "0wq9lp0q8qr3w4ryxjjxlk1jgp0bznv7rr9x4v470zz9rvcyi5sl"
     },
     "treefmt-nix": {
       "type": "Git",
