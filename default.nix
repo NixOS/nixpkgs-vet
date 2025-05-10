@@ -87,7 +87,7 @@ let
               # Needed because GitHub's rendering of the first body line breaks down otherwise
               echo ""
               echo '```'
-              npins update --directory "$1/npins" 2>&1
+              npins --directory "$1/npins" update 2>&1
               echo  '```'
               echo "</details>"
             '';
