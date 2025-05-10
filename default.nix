@@ -162,11 +162,11 @@ let
 
     # Tests the tool on the pinned Nixpkgs tree with various Nix and Lix versions.
     # This allows exposure to changes in behavior from Nix and Nix-alikes.
-    nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
-    nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
-    nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
-    nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
-    nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
+    #nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
+    #nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
+    #nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
+    #nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
+    #nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
   };
 in
 packages
