@@ -148,7 +148,7 @@ mod tests {
 
     use anyhow::Context;
     use pretty_assertions::StrComparison;
-    use tempfile::{tempdir_in, TempDir};
+    use tempfile::{TempDir, tempdir_in};
 
     use super::{process, structure::BASE_SUBPATH};
 
