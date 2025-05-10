@@ -520,7 +520,7 @@ mod tests {
         // Then, run this command to get the raw test data.
         //
         // ```
-        // for v in Versions.{stable,minimum,latest} lixVersions.{stable,latest}; do
+        // for v in nixVersions.{stable,minimum,latest} lixPackageSets.{stable,latest}.lix; do
         //   nix-instantiate --strict --eval --json driver.nix | jq -r .[]
         // done | sort -u
         // ```
