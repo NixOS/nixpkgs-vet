@@ -6,16 +6,10 @@
   nixpkgs,
   nix,
   nixVersions,
-  lixVersions,
+  lixPackageSets,
 }:
 let
   # Given an attrset, return only the values that both eval and are derivations.
-  #
-  # We do this to avoid encoding information about which names are in present in the attrset.
-  # For instance, `nixVersions` contains `nix_2_10`, which throws, and `lixVersions` does not
-  # contain `minimum` or `git`, but `nixVersions` does.
-  #
-  # Let's just map over those attrsets and return what's useful from there.
   derivationsFromAttrset =
     attrset:
     lib.filterAttrs (
@@ -42,7 +36,10 @@ let
           nixVersions = lib.mapAttrs mkNixpkgsCheck (derivationsFromAttrset nixVersions);
 
           # Allow running against all other Lix versions.
-          lixVersions = lib.mapAttrs mkNixpkgsCheck (derivationsFromAttrset lixVersions);
+          lixVersions = lib.mapAttrs mkNixpkgsCheck {
+            stable = lixPackageSets.stable.lix;
+            latest = lixPackageSets.latest.lix;
+          };
         };
       }
       ''

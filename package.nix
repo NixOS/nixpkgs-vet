@@ -4,7 +4,7 @@
   path,
   nix,
   nixVersions,
-  lixVersions,
+  lixPackageSets,
   clippy,
   makeWrapper,
 
@@ -13,8 +13,8 @@
     nixVersions.stable
     nixVersions.minimum
     nixVersions.latest
-    lixVersions.stable
-    lixVersions.latest
+    lixPackageSets.stable.lix
+    lixPackageSets.latest.lix
   ],
 
   initNix,

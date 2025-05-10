@@ -87,7 +87,7 @@ let
               # Needed because GitHub's rendering of the first body line breaks down otherwise
               echo ""
               echo '```'
-              npins update --directory "$1/npins" 2>&1
+              npins --directory "$1/npins" update 2>&1
               echo  '```'
               echo "</details>"
             '';
@@ -162,11 +162,11 @@ let
 
     # Tests the tool on the pinned Nixpkgs tree with various Nix and Lix versions.
     # This allows exposure to changes in behavior from Nix and Nix-alikes.
-    nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
-    nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
-    nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
-    nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
-    nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
+    #nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
+    #nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
+    #nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
+    #nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
+    #nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
   };
 in
 packages

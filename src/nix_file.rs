@@ -7,11 +7,11 @@ use relative_path::RelativePathBuf;
 use rnix::ast;
 use rnix::ast::Expr;
 use rnix::ast::HasEntry;
-use rowan::ast::AstNode;
 use rowan::TextSize;
 use rowan::TokenAtOffset;
-use std::collections::hash_map::Entry;
+use rowan::ast::AstNode;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::path::PathBuf;
@@ -520,7 +520,7 @@ mod tests {
         // Then, run this command to get the raw test data.
         //
         // ```
-        // for v in Versions.{stable,minimum,latest} lixVersions.{stable,latest}; do
+        // for v in nixVersions.{stable,minimum,latest} lixPackageSets.{stable,latest}.lix; do
         //   nix-instantiate --strict --eval --json driver.nix | jq -r .[]
         // done | sort -u
         // ```

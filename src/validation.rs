@@ -1,10 +1,10 @@
 use crate::problem::Problem;
+use Validation::{Failure, Success};
 use itertools::concat;
 use itertools::{
     Either::{Left, Right},
     Itertools,
 };
-use Validation::{Failure, Success};
 
 /// The validation result of a check.  Instead of exiting at the first failure, this type can
 /// accumulate multiple failures.  This can be achieved using the functions `and`, `sequence` and
