@@ -7,6 +7,7 @@
   lixPackageSets,
   clippy,
   makeWrapper,
+  versionCheckHook,
 
   nixVersionsToTest ? [
     nix
@@ -43,6 +44,9 @@ rustPlatform.buildRustPackage {
     clippy
     makeWrapper
   ];
+
+  doInstallCheck = true;
+  nativeInstallCheckInputs = [ versionCheckHook ];
 
   env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
   env.NIXPKGS_VET_NIXPKGS_LIB = "${path}/lib";

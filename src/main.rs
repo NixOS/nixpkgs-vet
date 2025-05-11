@@ -47,7 +47,7 @@ use crate::validation::Validation::Success;
 /// - Informative messages
 /// - Detected problems if validation is not successful
 #[derive(Parser, Debug)]
-#[command(about, verbatim_doc_comment)]
+#[command(about, version, verbatim_doc_comment)]
 pub struct Args {
     /// Path to the main Nixpkgs to check. For PRs, set this to a checkout of the PR branch.
     nixpkgs: PathBuf,
