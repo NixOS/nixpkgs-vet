@@ -14,6 +14,9 @@ jobs:
           path: repo
 
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            max-jobs = 1
 
       - name: Run update script
         run: |
