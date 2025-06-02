@@ -9,9 +9,9 @@
       },
       "branch": "master",
       "submodules": false,
-      "revision": "cc9c4b607e7b1a6fd25b16d5951b39077e7f2218",
-      "url": "https://github.com/nixos/nixpkgs/archive/cc9c4b607e7b1a6fd25b16d5951b39077e7f2218.tar.gz",
-      "hash": "0b86n57286552vp1gix9jasgiqj913r1nk8wxssfhpcdfpv1d1vg"
+      "revision": "3ac76b8cc76f259d639b0972a5547880a835652d",
+      "url": "https://github.com/nixos/nixpkgs/archive/3ac76b8cc76f259d639b0972a5547880a835652d.tar.gz",
+      "hash": "03jvgndv69p9k62lm6sf23rdh0f6fxm331v1w8rr5pp9bwxsf2g6"
     },
     "treefmt-nix": {
       "type": "Git",
@@ -22,9 +22,9 @@
       },
       "branch": "main",
       "submodules": false,
-      "revision": "ab0378b61b0d85e73a8ab05d5c6029b5bd58c9fb",
-      "url": "https://github.com/numtide/treefmt-nix/archive/ab0378b61b0d85e73a8ab05d5c6029b5bd58c9fb.tar.gz",
-      "hash": "0f6fdrmjmcbflbqmnbfymfd82q4r9448hxjhkfxajdk846v6k3bf"
+      "revision": "1f3f7b784643d488ba4bf315638b2b0a4c5fb007",
+      "url": "https://github.com/numtide/treefmt-nix/archive/1f3f7b784643d488ba4bf315638b2b0a4c5fb007.tar.gz",
+      "hash": "13qisjalw9qvd6lkd9g8225r46j5wdjrp3zw6jrs81q2vxwdz37m"
     }
   },
   "version": 5
