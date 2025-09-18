@@ -1,7 +1,8 @@
 # Contributor documentation
 
-[@infinisil](https://github.com/infinisil) is the admin and main developer of this repository,
-while everybody in [@NixOS/nixpkgs-vet](https://github.com/orgs/NixOS/teams/nixpkgs-vet) has write access.
+[@philiptaron](https://github.com/philiptaron) and
+[@wolfgangwalther](https://github.com/wolfgangwalther) are admins of this repository,
+while everybody in [@NixOS/nixpkgs-ci](https://github.com/orgs/NixOS/teams/nixpkgs-ci) has write access, as well as [@infinisil](https://github.com/infinisil) and [@willbush](https://github.com/willbush).
 
 ## Development
 
