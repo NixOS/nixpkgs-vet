@@ -164,7 +164,6 @@ let
     # This allows exposure to changes in behavior from Nix and Nix-alikes.
     nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
     nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
-    nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
     nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
     nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
   };

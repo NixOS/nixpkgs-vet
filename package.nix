@@ -12,7 +12,6 @@
   nixVersionsToTest ? [
     nix
     nixVersions.stable
-    nixVersions.minimum
     nixVersions.latest
     lixPackageSets.stable.lix
     lixPackageSets.latest.lix
