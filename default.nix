@@ -144,8 +144,10 @@ let
       pkgs.writeShellApplication {
         name = "auto-pr-update";
         text = ''
+          set -eo pipefail
           # Prevent impurities
           unset PATH
+
           ${lib.concatMapStringsSep "\n" (script: ''
             echo >&2 "Running ${script}"
             ${lib.getExe script} "$1"
