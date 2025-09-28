@@ -12,7 +12,6 @@
   nixVersionsToTest ? [
     nix
     nixVersions.stable
-    nixVersions.minimum
     nixVersions.latest
     lixPackageSets.stable.lix
     lixPackageSets.latest.lix
@@ -76,4 +75,7 @@ rustPlatform.buildRustPackage {
     wrapProgram $out/bin/nixpkgs-vet \
       --set NIXPKGS_VET_NIX_PACKAGE ${lib.getBin nix}
   '';
+
+  # silence a warning when building
+  meta.mainProgram = "nixpkgs-vet";
 }

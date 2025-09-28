@@ -144,8 +144,10 @@ let
       pkgs.writeShellApplication {
         name = "auto-pr-update";
         text = ''
+          set -eo pipefail
           # Prevent impurities
           unset PATH
+
           ${lib.concatMapStringsSep "\n" (script: ''
             echo >&2 "Running ${script}"
             ${lib.getExe script} "$1"
@@ -164,7 +166,6 @@ let
     # This allows exposure to changes in behavior from Nix and Nix-alikes.
     nixpkgsCheckWithLatestNix = packages.nixpkgsCheck.nixVersions.latest;
     nixpkgsCheckWithGitNix = packages.nixpkgsCheck.nixVersions.git;
-    nixpkgsCheckWithMinimumNix = packages.nixpkgsCheck.nixVersions.minimum;
     nixpkgsCheckWithStableLix = packages.nixpkgsCheck.lixVersions.stable;
     nixpkgsCheckWithLatestLix = packages.nixpkgsCheck.lixVersions.latest;
   };

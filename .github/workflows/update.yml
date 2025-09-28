@@ -21,7 +21,7 @@ jobs:
       - name: Run update script
         run: |
           nix-build repo -A autoPrUpdate
-          result/bin/auto-pr-update repo > body
+          result/bin/auto-pr-update repo &> body || (echo "SCRIPT FAILED: " && cat body && exit 1)
         env:
           GH_TOKEN: ${{ github.token }}
 
