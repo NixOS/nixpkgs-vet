@@ -1,10 +1,11 @@
 use std::fmt;
 
 use derive_new::new;
+use relative_path::RelativePath;
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct ByNameShardIsNotDirectory {
     #[new(into)]
     shard_name: String,
@@ -12,7 +13,8 @@ pub struct ByNameShardIsNotDirectory {
 
 impl fmt::Display for ByNameShardIsNotDirectory {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let relative_shard_path = structure::relative_dir_for_shard(&self.shard_name);
+        let relative_shard_path =
+            structure::relative_dir_for_shard(&self.shard_name, RelativePath::new("pkgs/by-name"));
         write!(
             f,
             "- {relative_shard_path}: This is a file, but it should be a directory.",

@@ -2,11 +2,11 @@ use std::fmt;
 
 use derive_new::new;
 use indoc::writedoc;
-use relative_path::RelativePathBuf;
+use relative_path::{RelativePath, RelativePathBuf};
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct TopLevelPackageMovedOutOfByNameWithCustomArguments {
     #[new(into)]
     package_name: String,
@@ -23,7 +23,8 @@ impl fmt::Display for TopLevelPackageMovedOutOfByNameWithCustomArguments {
             call_package_path,
             file,
         } = self;
-        let relative_package_file = structure::relative_file_for_package(package_name);
+        let relative_package_file =
+            structure::relative_file_for_package(package_name, RelativePath::new("pkgs/by-name"));
         let call_package_arg = call_package_path
             .as_ref()
             .map_or_else(|| "...".into(), |path| format!("./{}", path));

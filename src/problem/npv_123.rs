@@ -6,7 +6,7 @@ use relative_path::RelativePathBuf;
 
 use crate::structure::PACKAGE_NIX_FILENAME;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct NixFileContainsPathOutsideDirectory {
     #[new(into)]
     relative_package_dir: RelativePathBuf,

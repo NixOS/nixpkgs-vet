@@ -2,7 +2,7 @@ use std::fmt;
 
 use derive_new::new;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct NixEvalError {
     #[new(into)]
     stderr: String,

@@ -4,7 +4,7 @@ use std::{fmt, io};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct NixFileContainsUnresolvablePath {
     #[new(into)]
     relative_package_dir: RelativePathBuf,

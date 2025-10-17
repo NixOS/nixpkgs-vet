@@ -69,7 +69,7 @@ let
         };
   };
 
-  # Information on all attributes that are in `pkgs/by-name`.
+  # Information on all attributes that are in a `by-name` directory.
   byNameAttrs = builtins.listToAttrs (
     map (name: {
       inherit name;
@@ -82,12 +82,12 @@ let
     }) attrs
   );
 
-  # Information on all attributes that exist but are not in `pkgs/by-name`.
-  # We need this to enforce `pkgs/by-name` for new packages.
+  # Information on all attributes that exist but are not in a `by-name` directory.
+  # We need this to enforce placement in a `by-name` directory for new packages.
   nonByNameAttrs = builtins.mapAttrs (
     name: value:
     let
-      # Packages outside `pkgs/by-name` often fail evaluation, so we need to handle that.
+      # Packages outside  `by-name` directories often fail evaluation, so we need to handle that.
       output = attrInfo name value;
       result = builtins.tryEval (builtins.deepSeq output null);
     in

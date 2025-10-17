@@ -60,6 +60,8 @@ rustPlatform.buildRustPackage {
     # This is what nixpkgs-vet uses
     export NIXPKGS_VET_NIX_PACKAGE=$nixPackage
 
+    cp ${./by-name-config.json} by-name-config.json
+
     ${lib.concatMapStringsSep "\n" (nix: ''
       ln -s ${lib.getBin nix} "$nixPackage"
       echo "Testing with $(nix --version)"

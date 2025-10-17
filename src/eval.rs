@@ -12,7 +12,7 @@ use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::structure::{self, BASE_SUBPATH};
+use crate::structure::{self, Config};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::{location, ratchet};
@@ -22,9 +22,9 @@ const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 /// Attribute set of this structure is returned by `./eval.nix`
 #[derive(Deserialize)]
 enum Attribute {
-    /// An attribute that should be defined via `pkgs/by-name`.
+    /// An attribute that should be defined via a `by-name` directory.
     ByName(ByNameAttribute),
-    /// An attribute not defined via `pkgs/by-name`.
+    /// An attribute not defined via a `by-name` directory.
     NonByName(NonByNameAttribute),
 }
 
@@ -88,7 +88,7 @@ pub enum AttributeVariant {
 
 #[derive(Deserialize)]
 pub enum DefinitionVariant {
-    /// An automatic definition by the `pkgs/by-name` overlay, though it's detected using the
+    /// An automatic definition by the `by-name` overlay, though it's detected using the
     /// internal `_internalCallByNamePackageFile` attribute, which can in theory also be used by
     /// other code.
     AutoDefinition,
@@ -150,7 +150,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
     Ok(())
 }
 
-/// Check that the Nixpkgs attribute values corresponding to the packages in `pkgs/by-name` are of
+/// Check that the Nixpkgs attribute values corresponding to the packages in a `by-name` directory are of
 /// the form `callPackage <package_file> { ... }`. See the `./eval.nix` file for how this is
 /// achieved on the Nix side.
 ///
@@ -159,6 +159,7 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
+    config: &Config,
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
@@ -245,12 +246,14 @@ pub fn check_values(
                         nix_file_store,
                         &attribute_name,
                         non_by_name_attribute,
+                        config,
                     )?,
                     Attribute::ByName(by_name_attribute) => by_name(
                         nix_file_store,
                         nixpkgs_path,
                         &attribute_name,
                         by_name_attribute,
+                        config,
                     )?,
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
@@ -261,12 +264,13 @@ pub fn check_values(
     Ok(check_result.map(|elems| elems.into_iter().collect()))
 }
 
-/// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
+/// Handle the evaluation result for an attribute in a `by-name` directory, making it a validation result.
 fn by_name(
     nix_file_store: &mut NixFileStore,
     nixpkgs_path: &Path,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
+    config: &Config,
 ) -> validation::Result<ratchet::Package> {
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.  This match
     // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
@@ -275,7 +279,7 @@ fn by_name(
         // The attribute is missing.
         ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
-            // automatically defined attributes in `pkgs/by-name`
+            // automatically define attributes in a `by-name` directory
             npv_100::ByNameUndefinedAttribute::new(attribute_name).into()
         }
         // The attribute exists
@@ -302,7 +306,7 @@ fn by_name(
                 },
             location,
         }) => {
-            // Only derivations are allowed in `pkgs/by-name`.
+            // Only derivations are allowed in a `by-name` directory
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
@@ -361,6 +365,7 @@ fn by_name(
                             optional_syntactic_call_package,
                             definition,
                             location,
+                            config,
                         )
                     } else {
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
@@ -377,7 +382,7 @@ fn by_name(
         }
     };
     Ok(
-        // Packages being checked in this function are _always_ already defined in `pkgs/by-name`,
+        // Packages being checked in this function are _always_ already defined in a `by-name` directory,
         // so instead of repeating ourselves all the time to define `uses_by_name`, just set it
         // once at the end with a map.
         manual_definition_result.map(|manual_definition| ratchet::Package {
@@ -387,7 +392,7 @@ fn by_name(
     )
 }
 
-/// Handles the case for packages in `pkgs/by-name` that are manually overridden,
+/// Handles the case for packages in a `by-name` directory that are manually overridden,
 /// e.g. in `pkgs/top-level/all-packages.nix`.
 fn by_name_override(
     attribute_name: &str,
@@ -395,6 +400,7 @@ fn by_name_override(
     optional_syntactic_call_package: Option<CallPackageArgumentInfo>,
     definition: String,
     location: location::Location,
+    config: &Config,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
     let Some(syntactic_call_package) = optional_syntactic_call_package else {
         // Something like `<attr> = foo`
@@ -421,7 +427,10 @@ fn by_name_override(
             .into();
     };
 
-    let expected_package_path = structure::relative_file_for_package(attribute_name);
+    let expected_by_name_dir = structure::expected_by_name_dir_for_package(attribute_name, config);
+
+    let expected_package_path =
+        structure::relative_file_for_package(attribute_name, &expected_by_name_dir);
     if actual_package_path != expected_package_path {
         return npv_106::ByNameOverrideContainsWrongCallPackagePath::new(
             attribute_name,
@@ -444,44 +453,45 @@ fn by_name_override(
     }
 }
 
-/// Handles the evaluation result for an attribute _not_ in `pkgs/by-name`, turning it into a
-/// validation result.
+/// Handles the evaluation result for an attribute _not_ in a `by-name`
+/// directory, turning it into a validation result.
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
+    config: &Config,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
 
-    // The ratchet state whether this attribute uses `pkgs/by-name`.
+    // The ratchet state whether this attribute uses a `by-name` directory
     //
     // This is never `Tight`, because we only either:
-    // - Know that the attribute _could_ be migrated to `pkgs/by-name`, which is `Loose`
+    // - Know that the attribute _could_ be migrated to a `by-name` directory, which is `Loose`
     // - Or we're unsure, in which case we use `NonApplicable`
     let uses_by_name =
         // This is a big ol' match on various properties of the attribute
         //
         // First, it needs to succeed evaluation. We can't know whether an attribute could be
-        // migrated to `pkgs/by-name` if it doesn't evaluate, since we need to check that it's a
+        // migrated to a `by-name` directory if it doesn't evaluate, since we need to check that it's a
         // derivation.
         //
         // This only has the minor negative effect that if a PR that breaks evaluation gets merged,
-        // fixing those failures won't force anything into `pkgs/by-name`.
+        // fixing those failures won't force anything into a `by-name` directory.
         //
         // For now this isn't our problem, but in the future we might have another check to enforce
         // that evaluation must not be broken.
         //
         // The alternative of assuming that failing attributes would have been fit for
-        // `pkgs/by-name` has the problem that if a package evaluation gets broken temporarily,
-        // fixing it requires a move to pkgs/by-name, which could happen more often and isn't
+        // a `by-name` directory has the problem that if a package evaluation gets broken temporarily,
+        // fixing it requires a move to a `by-name` directory, which could happen more often and isn't
         // really justified.
         if let EvalSuccess(AttributeInfo {
             // We're only interested in attributes that are attribute sets, which all derivations
-            // are. Anything else can't be in `pkgs/by-name`.
+            // are. Anything else can't be in a `by-name` directory.
             attribute_variant: AttributeVariant::AttributeSet {
-                // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
+                // As of today, non-derivation attribute sets can't be in a `by-name` directory.
                 is_derivation: true,
                 // Of the two definition variants, really only the manual one makes sense here.
                 //
@@ -537,7 +547,7 @@ fn handle_non_by_name_attribute(
             // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
             | (true, None) => {
                 // In all of these cases, it's not possible to migrate the package to
-                // `pkgs/by-name`.
+                // a `by-name` directory
                 NonApplicable
             }
 
@@ -545,14 +555,14 @@ fn handle_non_by_name_attribute(
             (true, Some(syntactic_call_package)) => {
                 // It's only possible to migrate such a definitions if..
                 match syntactic_call_package.relative_path {
-                    Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
-                        // ..the path is not already within `pkgs/by-name` like
+                    Some(ref rel_path) if config.by_name_dirs.iter().any(|base| rel_path.starts_with(base.path.as_str())) => {
+                        // ..the path is not already within a `by-name` directory like
                         //
                         //   foo-variant = callPackage ../by-name/fo/foo/package.nix {
                         //     someFlag = true;
                         //   }
                         //
-                        // While such definitions could be moved to `pkgs/by-name` by using
+                        // While such definitions could be moved to a `by-name` directory by using
                         // `.override { someFlag = true; }` instead, this changes the semantics in
                         // relation with overlays, so migration is generally not possible.
                         //
@@ -561,7 +571,7 @@ fn handle_non_by_name_attribute(
                         NonApplicable
                     }
                     _ => {
-                        // Otherwise, the path is outside `pkgs/by-name`, which means it can be
+                        // Otherwise, the path is outside a `by-name` directory, which means it can be
                         // migrated.
                         Loose((syntactic_call_package, location.file))
                     }
@@ -575,7 +585,7 @@ fn handle_non_by_name_attribute(
     };
     Ok(Success(ratchet::Package {
         // Packages being checked in this function _always_ need a manual definition, because
-        // they're not using `pkgs/by-name` which would allow avoiding it. So instead of repeating
+        // they're not using a `by-name` directory which would allow avoiding it. So instead of repeating
         // ourselves all the time to define `manual_definition`, just set it once at the end here.
         manual_definition: Tight,
         uses_by_name,
