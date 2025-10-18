@@ -1,4 +1,4 @@
-- Because pkgs/by-name/a/a exists, the attribute `pkgs.a` must be defined like
+- Because pkgs/by-name/a/a exists, the attribute `a` must be defined like
 
     a = callPackage ./../by-name/a/a/package.nix { /* ... */ };
 
@@ -8,12 +8,12 @@
 
   Such a definition is provided automatically and therefore not necessary. Please remove it.
 
-- Attribute `pkgs.b` is a new top-level package using `pkgs.callPackage ... { /* ... */ }`.
+- Attribute `b` is a new top-level package using `callPackage ... { /* ... */ }`.
   Please define it in pkgs/by-name/b/b/package.nix instead.
   See `pkgs/by-name/README.md` for more details.
   Since the second `callPackage` argument is `{ }`, no manual `callPackage` in pkgs/top-level/all-packages.nix is needed anymore.
 
-- Because pkgs/by-name/c/c exists, the attribute `pkgs.c` must be defined like
+- Because pkgs/by-name/c/c exists, the attribute `c` must be defined like
 
     c = callPackage ./../by-name/c/c/package.nix { /* ... */ };
 
@@ -23,7 +23,7 @@
 
   Such a definition is provided automatically and therefore not necessary. Please remove it.
 
-- Attribute `pkgs.d` is a new top-level package using `pkgs.callPackage ... { /* ... */ }`.
+- Attribute `d` is a new top-level package using `callPackage ... { /* ... */ }`.
   Please define it in pkgs/by-name/d/d/package.nix instead.
   See `pkgs/by-name/README.md` for more details.
   Since the second `callPackage` argument is `{ }`, no manual `callPackage` in pkgs/top-level/all-packages.nix is needed anymore.

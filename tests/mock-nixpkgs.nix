@@ -10,15 +10,17 @@
 
   It returns a Nixpkgs-like function that can be auto-called and evaluates to an attribute set.
 */
-{ root }:
+{
+  root,
+}:
 # The arguments for the Nixpkgs function
 {
   # Passed by the checker to modify `callPackage`
   overlays ? [ ],
   # Passed by the checker to make sure a real Nixpkgs isn't influenced by impurities
   config ? { },
-  # Passed by the checker to make sure a real Nixpkgs isn't influenced by impurities
-  system ? null,
+  byNameConfig,
+  ...
 }:
 let
 
@@ -46,13 +48,39 @@ let
       };
     };
 
-  baseDirectory = root + "/pkgs/by-name";
-
-  # Generates { <name> = <file>; } entries mapping package names to their `package.nix` files in `pkgs/by-name`.
-  # Could be more efficient, but this is only for testing.
-  autoCalledPackageFiles =
+  byNameDirs =
     let
-      entries = builtins.readDir baseDirectory;
+      mapped = map (dir: {
+        inherit dir;
+        path = lib.concatStrings [
+          (builtins.toString root)
+          "/"
+          dir.path
+        ];
+      }) byNameConfig.by_name_dirs;
+      filtered = builtins.filter ({ path, ... }: lib.pathIsDirectory path) mapped;
+    in
+    map (elem: elem.dir) filtered;
+  # (builtins.trace (builtins.deepSeq mapped mapped) mapped);
+
+  # Generates { <name> = <file>; } entries mapping package names to their `package.nix` files in their `by-name` directory.
+  # Could be more efficient, but this is only for testing.
+  autoCalledPackageFilesForByNameDir =
+    byNameDir:
+    let
+      entries = builtins.readDir (
+        builtins.trace
+          (lib.concatStringsSep "/" [
+            (builtins.toString root)
+            byNameDir.path
+          ])
+          (
+            lib.concatStringsSep "/" [
+              (builtins.toString root)
+              byNameDir.path
+            ]
+          )
+      );
 
       namesForShard =
         shard:
@@ -60,21 +88,58 @@ let
           # Only README.md is allowed to be a file, but it's not this code's job to check for that
           { }
         else
-          builtins.mapAttrs (name: _: baseDirectory + "/${shard}/${name}/package.nix") (
-            builtins.readDir (baseDirectory + "/${shard}")
-          );
+          let
+            fileNames = builtins.attrNames (
+              builtins.readDir (
+                lib.concatStringsSep "/" [
+                  (builtins.toString root)
+                  byNameDir.path
+                  shard
+                ]
+              )
+            );
+            fileNameToAttrPath =
+              name:
+              if byNameDir.unversioned_attr_prefix != "" then
+                [
+                  byNameDir.unversioned_attr_prefix
+                  name
+                ]
+              else
+                [ name ];
+            attrSetList = map (
+              fileName:
+              lib.setAttrByPath (fileNameToAttrPath fileName) (
+                lib.concatStringsSep "/" [
+                  (builtins.toString root)
+                  byNameDir.path
+                  shard
+                  fileName
+                  "package.nix"
+                ]
+              )
+            ) fileNames;
+            merged = lib.mergeAttrsList attrSetList;
+          in
+          merged;
     in
     builtins.foldl' (acc: el: acc // el) { } (map namesForShard (builtins.attrNames entries));
-
   # Turns autoCalledPackageFiles into an overlay that `callPackage`'s all of them
   autoCalledPackages =
     self: super:
     {
       # Needed to be able to detect empty arguments in all-packages.nix
       # See a more detailed description in pkgs/top-level/by-name-overlay.nix
-      _internalCallByNamePackageFile = file: self.callPackage file { };
+      _internalCallByNamePackageFile =
+        file:
+        self.callPackage (builtins.trace "file at mock:85: ${builtins.toString file}" (
+          builtins.toString file
+        )) { };
+      # _internalCallByNamePackageFile = file: self.callPackage file { };
     }
-    // builtins.mapAttrs (name: self._internalCallByNamePackageFile) autoCalledPackageFiles;
+    // lib.mapAttrsRecursiveCond (as: !(as ? "type" && as.type == "derivation")) (
+      name: self._internalCallByNamePackageFile
+    ) (lib.mergeAttrsList (map autoCalledPackageFilesForByNameDir byNameDirs));
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
   optionalAllPackagesOverlay =
@@ -101,6 +166,7 @@ let
 
   # Apply all the overlays in order to the base fixed-point function pkgsFun
   f = builtins.foldl' (f: overlay: lib.extends overlay f) pkgsFun allOverlays;
+  # fixf = lib.fix f;
 in
 # Evaluate the fixed-point
 lib.fix f

@@ -120,6 +120,7 @@ fn pass_through_environment_variables_for_nix_eval_in_nix_build(command: &mut pr
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     _work_dir_path: &Path,
     command: &mut process::Command,
+    _config_file_path: &PathBuf,
 ) -> anyhow::Result<()> {
     command.arg("--show-trace");
 
@@ -131,10 +132,15 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     work_dir_path: &Path,
     command: &mut process::Command,
+    config_file_path: &PathBuf,
 ) -> anyhow::Result<()> {
+    println!("work dir path: {work_dir_path:?}");
     const MOCK_NIXPKGS: &[u8] = include_bytes!("../tests/mock-nixpkgs.nix");
     let mock_nixpkgs_path = work_dir_path.join("mock-nixpkgs.nix");
     fs::write(&mock_nixpkgs_path, MOCK_NIXPKGS)?;
+
+    let test_config_file_path = work_dir_path.join("by-name-config.json");
+    fs::write(&test_config_file_path, fs::read(&config_file_path)?)?;
 
     // Wire it up so that it can be imported as `import <test-nixpkgs> { }`.
     command.arg("-I");
@@ -147,6 +153,12 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
     command.arg("-I");
     command.arg(format!("test-nixpkgs/lib={nixpkgs_lib}"));
 
+    command.arg("--argstr");
+    command.arg("configPath");
+    command.arg(test_config_file_path);
+
+    command.arg("--show-trace");
+
     Ok(())
 }
 
@@ -158,7 +170,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    package_names: &[String],
+    packages: &[(String, String)],
     by_name_dir: &ByNameDir,
     config: &Config,
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
@@ -170,14 +182,34 @@ pub fn check_values(
     // Canonicalize the path so that if a symlink were returned, we wouldn't ask Nix to follow it.
     let work_dir_path = work_dir.path().canonicalize()?;
 
-    println!("package_names: {}", package_names.join(", "));
+    println!(
+        "package_names: {}",
+        packages
+            .iter()
+            .map(|x| x.0.to_owned())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     // Write the list of packages we need to check into a temporary JSON file.
     let package_names_path = work_dir_path.join("package-names.json");
     let package_names_file = fs::File::create(&package_names_path)?;
-    serde_json::to_writer(&package_names_file, &package_names).with_context(|| {
+    serde_json::to_writer(
+        &package_names_file,
+        &packages.iter().map(|x| x.1.to_owned()).collect::<Vec<_>>(),
+    )
+    .with_context(|| {
         format!(
             "Failed to serialise the package names to the work dir {}",
+            work_dir_path.display()
+        )
+    })?;
+
+    let config_file_path = work_dir_path.join("by-name-config.json");
+    let config_file = fs::File::create(&config_file_path)?;
+    serde_json::to_writer(&config_file, &config).with_context(|| {
+        format!(
+            "Failed to serialise the config file to the work dir {}",
             work_dir_path.display()
         )
     })?;
@@ -217,7 +249,7 @@ pub fn check_values(
         .arg(nixpkgs_path);
 
     pass_through_environment_variables_for_nix_eval_in_nix_build(&mut command);
-    mutate_nix_instatiate_arguments_based_on_cfg(&work_dir_path, &mut command)?;
+    mutate_nix_instatiate_arguments_based_on_cfg(&work_dir_path, &mut command, &config_file_path)?;
 
     command.arg(eval_nix_path);
 
@@ -234,8 +266,17 @@ pub fn check_values(
         .into());
     }
 
+    println!(
+        "result (stdout): {}",
+        String::from_utf8_lossy(&result.stdout)
+    );
+    println!(
+        "result (stderr): {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
     // Parse the resulting JSON value
-    let attributes: Vec<(String, Attribute)> = serde_json::from_slice(&result.stdout)
+    let attributes: Vec<(Vec<String>, Attribute)> = serde_json::from_slice(&result.stdout)
         .with_context(|| {
             format!(
                 "Failed to deserialise {}",
@@ -251,7 +292,7 @@ pub fn check_values(
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
-                        &attribute_name,
+                        &attribute_name.join("."),
                         non_by_name_attribute,
                         config,
                         by_name_dir,
@@ -259,7 +300,7 @@ pub fn check_values(
                     Attribute::ByName(by_name_attribute) => by_name(
                         nix_file_store,
                         nixpkgs_path,
-                        &attribute_name,
+                        &attribute_name.join("."),
                         by_name_attribute,
                         config,
                         by_name_dir,
@@ -270,7 +311,13 @@ pub fn check_values(
             .collect_vec()?,
     );
 
-    Ok(check_result.map(|elems| elems.into_iter().collect()))
+    Ok(check_result.map(|elems| {
+        elems
+            .into_iter()
+            .map(|(attribute_name, package)| (attribute_name.join("."), package))
+            .into_iter()
+            .collect()
+    }))
 }
 
 /// Handle the evaluation result for an attribute in a `by-name` directory, making it a validation result.

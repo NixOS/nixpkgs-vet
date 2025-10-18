@@ -1,4 +1,4 @@
-- Because pkgs/by-name/fo/foo exists, the attribute `pkgs.foo` must be defined like
+- Because pkgs/by-name/fo/foo exists, the attribute `foo` must be defined like
 
     foo = callPackage ./../by-name/fo/foo/package.nix { /* ... */ };
 

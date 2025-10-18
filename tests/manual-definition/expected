@@ -1,4 +1,4 @@
-- Because pkgs/by-name/no/noEval exists, the attribute `pkgs.noEval` must be defined like
+- Because pkgs/by-name/no/noEval exists, the attribute `noEval` must be defined like
 
     noEval = callPackage ./../by-name/no/noEval/package.nix { /* ... */ };
 
@@ -8,7 +8,7 @@
 
   Such a definition is provided automatically and therefore not necessary. Please remove it.
 
-- Because pkgs/by-name/on/onlyMove exists, the attribute `pkgs.onlyMove` must be defined like
+- Because pkgs/by-name/on/onlyMove exists, the attribute `onlyMove` must be defined like
 
     onlyMove = callPackage ./../by-name/on/onlyMove/package.nix { /* ... */ };
 

@@ -6,7 +6,7 @@ use anyhow::Context;
 use itertools::{concat, process_results};
 use regex::Regex;
 use relative_path::{RelativePath, RelativePathBuf};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::problem::{npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_143, npv_144};
 use crate::references;
@@ -20,16 +20,16 @@ static SHARD_NAME_REGEX: LazyLock<Regex> =
 static PACKAGE_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap());
 
-#[derive(Deserialize, Debug)]
-struct DeserializedByNameDir {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct SerializableByNameDir {
     path: String,
     attr_path_regex: String,
     unversioned_attr_prefix: String,
 }
 
-#[derive(Deserialize, Debug)]
-struct DeserializedConfig {
-    by_name_dirs: Vec<DeserializedByNameDir>,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct SerializableConfig {
+    by_name_dirs: Vec<SerializableByNameDir>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,14 +39,31 @@ pub struct ByNameDir {
     pub unversioned_attr_prefix: String,
 }
 
+#[derive(Deserialize, Serialize, Clone)]
+#[readonly::make]
 pub struct Config {
+    #[serde(skip)]
     pub by_name_dirs: Vec<ByNameDir>,
+    #[serde(flatten)]
+    serialized: SerializableConfig,
 }
+
+// impl Into<SerializableConfig> for Config {
+//     fn into(self) -> SerializableConfig {
+//         self.serialized
+//     }
+// }
+
+// impl Serialize for Config {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+//         Ok(self.serialized.into())
+//     }
+// }
 
 pub fn read_config(config_file: &Path) -> Config {
     let config_file_contents = read(config_file);
     println!("config file path {}", config_file.to_string_lossy());
-    let config: DeserializedConfig = serde_json::from_slice(
+    let config: SerializableConfig = serde_json::from_slice(
         config_file_contents
             .with_context(|| format!("Config file {}", config_file.display()))
             .unwrap()
@@ -66,7 +83,10 @@ pub fn read_config(config_file: &Path) -> Config {
         })
         .collect();
 
-    Config { by_name_dirs }
+    Config {
+        by_name_dirs: by_name_dirs,
+        serialized: config,
+    }
 }
 
 /// Deterministic file listing so that tests are reproducible.
@@ -133,7 +153,7 @@ pub fn check_structure(
     path: &Path,
     nix_file_store: &mut NixFileStore,
     by_name_dir: &ByNameDir,
-) -> validation::Result<Vec<String>> {
+) -> validation::Result<Vec<(String, String)>> {
     let base_dir = path.join(by_name_dir.path.as_str());
 
     let shard_results = read_dir_sorted(&base_dir)?
@@ -205,7 +225,11 @@ pub fn check_structure(
                 .to_owned(),
             validation::Validation::Success(ref foo) => foo
                 .iter()
-                .fold("".to_string(), |acc, elem| (acc + " " + &elem.to_string()))
+                .fold("".to_string(), |acc, (package_name, attr_name)| (acc
+                    + &format!(
+                        " (package_name: {}; attr_name: {})",
+                        package_name, attr_name
+                    )))
                 .to_owned(),
         }
     );
@@ -220,7 +244,7 @@ fn check_package(
     shard_name_valid: bool,
     package_entry: &DirEntry,
     by_name_dir: &ByNameDir,
-) -> validation::Result<String> {
+) -> validation::Result<(String, String)> {
     let package_path = package_entry.path();
     let package_name = package_entry.file_name().to_string_lossy().into_owned();
     let relative_package_dir = by_name_dir.path.join(shard_name).join(&package_name);
@@ -274,8 +298,13 @@ fn check_package(
             &relative_package_dir.to_path(path),
         )?);
 
-        // let attr_path_prefix = &by_name_dir.unversioned_attr_prefix;
+        let attr_path_prefix = if &by_name_dir.unversioned_attr_prefix != "" {
+            by_name_dir.unversioned_attr_prefix.to_owned() + "."
+        } else {
+            "".to_string()
+        };
+        let attr_name = attr_path_prefix + &package_name;
         // result.map(|_| attr_path_prefix.to_owned() + "." + &package_name)
-        result.map(|_| package_name)
+        result.map(|_| (package_name, attr_name))
     })
 }

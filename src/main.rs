@@ -81,11 +81,9 @@ fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status 
     thread::scope(|s| {
         let mut threads: Vec<ScopedJoinHandle<Status>> = vec![];
         for dir in by_name_dirs {
-            if dir.path != "pkgs/by-name" {
-                let new_thread =
-                    s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config));
-                threads.push(new_thread);
-            }
+            let new_thread =
+                s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config));
+            threads.push(new_thread);
         }
         for thread in threads {
             thread_results.push(thread.join().unwrap())
