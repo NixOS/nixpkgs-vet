@@ -6,15 +6,15 @@ use anyhow::Context;
 use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
-use crate::NixFileStore;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::structure::{self, Config};
+use crate::structure::{self, ByNameDir, Config};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
+use crate::NixFileStore;
 use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
@@ -159,6 +159,7 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
+    by_name_dir: &ByNameDir,
     config: &Config,
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
@@ -168,6 +169,8 @@ pub fn check_values(
 
     // Canonicalize the path so that if a symlink were returned, we wouldn't ask Nix to follow it.
     let work_dir_path = work_dir.path().canonicalize()?;
+
+    println!("package_names: {}", package_names.join(", "));
 
     // Write the list of packages we need to check into a temporary JSON file.
     let package_names_path = work_dir_path.join("package-names.json");
@@ -224,7 +227,11 @@ pub fn check_values(
 
     if !result.status.success() {
         // Early return in case evaluation fails
-        return Ok(npv_120::NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
+        return Ok(npv_120::NixEvalError::new(
+            String::from_utf8_lossy(&result.stderr),
+            by_name_dir.clone(),
+        )
+        .into());
     }
 
     // Parse the resulting JSON value
@@ -247,6 +254,7 @@ pub fn check_values(
                         &attribute_name,
                         non_by_name_attribute,
                         config,
+                        by_name_dir,
                     )?,
                     Attribute::ByName(by_name_attribute) => by_name(
                         nix_file_store,
@@ -254,6 +262,7 @@ pub fn check_values(
                         &attribute_name,
                         by_name_attribute,
                         config,
+                        by_name_dir,
                     )?,
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
@@ -271,8 +280,10 @@ fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
     config: &Config,
+    by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
-    // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.  This match
+    println!("attribute_name: {attribute_name}");
+    // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exist.  This match
     // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
     // definition could be removed.
     let manual_definition_result = match by_name_attribute {
@@ -280,7 +291,7 @@ fn by_name(
         ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically define attributes in a `by-name` directory
-            npv_100::ByNameUndefinedAttribute::new(attribute_name).into()
+            npv_100::ByNameUndefinedAttribute::new(attribute_name, by_name_dir.clone()).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -294,7 +305,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            npv_101::ByNameNonDerivation::new(attribute_name).into()
+            npv_101::ByNameNonDerivation::new(attribute_name, by_name_dir.clone()).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -310,7 +321,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                npv_101::ByNameNonDerivation::new(attribute_name).into()
+                npv_101::ByNameNonDerivation::new(attribute_name, by_name_dir.clone()).into()
             };
 
             // If the definition looks correct
@@ -366,6 +377,7 @@ fn by_name(
                             definition,
                             location,
                             config,
+                            by_name_dir,
                         )
                     } else {
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
@@ -401,6 +413,7 @@ fn by_name_override(
     definition: String,
     location: location::Location,
     config: &Config,
+    by_name_dir: &ByNameDir,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
     let Some(syntactic_call_package) = optional_syntactic_call_package else {
         // Something like `<attr> = foo`
@@ -408,6 +421,7 @@ fn by_name_override(
             attribute_name,
             location,
             definition,
+            by_name_dir.clone(),
         )
         .into();
     };
@@ -418,13 +432,19 @@ fn by_name_override(
             attribute_name,
             location,
             definition,
+            by_name_dir.clone(),
         )
         .into();
     }
 
     let Some(actual_package_path) = syntactic_call_package.relative_path else {
-        return npv_108::ByNameOverrideContainsEmptyPath::new(attribute_name, location, definition)
-            .into();
+        return npv_108::ByNameOverrideContainsEmptyPath::new(
+            attribute_name,
+            location,
+            definition,
+            by_name_dir.clone(),
+        )
+        .into();
     };
 
     let expected_by_name_dir = structure::expected_by_name_dir_for_package(attribute_name, config);
@@ -436,6 +456,7 @@ fn by_name_override(
             attribute_name,
             actual_package_path,
             location,
+            by_name_dir.clone(),
         )
         .into();
     }
@@ -444,8 +465,13 @@ fn by_name_override(
     // continue to be allowed. This is the state to migrate away from.
     if syntactic_call_package.empty_arg {
         Success(Loose(
-            npv_107::ByNameOverrideContainsEmptyArgument::new(attribute_name, location, definition)
-                .into(),
+            npv_107::ByNameOverrideContainsEmptyArgument::new(
+                attribute_name,
+                location,
+                definition,
+                by_name_dir.clone(),
+            )
+            .into(),
         ))
     } else {
         // This is the state to migrate to.
@@ -461,9 +487,10 @@ fn handle_non_by_name_attribute(
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
     config: &Config,
+    by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
-    use NonByNameAttribute::EvalSuccess;
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
+    use NonByNameAttribute::EvalSuccess;
 
     // The ratchet state whether this attribute uses a `by-name` directory
     //
@@ -573,7 +600,7 @@ fn handle_non_by_name_attribute(
                     _ => {
                         // Otherwise, the path is outside a `by-name` directory, which means it can be
                         // migrated.
-                        Loose((syntactic_call_package, location.file))
+                        Loose((syntactic_call_package, location.file, by_name_dir.to_owned()))
                     }
                 }
             }

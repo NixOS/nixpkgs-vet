@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163};
+use crate::problem::{npv_160, npv_161, npv_162, npv_163, Problem};
+use crate::structure::ByNameDir;
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -160,32 +161,44 @@ impl ToProblem for ManualDefinition {
 pub enum UsesByName {}
 
 impl ToProblem for UsesByName {
-    type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
+    type ToContext = (CallPackageArgumentInfo, RelativePathBuf, ByNameDir);
 
-    fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
+    fn to_problem(
+        name: &str,
+        optional_from: Option<()>,
+        (to, file, by_name_dir): &Self::ToContext,
+    ) -> Problem {
         let is_new = optional_from.is_none();
         let is_empty = to.empty_arg;
         match (is_new, is_empty) {
-            (false, true) => {
-                npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
+            (false, true) => npv_160::TopLevelPackageMovedOutOfByName::new(
+                name,
+                to.relative_path.clone(),
+                file,
+                by_name_dir.clone(),
+            )
+            .into(),
             // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
             // for custom arguments.
             (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
                 name,
                 to.relative_path.clone(),
                 file,
+                by_name_dir.clone(),
             )
             .into(),
-            (true, true) => {
-                npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
+            (true, true) => npv_162::NewTopLevelPackageShouldBeByName::new(
+                name,
+                to.relative_path.clone(),
+                file,
+                by_name_dir.clone(),
+            )
+            .into(),
             (true, false) => npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
                 name,
                 to.relative_path.clone(),
                 file,
+                by_name_dir.clone(),
             )
             .into(),
         }

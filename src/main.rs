@@ -22,7 +22,6 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
-use relative_path::{RelativePath, RelativePathBuf};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -32,7 +31,7 @@ use std::{panic, thread};
 use crate::nix_file::NixFileStore;
 use crate::problem::Problem;
 use crate::status::{ColoredStatus, Status};
-use crate::structure::{Config, check_structure, read_config};
+use crate::structure::{check_structure, read_config, ByNameDir, Config};
 use crate::validation::Validation::{Failure, Success};
 
 /// Program to check the validity of pkgs/by-name
@@ -77,15 +76,16 @@ fn main() -> ExitCode {
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
 fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status {
-    let by_name_dir_paths: Vec<RelativePathBuf> =
-        config.by_name_dirs.iter().map(|x| x.path.clone()).collect();
+    let by_name_dirs: &Vec<ByNameDir> = &config.by_name_dirs;
     let mut thread_results: Vec<Status> = vec![];
     thread::scope(|s| {
         let mut threads: Vec<ScopedJoinHandle<Status>> = vec![];
-        for path in by_name_dir_paths {
-            let new_thread =
-                s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, &path, config));
-            threads.push(new_thread);
+        for dir in by_name_dirs {
+            if dir.path != "pkgs/by-name" {
+                let new_thread =
+                    s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config));
+                threads.push(new_thread);
+            }
         }
         for thread in threads {
             thread_results.push(thread.join().unwrap())
@@ -158,7 +158,7 @@ fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status 
 fn process_by_name_dir(
     base_nixpkgs: &Path,
     main_nixpkgs: &Path,
-    by_name_dir: &RelativePath,
+    by_name_dir: &ByNameDir,
     config: &Config,
 ) -> Status {
     let (main_result, base_result) = thread::scope(|s| {
@@ -206,7 +206,7 @@ fn process_by_name_dir(
 /// ratchet check against another result.
 fn check_nixpkgs(
     nixpkgs_path: &Path,
-    by_name_subpath: &RelativePath,
+    by_name_dir: &ByNameDir,
     config: &Config,
 ) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
@@ -219,15 +219,21 @@ fn check_nixpkgs(
     let mut nix_file_store = NixFileStore::default();
 
     let package_result = {
-        if !nixpkgs_path.join(by_name_subpath.as_str()).exists() {
+        if !nixpkgs_path.join(by_name_dir.path.as_str()).exists() {
             // No pkgs/by-name directory, always valid
             Success(BTreeMap::new())
         } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store, by_name_subpath)?;
+            let structure = check_structure(&nixpkgs_path, &mut nix_file_store, by_name_dir)?;
 
             // Only if we could successfully parse the structure, we do the evaluation checks
             structure.result_map(|package_names| {
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice(), config)
+                eval::check_values(
+                    &nixpkgs_path,
+                    &mut nix_file_store,
+                    package_names.as_slice(),
+                    by_name_dir,
+                    config,
+                )
             })?
         }
     };
@@ -249,7 +255,7 @@ mod tests {
 
     use anyhow::Context;
     use pretty_assertions::StrComparison;
-    use tempfile::{TempDir, tempdir_in};
+    use tempfile::{tempdir_in, TempDir};
 
     use crate::structure;
 
@@ -369,7 +375,7 @@ mod tests {
             process(
                 &base_nixpkgs,
                 &main_path,
-                &structure::read_config(Path::new("by-name-config.json")),
+                &structure::read_config(Path::new("by-name-config-generated.json")),
             )
         });
 

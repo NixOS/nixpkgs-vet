@@ -13,7 +13,7 @@ impl fmt::Display for ByNameInternalCallPackageUsed {
         let Self { attribute_name } = self;
         write!(
             f,
-            "- pkgs.{attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
+            "- {attribute_name}: This attribute is defined using `_internalCallByNamePackageFile`, which is an internal function not intended for manual use.",
         )
     }
 }

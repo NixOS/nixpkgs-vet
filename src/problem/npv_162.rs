@@ -2,9 +2,9 @@ use std::fmt;
 
 use derive_new::new;
 use indoc::writedoc;
-use relative_path::{RelativePath, RelativePathBuf};
+use relative_path::RelativePathBuf;
 
-use crate::structure;
+use crate::structure::{self, ByNameDir};
 
 #[derive(Clone, new, Debug)]
 pub struct NewTopLevelPackageShouldBeByName {
@@ -14,6 +14,7 @@ pub struct NewTopLevelPackageShouldBeByName {
     call_package_path: Option<RelativePathBuf>,
     #[new(into)]
     file: RelativePathBuf,
+    by_name_dir: ByNameDir,
 }
 
 impl fmt::Display for NewTopLevelPackageShouldBeByName {
@@ -22,16 +23,17 @@ impl fmt::Display for NewTopLevelPackageShouldBeByName {
             package_name,
             call_package_path,
             file,
+            by_name_dir,
         } = self;
         let relative_package_file =
-            structure::relative_file_for_package(package_name, RelativePath::new("pkgs/by-name"));
+            structure::relative_file_for_package(package_name, &by_name_dir.path);
         let call_package_arg = call_package_path
             .as_ref()
             .map_or_else(|| "...".into(), |path| format!("./{}", path));
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+            - Attribute `{package_name}` is a new top-level package using `callPackage {call_package_arg} {{ /* ... */ }}`.
               Please define it in {relative_package_file} instead.
               See `pkgs/by-name/README.md` for more details.
               Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.

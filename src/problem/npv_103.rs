@@ -13,7 +13,7 @@ impl fmt::Display for ByNameCannotDetermineAttributeLocation {
         let Self { attribute_name } = self;
         write!(
             f,
-            "- pkgs.{attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
+            "- {attribute_name}: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`.",
         )
     }
 }

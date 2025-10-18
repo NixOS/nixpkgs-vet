@@ -2,10 +2,10 @@ use std::fmt;
 
 use derive_new::new;
 use indoc::writedoc;
-use relative_path::{RelativePath, RelativePathBuf};
+use relative_path::RelativePathBuf;
 
 use crate::location::Location;
-use crate::structure;
+use crate::structure::{self, ByNameDir};
 
 use super::create_path_expr;
 
@@ -16,6 +16,7 @@ pub struct ByNameOverrideContainsWrongCallPackagePath {
     #[new(into)]
     actual_path: RelativePathBuf,
     location: Location,
+    by_name_dir: ByNameDir,
 }
 
 impl fmt::Display for ByNameOverrideContainsWrongCallPackagePath {
@@ -24,18 +25,19 @@ impl fmt::Display for ByNameOverrideContainsWrongCallPackagePath {
             package_name,
             location,
             actual_path,
+            by_name_dir,
         } = self;
         let Location { file, line, .. } = location;
         let expected_package_path =
-            structure::relative_file_for_package(package_name, RelativePath::new("pkgs/by-name"));
+            structure::relative_file_for_package(package_name, &by_name_dir.path);
         let expected_path_expr = create_path_expr(file, expected_package_path);
         let relative_package_dir =
-            structure::relative_dir_for_package(package_name, RelativePath::new("pkgs/by-name"));
+            structure::relative_dir_for_package(package_name, &by_name_dir.path);
         let actual_path_expr = create_path_expr(file, actual_path);
         writedoc!(
             f,
             "
-            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+            - Because {relative_package_dir} exists, the attribute `{package_name}` must be defined like
 
                 {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 

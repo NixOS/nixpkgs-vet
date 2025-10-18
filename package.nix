@@ -50,6 +50,10 @@ rustPlatform.buildRustPackage {
   env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
   env.NIXPKGS_VET_NIXPKGS_LIB = "${path}/lib";
 
+  postBuild = ''
+    nix-instantiate --eval --json --strict ${./by-name-config.nix} > by-name-config-generated.json
+  '';
+
   checkPhase = ''
     # This path will be symlinked to the current version that is being tested
     nixPackage=$(mktemp -d)/nix
@@ -59,8 +63,6 @@ rustPlatform.buildRustPackage {
 
     # This is what nixpkgs-vet uses
     export NIXPKGS_VET_NIX_PACKAGE=$nixPackage
-
-    cp ${./by-name-config.json} by-name-config.json
 
     ${lib.concatMapStringsSep "\n" (nix: ''
       ln -s ${lib.getBin nix} "$nixPackage"
