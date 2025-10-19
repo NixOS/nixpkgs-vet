@@ -120,7 +120,7 @@ fn pass_through_environment_variables_for_nix_eval_in_nix_build(command: &mut pr
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     _work_dir_path: &Path,
     command: &mut process::Command,
-    _config_file_path: &PathBuf,
+    _config_file_path: &Path,
 ) -> anyhow::Result<()> {
     command.arg("--show-trace");
 
@@ -132,15 +132,15 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     work_dir_path: &Path,
     command: &mut process::Command,
-    config_file_path: &PathBuf,
+    config_file_path: &Path,
 ) -> anyhow::Result<()> {
-    println!("{}:{}: work dir path: {work_dir_path:?}",file!(), line!());
+    println!("{}:{}: work dir path: {work_dir_path:?}", file!(), line!());
     const MOCK_NIXPKGS: &[u8] = include_bytes!("../tests/mock-nixpkgs.nix");
     let mock_nixpkgs_path = work_dir_path.join("mock-nixpkgs.nix");
     fs::write(&mock_nixpkgs_path, MOCK_NIXPKGS)?;
 
     let test_config_file_path = work_dir_path.join("by-name-config.json");
-    fs::write(&test_config_file_path, fs::read(&config_file_path)?)?;
+    fs::write(&test_config_file_path, fs::read(config_file_path)?)?;
 
     // Wire it up so that it can be imported as `import <test-nixpkgs> { }`.
     command.arg("-I");
@@ -188,7 +188,8 @@ pub fn check_values(
 
     println!(
         "{}:{}: package_names for {full_path}: {}",
-        file!(), line!(),
+        file!(),
+        line!(),
         packages
             .iter()
             .map(|x| x.0.to_owned())
@@ -261,27 +262,28 @@ pub fn check_values(
     let result = command
         .output()
         .with_context(|| format!("Failed to run command {command:?}"))?;
-        
+
     println!(
         "{}:{}: result for {full_path} (stdout): {}",
-        file!(), line!(),
+        file!(),
+        line!(),
         String::from_utf8(result.stdout.clone()).unwrap(),
     );
     println!(
         "{}:{}: result for {full_path} (stderr): {}",
-        file!(), line!(),
+        file!(),
+        line!(),
         String::from_utf8(result.stderr.clone()).unwrap(),
     );
 
     if !result.status.success() {
-        println!("{}:{}: : eval failed for {full_path}" , file!(), line!());
+        println!("{}:{}: : eval failed for {full_path}", file!(), line!());
         // Early return in case evaluation fails
-        let foo =  Ok(npv_120::NixEvalError::new(
+        return Ok(npv_120::NixEvalError::new(
             String::from_utf8_lossy(&result.stderr),
             by_name_dir.clone(),
         )
         .into());
-        return foo
     }
 
     // Parse the resulting JSON value
@@ -297,7 +299,7 @@ pub fn check_values(
         attributes
             .into_iter()
             .map(|(attribute_name, attribute_value)| {
-                println!("{}:{}: : attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
+                println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
@@ -325,7 +327,6 @@ pub fn check_values(
         elems
             .into_iter()
             .map(|(attribute_name, package)| (attribute_name.join("."), package))
-            .into_iter()
             .collect()
     }))
 }
@@ -339,7 +340,11 @@ fn by_name(
     config: &Config,
     by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
-    println!("{}:{}:  attribute_name: {attribute_name}; by_name_attribute: {by_name_attribute:?}", file!(), line!());
+    println!(
+        "{}:{}:  attribute_name: {attribute_name}; by_name_attribute: {by_name_attribute:?}",
+        file!(),
+        line!()
+    );
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exist.  This match
     // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
     // definition could be removed.
@@ -526,7 +531,11 @@ fn by_name_override(
     // Manual definitions with empty arguments are not allowed anymore, but existing ones should
     // continue to be allowed. This is the state to migrate away from.
     if syntactic_call_package.empty_arg {
-        println!("{}:{}: : here; attribute_name: {attribute_name}", file!(), line!());
+        println!(
+            "{}:{}: : here; attribute_name: {attribute_name}",
+            file!(),
+            line!()
+        );
         Success(Loose(
             npv_107::ByNameOverrideContainsEmptyArgument::new(
                 attribute_name,
@@ -554,7 +563,7 @@ fn handle_non_by_name_attribute(
 ) -> validation::Result<ratchet::Package> {
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
     use NonByNameAttribute::EvalSuccess;
-    println!("{}:{}: : attribute_name: {attribute_name}", file!(), line!());
+    println!("{}:{}: attribute_name: {attribute_name}", file!(), line!());
 
     // The ratchet state whether this attribute uses a `by-name` directory
     //

@@ -41,6 +41,7 @@ rustPlatform.buildRustPackage {
 
   nativeBuildInputs = [
     clippy
+    nix
     makeWrapper
   ];
 
@@ -51,6 +52,7 @@ rustPlatform.buildRustPackage {
   env.NIXPKGS_VET_NIXPKGS_LIB = "${path}/lib";
 
   postBuild = ''
+    ${initNix}
     nix-instantiate --eval --json --strict ${./by-name-config.nix} > by-name-config-generated.json
   '';
 

@@ -48,21 +48,14 @@ pub struct Config {
     serialized: SerializableConfig,
 }
 
-// impl Into<SerializableConfig> for Config {
-//     fn into(self) -> SerializableConfig {
-//         self.serialized
-//     }
-// }
-
-// impl Serialize for Config {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-//         Ok(self.serialized.into())
-//     }
-// }
-
 pub fn read_config(config_file: &Path) -> Config {
     let config_file_contents = read(config_file);
-    println!("{}:{}: config file path {}", file!(), line!(), config_file.to_string_lossy());
+    println!(
+        "{}:{}: config file path {}",
+        file!(),
+        line!(),
+        config_file.to_string_lossy()
+    );
     let config: SerializableConfig = serde_json::from_slice(
         config_file_contents
             .with_context(|| format!("Config file {}", config_file.display()))
@@ -84,7 +77,7 @@ pub fn read_config(config_file: &Path) -> Config {
         .collect();
 
     Config {
-        by_name_dirs: by_name_dirs,
+        by_name_dirs,
         serialized: config,
     }
 }
@@ -215,25 +208,25 @@ pub fn check_structure(
         .collect_vec()?;
 
     let retval = validation::sequence(shard_results).map(concat);
-    println!(
-        "{}:{}: (check_structure): Path: {}; results: {}",
-        file!(), line!(),
-        by_name_dir.path.as_str(),
-        match retval {
-            validation::Validation::Failure(ref foo) => foo
-                .iter()
-                .fold("".to_string(), |acc, elem| (acc + " " + &elem.to_string()))
-                .to_owned(),
-            validation::Validation::Success(ref foo) => foo
-                .iter()
-                .fold("".to_string(), |acc, (package_name, attr_name)| (acc
-                    + &format!(
-                        " (package_name: {}; attr_name: {})",
-                        package_name, attr_name
-                    )))
-                .to_owned(),
-        }
-    );
+    // println!(
+    //     "{}:{}: (check_structure): Path: {}; results: {}",
+    //     file!(), line!(),
+    //     by_name_dir.path.as_str(),
+    //     match retval {
+    //         validation::Validation::Failure(ref foo) => foo
+    //             .iter()
+    //             .fold("".to_string(), |acc, elem| (acc + " " + &elem.to_string()))
+    //             .to_owned(),
+    //         validation::Validation::Success(ref foo) => foo
+    //             .iter()
+    //             .fold("".to_string(), |acc, (package_name, attr_name)| (acc
+    //                 + &format!(
+    //                     " (package_name: {}; attr_name: {})",
+    //                     package_name, attr_name
+    //                 )))
+    //             .to_owned(),
+    //     }
+    // );
     // Combine the package names contained within each shard into a longer list.
     Ok(retval)
 }
@@ -299,7 +292,7 @@ fn check_package(
             &relative_package_dir.to_path(path),
         )?);
 
-        let attr_path_prefix = if &by_name_dir.unversioned_attr_prefix != "" {
+        let attr_path_prefix = if !&by_name_dir.unversioned_attr_prefix.is_empty() {
             by_name_dir.unversioned_attr_prefix.to_owned() + "."
         } else {
             "".to_string()
