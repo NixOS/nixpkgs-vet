@@ -307,25 +307,19 @@ mod tests {
 
     use super::process;
 
+    #[fixtures::fixtures(["tests/*"])]
+    #[allow(non_snake_case)] // the test directories don't use snake case, and the macro expansion causes a warning.
     #[test]
-    fn tests_dir() -> anyhow::Result<()> {
-        for entry in Path::new("tests").read_dir()? {
-            let entry = entry?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-
-            if !path.is_dir() {
-                continue;
-            }
-            // if path.to_string_lossy() != "tests/manual-definition" {
-            //     continue;
-            // }
-
-            let expected_errors = fs::read_to_string(path.join("expected"))
-                .with_context(|| format!("No expected file for test {name}"))?;
-
-            test_nixpkgs(&name, &path, &expected_errors);
+    fn test_dir(path: &Path) -> anyhow::Result<()> {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !path.is_dir() {
+            return Ok(());
         }
+
+        let expected_errors = fs::read_to_string(path.join("expected"))
+            .with_context(|| format!("No expected file for test {name}"))?;
+
+        test_nixpkgs(&name, path, &expected_errors);
         Ok(())
     }
 

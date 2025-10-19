@@ -23,5 +23,6 @@ derive_more = { version = "2.0.1", features = ["display"] }
 readonly = "0.2.13"
 
 [dev-dependencies]
+fixtures = "2.4.0"
 pretty_assertions = "1.4.1"
 temp-env = "0.3.6"
