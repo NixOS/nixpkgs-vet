@@ -62,7 +62,7 @@ pub struct Config {
 
 pub fn read_config(config_file: &Path) -> Config {
     let config_file_contents = read(config_file);
-    println!("config file path {}", config_file.to_string_lossy());
+    println!("{}:{}: config file path {}", file!(), line!(), config_file.to_string_lossy());
     let config: SerializableConfig = serde_json::from_slice(
         config_file_contents
             .with_context(|| format!("Config file {}", config_file.display()))
@@ -216,7 +216,8 @@ pub fn check_structure(
 
     let retval = validation::sequence(shard_results).map(concat);
     println!(
-        "(check_structure): Path: {}; results: {}",
+        "{}:{}: (check_structure): Path: {}; results: {}",
+        file!(), line!(),
         by_name_dir.path.as_str(),
         match retval {
             validation::Validation::Failure(ref foo) => foo

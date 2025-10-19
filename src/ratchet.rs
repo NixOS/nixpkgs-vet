@@ -13,7 +13,7 @@ use crate::structure::ByNameDir;
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Nixpkgs {
     /// The ratchet values for all packages
     pub packages: BTreeMap<String, Package>,
@@ -37,6 +37,7 @@ impl Nixpkgs {
 }
 
 /// The ratchet value for a top-level package
+#[derive(Debug)]
 pub struct Package {
     /// The ratchet value for the check for non-auto-called empty arguments
     pub manual_definition: RatchetState<ManualDefinition>,
@@ -63,6 +64,7 @@ impl Package {
     }
 }
 
+#[derive(Debug)]
 pub struct File {}
 
 impl File {
@@ -77,6 +79,7 @@ impl File {
 }
 
 /// The ratchet state of a generic ratchet check.
+#[derive(Debug)]
 pub enum RatchetState<Ratchet: ToProblem> {
     /// The ratchet is loose. It can be tightened more. In other words, this is the legacy state
     /// we're trying to move away from.
@@ -143,6 +146,7 @@ impl<Context: ToProblem> RatchetState<Context> {
 ///
 /// - Are defined in `pkgs/by-name` with a manual definition that doesn't have any
 ///   custom argument overrides.
+#[derive(Debug)]
 pub enum ManualDefinition {}
 
 impl ToProblem for ManualDefinition {
@@ -158,6 +162,7 @@ impl ToProblem for ManualDefinition {
 /// This checks that all new package defined using `callPackage` must be defined via
 /// `pkgs/by-name`. It also checks that once a package uses `pkgs/by-name`, it can't switch back
 /// to `pkgs/top-level/all-packages.nix`.
+#[derive(Debug)]
 pub enum UsesByName {}
 
 impl ToProblem for UsesByName {

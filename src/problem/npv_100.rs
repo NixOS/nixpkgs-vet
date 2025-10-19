@@ -24,7 +24,7 @@ impl fmt::Display for ByNameUndefinedAttribute {
             "- {attribute_name}: This attribute is not defined but it should be defined automatically as {}",
             relative_package_file
                 .into_string()
-                .replace(&(by_name_dir.unversioned_attr_prefix.clone() + "."), "")
+                .replace(&(by_name_dir.unversioned_attr_prefix.clone()), "")
         )
     }
 }

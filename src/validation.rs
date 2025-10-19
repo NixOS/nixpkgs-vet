@@ -11,6 +11,7 @@ use Validation::{Failure, Success};
 /// `sequence_`.
 ///
 /// This leans on <https://hackage.haskell.org/package/validation>.
+#[derive(Debug)]
 pub enum Validation<A> {
     Failure(Vec<Problem>),
     Success(A),

@@ -70,10 +70,10 @@ let
     let
       entries = builtins.readDir (
         builtins.trace
-          (lib.concatStringsSep "/" [
+          "mock-nixpkgs.nix:73: full path = ${(lib.concatStringsSep "/" [
             (builtins.toString root)
             byNameDir.path
-          ])
+          ])}"
           (
             lib.concatStringsSep "/" [
               (builtins.toString root)
@@ -132,7 +132,7 @@ let
       # See a more detailed description in pkgs/top-level/by-name-overlay.nix
       _internalCallByNamePackageFile =
         file:
-        self.callPackage (builtins.trace "file at mock:85: ${builtins.toString file}" (
+        self.callPackage (builtins.trace "mock-nixpkgs.nix:85: file =  ${builtins.toString file}" (
           builtins.toString file
         )) { };
       # _internalCallByNamePackageFile = file: self.callPackage file { };
