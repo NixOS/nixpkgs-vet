@@ -57,15 +57,15 @@ pub struct Args {
     /// For PRs, set this to a checkout of the PRs base branch.
     #[arg(long)]
     base: PathBuf,
-
-    // TODO: doc
-    config_file: PathBuf,
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
+    let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE").expect("Could not get environment variable NIXPKGS_VET_CONFIG_FILE");
+    let config_file = Path::new(&config_file);
+    
     let status: ColoredStatus =
-        process(&args.base, &args.nixpkgs, &read_config(&args.config_file)).into();
+        process(&args.base, &args.nixpkgs, &read_config(config_file)).into();
     eprintln!("{status}");
     status.into()
 }
@@ -413,12 +413,14 @@ mod tests {
         // that don't recognise certain newer keys in nix.conf
         let nix_conf_dir = tempdir().expect("directory");
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
+        let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE").unwrap_or("by-name-config-generated.json".to_string());
+        let config_file = Path::new(&config_file);
 
-        let status = temp_env::with_var("NIX_CONF_DIR", Some(nix_conf_dir), || {
+        let status = temp_env::with_vars([("NIX_CONF_DIR", Some(nix_conf_dir)), ("NIXPKGS_VET_CONFIG_FILE", Some(config_file.as_os_str()))], || {
             process(
                 &base_nixpkgs,
                 &main_path,
-                &structure::read_config(Path::new("by-name-config-generated.json")),
+                &structure::read_config(config_file),
             )
         });
 

@@ -7,6 +7,7 @@
   lixPackageSets,
   clippy,
   makeWrapper,
+  writeText,
   versionCheckHook,
 
   nixVersionsToTest ? [
@@ -22,6 +23,7 @@
 }:
 let
   fs = lib.fileset;
+  configFile = writeText "by-name-config-generated.json" (builtins.toJSON (import ./by-name-config.nix));
 in
 rustPlatform.buildRustPackage {
   pname = "nixpkgs-vet";
@@ -47,14 +49,10 @@ rustPlatform.buildRustPackage {
 
   doInstallCheck = true;
   nativeInstallCheckInputs = [ versionCheckHook ];
+  versionCheckProgramArg = "--version";
 
   env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
   env.NIXPKGS_VET_NIXPKGS_LIB = "${path}/lib";
-
-  postBuild = ''
-    ${initNix}
-    nix-instantiate --eval --json --strict ${./by-name-config.nix} > by-name-config-generated.json
-  '';
 
   checkPhase = ''
     # This path will be symlinked to the current version that is being tested
@@ -65,6 +63,7 @@ rustPlatform.buildRustPackage {
 
     # This is what nixpkgs-vet uses
     export NIXPKGS_VET_NIX_PACKAGE=$nixPackage
+    export NIXPKGS_VET_CONFIG_FILE=${configFile}
 
     ${lib.concatMapStringsSep "\n" (nix: ''
       ln -s ${lib.getBin nix} "$nixPackage"
@@ -79,7 +78,8 @@ rustPlatform.buildRustPackage {
   '';
   postInstall = ''
     wrapProgram $out/bin/nixpkgs-vet \
-      --set NIXPKGS_VET_NIX_PACKAGE ${lib.getBin nix}
+      --set NIXPKGS_VET_NIX_PACKAGE ${lib.getBin nix} \
+      --set NIXPKGS_VET_CONFIG_FILE ${configFile}
   '';
 
   # silence a warning when building

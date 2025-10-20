@@ -58,7 +58,7 @@ pub fn read_config(config_file: &Path) -> Config {
     );
     let config: SerializableConfig = serde_json::from_slice(
         config_file_contents
-            .with_context(|| format!("Config file {}", config_file.display()))
+            .with_context(|| format!("Config file {} could not be read. Does it exist?", config_file.display()))
             .unwrap()
             .as_slice(),
     )
