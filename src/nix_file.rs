@@ -6,7 +6,6 @@ use itertools::Either::{self, Left, Right};
 use relative_path::RelativePathBuf;
 use rnix::ast;
 use rnix::ast::Expr;
-use rnix::ast::HasEntry;
 use rowan::TextSize;
 use rowan::TokenAtOffset;
 use rowan::ast::AstNode;
@@ -82,9 +81,6 @@ impl NixFile {
 pub struct CallPackageArgumentInfo {
     /// The relative path of the first argument, or `None` if it's not a path.
     pub relative_path: Option<RelativePathBuf>,
-
-    /// Whether the second argument is an empty attribute set.
-    pub empty_arg: bool,
 }
 
 impl NixFile {
@@ -125,7 +121,7 @@ impl NixFile {
     ///
     /// ```rust
     /// Ok((
-    ///   Some(CallPackageArgumentInfo { path = Some("default.nix"), empty_arg: true }),
+    ///   Some(CallPackageArgumentInfo { path = Some("default.nix") }),
     ///   "foo = self.callPackage ./default.nix { };",
     /// ))
     /// ```
@@ -289,21 +285,8 @@ impl NixFile {
             anyhow::bail!("apply node doesn't have a lambda: {apply1:?}")
         };
 
-        let Some(arg1) = apply1.argument() else {
-            anyhow::bail!("apply node doesn't have an argument: {apply1:?}")
-        };
-
         // At this point we know it's something like `foo = <fun> <arg>`.
         // For a callPackage, `<fun>` would be `callPackage ./file` and `<arg>` would be `{ }`.
-
-        let empty_arg = if let Expr::AttrSet(attrset) = arg1 {
-            // We can only statically determine whether the argument is empty if it's an attribute
-            // set _expression_, even though other kind of expressions could evaluate to an
-            // attribute set _value_. But this is what we want anyway.
-            attrset.entries().next().is_none()
-        } else {
-            false
-        };
 
         // Because `callPackage` takes two curried arguments, the first function needs to be a
         // function call itself.
@@ -388,7 +371,6 @@ impl NixFile {
         if token.text() == "callPackage" {
             Ok(Some(CallPackageArgumentInfo {
                 relative_path: path,
-                empty_arg,
             }))
         } else {
             Ok(None)
@@ -601,8 +583,6 @@ mod tests {
               e = pythonPackages.callPackage ./file.nix { };
               f = callPackage ./file.nix { };
               g = callPackage ({ }: { }) { };
-              h = callPackage ./file.nix { x = 0; };
-              i = callPackage ({ }: { }) (let in { });
             }
         "};
 
@@ -619,35 +599,18 @@ mod tests {
                 6,
                 Some(CallPackageArgumentInfo {
                     relative_path: Some(RelativePathBuf::from("file.nix")),
-                    empty_arg: true,
                 }),
             ),
             (
                 7,
                 Some(CallPackageArgumentInfo {
                     relative_path: Some(RelativePathBuf::from("file.nix")),
-                    empty_arg: true,
                 }),
             ),
             (
                 8,
                 Some(CallPackageArgumentInfo {
                     relative_path: None,
-                    empty_arg: true,
-                }),
-            ),
-            (
-                9,
-                Some(CallPackageArgumentInfo {
-                    relative_path: Some(RelativePathBuf::from("file.nix")),
-                    empty_arg: false,
-                }),
-            ),
-            (
-                10,
-                Some(CallPackageArgumentInfo {
-                    relative_path: None,
-                    empty_arg: false,
                 }),
             ),
         ];
