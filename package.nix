@@ -23,7 +23,9 @@
 }:
 let
   fs = lib.fileset;
-  configFile = writeText "by-name-config-generated.json" (builtins.toJSON (import ./by-name-config.nix));
+  configFile = writeText "by-name-config-generated.json" (
+    builtins.toJSON (import ./by-name-config.nix)
+  );
 in
 rustPlatform.buildRustPackage {
   pname = "nixpkgs-vet";

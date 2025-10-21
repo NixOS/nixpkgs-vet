@@ -61,7 +61,6 @@ let
       filtered = builtins.filter ({ path, ... }: lib.pathIsDirectory path) mapped;
     in
     map (elem: elem.dir) filtered;
-  # (builtins.trace (builtins.deepSeq mapped mapped) mapped);
 
   # Generates { <name> = <file>; } entries mapping package names to their `package.nix` files in their `by-name` directory.
   # Could be more efficient, but this is only for testing.
@@ -70,10 +69,12 @@ let
     let
       entries = builtins.readDir (
         builtins.trace
-          "mock-nixpkgs.nix:73: full path = ${(lib.concatStringsSep "/" [
-            (builtins.toString root)
-            byNameDir.path
-          ])}"
+          "mock-nixpkgs.nix:73: full path = ${
+            (lib.concatStringsSep "/" [
+              (builtins.toString root)
+              byNameDir.path
+            ])
+          }"
           (
             lib.concatStringsSep "/" [
               (builtins.toString root)
@@ -130,29 +131,43 @@ let
     {
       # Needed to be able to detect empty arguments in all-packages.nix
       # See a more detailed description in pkgs/top-level/by-name-overlay.nix
-      _internalCallByNamePackageFile =
-        file:
-        self.callPackage (builtins.trace "mock-nixpkgs.nix:85: file =  ${builtins.toString file}" (
-          builtins.toString file
-        )) { };
-      # _internalCallByNamePackageFile = file: self.callPackage file { };
+      _internalCallByNamePackageFile = file: self.callPackage (builtins.toString file) { };
     }
     // lib.mapAttrsRecursiveCond (as: !(as ? "type" && as.type == "derivation")) (
       name: self._internalCallByNamePackageFile
     ) (lib.mergeAttrsList (map autoCalledPackageFilesForByNameDir byNameDirs));
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
-  optionalAllPackagesOverlay =
-    if builtins.pathExists (root + "/pkgs/top-level/all-packages.nix") then
-      [ (import (root + "/pkgs/top-level/all-packages.nix")) ]
-    else
-      [ ];
+  optionalAllPackagesOverlays =
+    let
+      filteredByNameDirs = builtins.filter (
+        byNameDir:
+        (byNameDir ? "all_packages_path")
+        && (byNameDir.all_packages_path != null)
+        && (builtins.pathExists (root + byNameDir.all_packages_path))
+      ) byNameDirs;
+      paths = map (byNameDir: byNameDir.all_packages_path) filteredByNameDirs;
+      forEachPath = relativePath: import (root + relativePath);
+    in
+    map forEachPath paths;
 
   # A list optionally containing the `aliases.nix` file from the test case as an overlay
   # But only if config.allowAliases is not false
-  optionalAliasesOverlay =
-    if (config.allowAliases or true) && builtins.pathExists (root + "/aliases.nix") then
-      [ (import (root + "/aliases.nix")) ]
+  optionalAliasesOverlays =
+    if (config.allowAliases or true) then
+      let
+        filteredByNameDirs = (
+          builtins.filter (
+            byNameDir:
+            (byNameDir ? "aliases_path")
+            && (byNameDir.aliases_path != null)
+            && (builtins.pathExists (root + byNameDir.aliases_path))
+          ) byNameDirs
+        );
+        paths = map (byNameDir: byNameDir.aliases_path) filteredByNameDirs;
+        forEachPath = relativePath: import (root + relativePath);
+      in
+      map forEachPath paths
     else
       [ ];
 
@@ -160,13 +175,12 @@ let
   allOverlays = [
     autoCalledPackages
   ]
-  ++ optionalAllPackagesOverlay
-  ++ optionalAliasesOverlay
+  ++ optionalAllPackagesOverlays
+  ++ optionalAliasesOverlays
   ++ overlays;
 
   # Apply all the overlays in order to the base fixed-point function pkgsFun
   f = builtins.foldl' (f: overlay: lib.extends overlay f) pkgsFun allOverlays;
-  # fixf = lib.fix f;
 in
 # Evaluate the fixed-point
 lib.fix f

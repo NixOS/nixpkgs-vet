@@ -1,0 +1,6 @@
+- Attribute `foo` is a new top-level package using `callPackage ./pkgs/development/tcl-modules/foo.nix { /* ... */ }`.
+  Please define it in pkgs/development/tcl-modules/by-name/fo/foo/package.nix instead.
+  See `pkgs/by-name/README.md` for more details.
+  Since the second `callPackage` argument is `{ }`, no manual `callPackage` in pkgs/top-level/tcl-packages.nix is needed anymore.
+
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.

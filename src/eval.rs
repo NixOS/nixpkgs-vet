@@ -6,6 +6,7 @@ use anyhow::Context;
 use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
+use crate::NixFileStore;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
@@ -14,7 +15,6 @@ use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::{self, ByNameDir, Config};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
-use crate::NixFileStore;
 use crate::{location, ratchet};
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
@@ -120,7 +120,6 @@ fn pass_through_environment_variables_for_nix_eval_in_nix_build(command: &mut pr
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     _work_dir_path: &Path,
     command: &mut process::Command,
-    _config_file_path: &Path,
 ) -> anyhow::Result<()> {
     command.arg("--show-trace");
 
@@ -132,15 +131,11 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 fn mutate_nix_instatiate_arguments_based_on_cfg(
     work_dir_path: &Path,
     command: &mut process::Command,
-    config_file_path: &Path,
 ) -> anyhow::Result<()> {
     println!("{}:{}: work dir path: {work_dir_path:?}", file!(), line!());
     const MOCK_NIXPKGS: &[u8] = include_bytes!("../tests/mock-nixpkgs.nix");
     let mock_nixpkgs_path = work_dir_path.join("mock-nixpkgs.nix");
     fs::write(&mock_nixpkgs_path, MOCK_NIXPKGS)?;
-
-    let test_config_file_path = work_dir_path.join("by-name-config.json");
-    fs::write(&test_config_file_path, fs::read(config_file_path)?)?;
 
     // Wire it up so that it can be imported as `import <test-nixpkgs> { }`.
     command.arg("-I");
@@ -152,10 +147,6 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 
     command.arg("-I");
     command.arg(format!("test-nixpkgs/lib={nixpkgs_lib}"));
-
-    command.arg("--argstr");
-    command.arg("configPath");
-    command.arg(test_config_file_path);
 
     command.arg("--show-trace");
     command.arg("--verbose");
@@ -186,23 +177,24 @@ pub fn check_values(
     let tmp = nixpkgs_path.join(by_name_dir.path.as_str());
     let full_path = tmp.to_string_lossy();
 
-    println!(
-        "{}:{}: package_names for {full_path}: {}",
-        file!(),
-        line!(),
-        packages
-            .iter()
-            .map(|x| x.0.to_owned())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    // println!(
+    //     "{}:{}: package_names for {full_path}: {}",
+    //     file!(),
+    //     line!(),
+    //     packages
+    //         .iter()
+    //         .map(|x| x.0.to_owned())
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     // Write the list of packages we need to check into a temporary JSON file.
     let package_names_path = work_dir_path.join("package-names.json");
     let package_names_file = fs::File::create(&package_names_path)?;
+    let packages = packages.to_owned();
     serde_json::to_writer(
         &package_names_file,
-        &packages.iter().map(|x| x.1.to_owned()).collect::<Vec<_>>(),
+        &packages.into_iter().map(|x| x.1).collect::<Vec<_>>(),
     )
     .with_context(|| {
         format!(
@@ -228,6 +220,8 @@ pub fn check_values(
     let nix_package = env::var("NIXPKGS_VET_NIX_PACKAGE")
         .with_context(|| "Could not get environment variable NIXPKGS_VET_NIX_PACKAGE")?;
 
+    println!("package_names_path: {package_names_path:?}");
+
     // With restrict-eval, only paths in NIX_PATH can be accessed. We explicitly specify them here.
     let mut command = process::Command::new(format!("{nix_package}/bin/nix-instantiate"));
     command
@@ -251,11 +245,13 @@ pub fn check_values(
         // restrict-eval mode.
         .args(["--arg", "nixpkgsPath"])
         .arg(nixpkgs_path)
+        .args(["--arg", "configPath"])
+        .arg(config_file_path)
         .arg("-I")
         .arg(nixpkgs_path);
 
     pass_through_environment_variables_for_nix_eval_in_nix_build(&mut command);
-    mutate_nix_instatiate_arguments_based_on_cfg(&work_dir_path, &mut command, &config_file_path)?;
+    mutate_nix_instatiate_arguments_based_on_cfg(&work_dir_path, &mut command)?;
 
     command.arg(eval_nix_path);
 
@@ -432,7 +428,11 @@ fn by_name(
                                 )
                             })?;
 
-                        println!("{}:{}: : attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}; definition: {definition}; location: {location:?}", file!(), line!());
+                        println!(
+                            "{}:{}: : attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}; definition: {definition}; location: {location:?}",
+                            file!(),
+                            line!()
+                        );
 
                         by_name_override(
                             attribute_name,
@@ -452,7 +452,11 @@ fn by_name(
                 }
             };
 
-            println!("{}:{}: attribute_name: {attribute_name}; is_derivation_result: {is_derivation_result:?}; variant_result: {variant_result:?}", file!(), line!());
+            println!(
+                "{}:{}: attribute_name: {attribute_name}; is_derivation_result: {is_derivation_result:?}; variant_result: {variant_result:?}",
+                file!(),
+                line!()
+            );
             // Independently report problems about whether it's a derivation and the callPackage
             // variant.
             is_derivation_result.and_(variant_result)
@@ -561,8 +565,8 @@ fn handle_non_by_name_attribute(
     config: &Config,
     by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
-    use ratchet::RatchetState::{Loose, NonApplicable, Tight};
     use NonByNameAttribute::EvalSuccess;
+    use ratchet::RatchetState::{Loose, NonApplicable, Tight};
     println!("{}:{}: attribute_name: {attribute_name}", file!(), line!());
 
     // The ratchet state whether this attribute uses a `by-name` directory

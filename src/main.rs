@@ -23,15 +23,14 @@ mod validation;
 use anyhow::Context as _;
 use clap::Parser;
 use std::collections::BTreeMap;
+use std::panic;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::thread::ScopedJoinHandle;
-use std::{panic, thread};
 
 use crate::nix_file::NixFileStore;
 use crate::problem::Problem;
 use crate::status::{ColoredStatus, Status};
-use crate::structure::{check_structure, read_config, ByNameDir, Config};
+use crate::structure::{ByNameDir, Config, check_structure, read_config};
 use crate::validation::Validation::{Failure, Success};
 
 /// Program to check the validity of pkgs/by-name
@@ -61,9 +60,10 @@ pub struct Args {
 
 fn main() -> ExitCode {
     let args = Args::parse();
-    let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE").expect("Could not get environment variable NIXPKGS_VET_CONFIG_FILE");
+    let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE")
+        .expect("Could not get environment variable NIXPKGS_VET_CONFIG_FILE");
     let config_file = Path::new(&config_file);
-    
+
     let status: ColoredStatus =
         process(&args.base, &args.nixpkgs, &read_config(config_file)).into();
     eprintln!("{status}");
@@ -78,17 +78,18 @@ fn main() -> ExitCode {
 fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status {
     let by_name_dirs: &Vec<ByNameDir> = &config.by_name_dirs;
     let mut thread_results: Vec<Status> = vec![];
-    thread::scope(|s| {
-        let mut threads: Vec<ScopedJoinHandle<Status>> = vec![];
-        for dir in by_name_dirs {
-            let new_thread =
-                s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config));
-            threads.push(new_thread);
-        }
-        for thread in threads {
-            thread_results.push(thread.join().unwrap())
-        }
-    });
+    // thread::scope(|s| {
+    // let mut threads: Vec<ScopedJoinHandle<Status>> = vec![];
+    for dir in by_name_dirs {
+        // let new_thread =
+        //     s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config));
+        // threads.push(new_thread);
+        thread_results.push(process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config))
+    }
+    // for thread in threads {
+    //     thread_results.push(thread.join().unwrap())
+    // }
+    // });
 
     if thread_results
         .iter()
@@ -188,24 +189,33 @@ fn process_by_name_dir(
     by_name_dir: &ByNameDir,
     config: &Config,
 ) -> Status {
-    let (base_result, main_result) = thread::scope(|s| {
-        let base_thread = s.spawn(move || check_nixpkgs(base_nixpkgs, by_name_dir, config));
-        let main_thread = s.spawn(move || check_nixpkgs(main_nixpkgs, by_name_dir, config));
+    // let (base_result, main_result) = thread::scope(|s| {
+    // let base_thread = s.spawn(move || check_nixpkgs(base_nixpkgs, by_name_dir, config));
+    // let main_thread = s.spawn(move || check_nixpkgs(main_nixpkgs, by_name_dir, config));
 
-        let base_result = match base_thread.join() {
-            Ok(Ok(result)) => Ok(result),
-            Ok(Err(error)) => Err(error),
-            Err(e) => panic::resume_unwind(e),
-        };
+    // let base_result = match base_thread.join() {
+    //     Ok(Ok(result)) => Ok(result),
+    //     Ok(Err(error)) => Err(error),
+    //     Err(e) => panic::resume_unwind(e),
+    // };
 
-        let main_result = match main_thread.join() {
-            Ok(Ok(result)) => Ok(result),
-            Ok(Err(error)) => Err(error),
-            Err(e) => panic::resume_unwind(e),
-        };
+    // let main_result = match main_thread.join() {
+    //     Ok(Ok(result)) => Ok(result),
+    //     Ok(Err(error)) => Err(error),
+    //     Err(e) => panic::resume_unwind(e),
+    // };
 
-        (base_result, main_result)
-    });
+    println!("Checking base with by_name_dir {}", by_name_dir.path);
+    let base_result = check_nixpkgs(base_nixpkgs, by_name_dir, config);
+    println!("Checking main with by_name_dir {}", by_name_dir.path);
+    let main_result = check_nixpkgs(main_nixpkgs, by_name_dir, config);
+    println!(
+        "Done with both base and main for by_name_dir {}",
+        by_name_dir.path
+    );
+
+    // (base_result, main_result)
+    // });
 
     if let Err(error) = main_result {
         error.into()
@@ -301,7 +311,7 @@ mod tests {
 
     use anyhow::Context;
     use pretty_assertions::StrComparison;
-    use tempfile::{tempdir_in, TempDir};
+    use tempfile::{TempDir, tempdir_in};
 
     use crate::structure;
 
@@ -413,16 +423,23 @@ mod tests {
         // that don't recognise certain newer keys in nix.conf
         let nix_conf_dir = tempdir().expect("directory");
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
-        let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE").unwrap_or("by-name-config-generated.json".to_string());
+        let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE")
+            .unwrap_or("by-name-config-generated.json".to_string());
         let config_file = Path::new(&config_file);
 
-        let status = temp_env::with_vars([("NIX_CONF_DIR", Some(nix_conf_dir)), ("NIXPKGS_VET_CONFIG_FILE", Some(config_file.as_os_str()))], || {
-            process(
-                &base_nixpkgs,
-                &main_path,
-                &structure::read_config(config_file),
-            )
-        });
+        let status = temp_env::with_vars(
+            [
+                ("NIX_CONF_DIR", Some(nix_conf_dir)),
+                ("NIXPKGS_VET_CONFIG_FILE", Some(config_file.as_os_str())),
+            ],
+            || {
+                process(
+                    &base_nixpkgs,
+                    &main_path,
+                    &structure::read_config(config_file),
+                )
+            },
+        );
 
         let actual_errors = format!("{status}\n");
 

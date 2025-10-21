@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{npv_160, npv_161, npv_162, npv_163, Problem};
+use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163};
 use crate::structure::ByNameDir;
 use crate::validation::{self, Validation, Validation::Success};
 

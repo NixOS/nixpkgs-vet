@@ -1,4 +1,4 @@
-use std::fs::{read, DirEntry};
+use std::fs::{DirEntry, read};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -8,10 +8,10 @@ use regex::Regex;
 use relative_path::{RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
 
+use crate::NixFileStore;
 use crate::problem::{npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_143, npv_144};
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
-use crate::NixFileStore;
 
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
@@ -25,6 +25,8 @@ struct SerializableByNameDir {
     path: String,
     attr_path_regex: String,
     unversioned_attr_prefix: String,
+    all_packages_path: String, // Includes a leading slash, but is still a relative path.
+    aliases_path: Option<String>, // Includes a leading slash, but is still a relative path.
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,6 +39,8 @@ pub struct ByNameDir {
     pub path: RelativePathBuf,
     pub attr_path_regex: Regex,
     pub unversioned_attr_prefix: String,
+    pub all_packages_path: String, // Includes a leading slash, but is still a relative path.
+    pub aliases_path: Option<String>, // Includes a leading slash, but is still a relative path.
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -58,7 +62,12 @@ pub fn read_config(config_file: &Path) -> Config {
     );
     let config: SerializableConfig = serde_json::from_slice(
         config_file_contents
-            .with_context(|| format!("Config file {} could not be read. Does it exist?", config_file.display()))
+            .with_context(|| {
+                format!(
+                    "Config file {} could not be read. Does it exist?",
+                    config_file.display()
+                )
+            })
             .unwrap()
             .as_slice(),
     )
@@ -72,6 +81,8 @@ pub fn read_config(config_file: &Path) -> Config {
                 path: RelativePathBuf::from(x.path.as_str()),
                 attr_path_regex: regex::Regex::new(regex_str).unwrap(),
                 unversioned_attr_prefix: x.unversioned_attr_prefix.clone(),
+                all_packages_path: x.all_packages_path.clone(),
+                aliases_path: x.aliases_path.clone(),
             }
         })
         .collect();
@@ -129,13 +140,16 @@ pub fn expected_by_name_dir_for_package(attr_name: &str, config: &Config) -> Rel
         2 => {
             let dir1 = matching_dirs[0];
             let dir2 = matching_dirs[1];
-            if dir1.attr_path_regex.as_str() == ".*" {
+            println!("attr_name: {attr_name}: dir1: {dir1:?}; dir2: {dir2:?}");
+            if dir2.attr_path_regex.as_str() == ".*" {
                 dir1.path.clone()
-            } else {
+            } else if dir1.attr_path_regex.as_str() == ".*" {
                 dir2.path.clone()
+            } else {
+                panic!("Multiple wildcard regexes, or overlapping regexes, detected.")
             }
         }
-        0 => panic!("There should be exactly one wildcard directory."),
+        0 => panic!("There should be exactly one wildcard regex."),
         _ => panic!("Multiple wildcard regexes, or overlapping regexes, detected."),
     }
 }
