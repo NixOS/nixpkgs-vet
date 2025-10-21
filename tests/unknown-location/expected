@@ -1,2 +1,0 @@
-- pkgs.foo: Cannot determine the location of this attribute using `builtins.unsafeGetAttrPos`. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-103)
-This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
