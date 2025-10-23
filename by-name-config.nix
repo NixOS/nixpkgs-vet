@@ -1,9 +1,16 @@
 # Configure by-name directories in this file.
 # Then build with `nix-build -A build` to automatically generate by-name-config-generated.json
 # (Or, to generate manually, `nix-instantiate --eval --json --strict by-name-config.nix > by-name-config-generated.json`)
-# The following field in the attrsets that make up by_name_dirs are optional: aliases_path.
+# In the attrsets that make up by_name_dirs:
+#   * The aliases_path field is optional.
+#   * The ID field must be short and unique.
+#   * At most one attr_path_regex may be a wildcard.
+#   * All non-wildcard attr_path_regexes must be mutually exclusive.
+#   * At most one unversioned_attr_prefix may be the empty string.
+#   * All non-wildcard unversioned_attr_prefixes must be mutually exclusive.
 {
   by_name_dirs = [
+    # Not quite yet!
     # {
     #   path = "pkgs/development/python-modules/by-name";
     #   attr_path_regex = "^(python3\\d*Packages|python3\\d*.pkgs)\\..*";
@@ -19,8 +26,8 @@
     }
     {
       path = "pkgs/by-name";
-      attr_path_regex = ".*"; # There must be exactly one wildcard. All non-wildcard regexes must be mutually exclusive.
-      unversioned_attr_prefix = ""; # Ditto for this field.
+      attr_path_regex = ".*";
+      unversioned_attr_prefix = "";
       all_packages_path = "/pkgs/top-level/all-packages.nix";
       aliases_path = "/pkgs/top-level/aliases.nix";
     }
