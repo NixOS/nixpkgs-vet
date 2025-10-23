@@ -8,7 +8,12 @@
   configPath,
 }:
 let
-  attrs = builtins.fromJSON (builtins.readFile attrsPath);
+  # attrs = builtins.fromJSON (builtins.readFile attrsPath);
+  rawAttrs = builtins.trace "rawAttrs = ${(builtins.toJSON (builtins.fromJSON (builtins.readFile attrsPath)))}" (builtins.fromJSON (builtins.readFile attrsPath));
+  # an attrset where the key is the ID field from by-name-config.nix and the value is a list of attr paths.
+  attrsByDir = builtins.trace "attrsByDir = ${(builtins.toJSON (builtins.groupBy (a: a.by_name_dir_id) rawAttrs))}" (builtins.groupBy (a: a.by_name_dir_id) rawAttrs);
+  allAttrPaths = map (a: a.attr_path) rawAttrs;
+  byNameConfig = builtins.fromJSON (builtins.readFile configPath);
   # We need to check whether attributes are defined manually e.g. in `all-packages.nix`,
   # automatically by the `pkgs/by-name` overlay, or neither. The only way to do so is to override
   # `callPackage` and `_internalCallByNamePackageFile` with our own version that adds this
@@ -57,14 +62,7 @@ let
       # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
       system = "x86_64-linux";
     }
-    // (
-      if (configPath != null) then
-        {
-          byNameConfig = builtins.fromJSON (builtins.readFile configPath);
-        }
-      else
-        { }
-    )
+    // { inherit byNameConfig; }
   );
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
@@ -101,12 +99,12 @@ let
     };
 
   # Information on all attributes that are in a `by-name` directory.
-  byNameAttrs = pkgs.lib.mergeAttrsList (
+  byNameAttrsForDir = byNameDir: pkgs.lib.mergeAttrsList (
     map (
-      name:
+      package:
       let
         # attrPath = builtins.trace "eval.nix:106: name = ${name}" (pkgs.lib.splitString "." name);
-        attrPath = pkgs.lib.splitString "." name;
+        attrPath = pkgs.lib.splitString "." package.attr_path;
         result = pkgs.lib.setAttrByPath attrPath {
           ByName =
             if !(pkgs.lib.hasAttrByPath attrPath pkgs) then
@@ -114,13 +112,15 @@ let
             else
               # Evaluation failures are not allowed, so don't try to catch them.
               {
-                Existing = attrInfo name (pkgs.lib.getAttrFromPath attrPath pkgs);
+                Existing = attrInfo package.package_name (pkgs.lib.getAttrFromPath attrPath pkgs);
               };
         };
       in
       result
-    ) attrs
+    ) attrsByDir.${byNameDir.id}
   );
+
+  byNameAttrs = pkgs.lib.mergeAttrsList (map byNameAttrsForDir (builtins.filter (dir: builtins.hasAttr dir.id attrsByDir) byNameConfig.by_name_dirs));
 
   attrSetIsOrContainsDerivation =
     name: value:
@@ -164,7 +164,7 @@ let
     in
     if
       (
-        (builtins.trace "141 name=${name}" result.success)
+        result.success
         && (builtins.isAttrs value)
         && !((value ? "type") && (value.type == "derivation"))
         && !(builtins.elem name [
@@ -174,7 +174,7 @@ let
           "_callPackageVariant"
           "lib"
         ])
-        && !(pkgs.lib.hasPrefix "pkgs" name)
+        && !(pkgs.lib.hasPrefix "pkgs" name) # pkgsBuildBuild and friends cause infinite recursion
         && (attrSetIsOrContainsDerivation (builtins.trace "151 name=${name}" name) value)
       )
     # (builtins.tryEval ((pkgs.lib.collect (x: (pkgs.lib.isDerivation x) || (x ? "passthru")) value) != [])
@@ -212,7 +212,7 @@ let
   nonByNameAttrs = (
     builtins.mapAttrs markNonByNameAttribute (
       builtins.removeAttrs pkgs (
-        attrs
+        allAttrPaths
         ++ [
           "lib" # Need to exclude lib to avoid infinite recursion
           # "buildPackages"

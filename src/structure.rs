@@ -22,6 +22,7 @@ static PACKAGE_NAME_REGEX: LazyLock<Regex> =
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct SerializableByNameDir {
+    id: String,
     path: String,
     attr_path_regex: String,
     unversioned_attr_prefix: String,
@@ -36,6 +37,7 @@ struct SerializableConfig {
 
 #[derive(Clone, Debug)]
 pub struct ByNameDir {
+    pub id: String,
     pub path: RelativePathBuf,
     pub attr_path_regex: Regex,
     pub unversioned_attr_prefix: String,
@@ -78,11 +80,12 @@ pub fn read_config(config_file: &Path) -> Config {
         .map(|x| {
             let regex_str = x.attr_path_regex.as_str();
             ByNameDir {
+                id: x.id.to_owned(),
                 path: RelativePathBuf::from(x.path.as_str()),
                 attr_path_regex: regex::Regex::new(regex_str).unwrap(),
-                unversioned_attr_prefix: x.unversioned_attr_prefix.clone(),
-                all_packages_path: x.all_packages_path.clone(),
-                aliases_path: x.aliases_path.clone(),
+                unversioned_attr_prefix: x.unversioned_attr_prefix.to_owned(),
+                all_packages_path: x.all_packages_path.to_owned(),
+                aliases_path: x.aliases_path.to_owned(),
             }
         })
         .collect();
@@ -154,105 +157,176 @@ pub fn expected_by_name_dir_for_package(attr_name: &str, config: &Config) -> Rel
     }
 }
 
-/// Check the structure of Nixpkgs, returning the attribute names that are defined in
-/// the given by-name directory.
-pub fn check_structure(
-    path: &Path,
-    nix_file_store: &mut NixFileStore,
-    by_name_dir: &ByNameDir,
-) -> validation::Result<Vec<(String, String)>> {
-    let base_dir = path.join(by_name_dir.path.as_str());
+// /// Check the structure of Nixpkgs, returning the attribute names that are defined in
+// /// the given by-name directory.
+// pub fn check_structure(
+//     path: &Path,
+//     nix_file_store: &mut NixFileStore,
+//     by_name_dir: &ByNameDir,
+// ) -> validation::Result<Vec<(String, String)>> {
+//     let base_dir = path.join(by_name_dir.path.as_str());
 
-    let shard_results = read_dir_sorted(&base_dir)?
-        .into_iter()
-        .map(|shard_entry| -> validation::Result<_> {
-            let shard_path = shard_entry.path();
-            let shard_name = shard_entry.file_name().to_string_lossy().into_owned();
+//     let shard_results = read_dir_sorted(&base_dir)?
+//         .into_iter()
+//         .map(|shard_entry| -> validation::Result<_> {
+//             let shard_path = shard_entry.path();
+//             let shard_name = shard_entry.file_name().to_string_lossy().into_owned();
 
-            Ok(if shard_name == "README.md" {
-                // README.md is allowed to be a file and not checked
-                Success(vec![])
-            } else if !shard_path.is_dir() {
-                // We can't check for any other errors if it's not a directory, since there are no
-                // subdirectories to check.
-                npv_109::ByNameShardIsNotDirectory::new(shard_name, by_name_dir.clone()).into()
-            } else {
-                let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
-                let result = if !shard_name_valid {
-                    npv_110::ByNameShardIsInvalid::new(&shard_name, by_name_dir.clone()).into()
-                } else {
-                    Success(())
-                };
+//             Ok(if shard_name == "README.md" {
+//                 // README.md is allowed to be a file and not checked
+//                 Success(vec![])
+//             } else if !shard_path.is_dir() {
+//                 // We can't check for any other errors if it's not a directory, since there are no
+//                 // subdirectories to check.
+//                 npv_109::ByNameShardIsNotDirectory::new(shard_name, by_name_dir.clone()).into()
+//             } else {
+//                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
+//                 let result = if !shard_name_valid {
+//                     npv_110::ByNameShardIsInvalid::new(&shard_name, by_name_dir.clone()).into()
+//                 } else {
+//                     Success(())
+//                 };
 
-                let entries = read_dir_sorted(&shard_path)?;
+//                 let entries = read_dir_sorted(&shard_path)?;
 
-                let duplicate_results = entries
-                    .iter()
-                    .zip(entries.iter().skip(1))
-                    .filter(|(l, r)| l.file_name().eq_ignore_ascii_case(r.file_name()))
-                    .map(|(l, r)| {
-                        npv_111::ByNameShardIsCaseSensitiveDuplicate::new(
-                            &shard_name,
-                            l.file_name(),
-                            r.file_name(),
-                            by_name_dir.clone(),
-                        )
-                        .into()
-                    });
+//                 let duplicate_results = entries
+//                     .iter()
+//                     .zip(entries.iter().skip(1))
+//                     .filter(|(l, r)| l.file_name().eq_ignore_ascii_case(r.file_name()))
+//                     .map(|(l, r)| {
+//                         npv_111::ByNameShardIsCaseSensitiveDuplicate::new(
+//                             &shard_name,
+//                             l.file_name(),
+//                             r.file_name(),
+//                             by_name_dir.clone(),
+//                         )
+//                         .into()
+//                     });
 
-                let result = result.and_(validation::sequence_(duplicate_results));
+//                 let result = result.and_(validation::sequence_(duplicate_results));
 
-                let package_results = entries
-                    .into_iter()
-                    .map(|package_entry| {
-                        check_package(
-                            nix_file_store,
-                            path,
-                            &shard_name,
-                            shard_name_valid,
-                            &package_entry,
-                            by_name_dir,
-                        )
-                    })
-                    .collect_vec()?;
+//                 let package_results = entries
+//                     .into_iter()
+//                     .map(|package_entry| {
+//                         check_package(
+//                             nix_file_store,
+//                             path,
+//                             &shard_name,
+//                             shard_name_valid,
+//                             &package_entry,
+//                             by_name_dir,
+//                         )
+//                     })
+//                     .collect_vec()?;
 
-                result.and_(validation::sequence(package_results))
-            })
-        })
-        .collect_vec()?;
+//                 result.and_(validation::sequence(package_results))
+//             })
+//         })
+//         .collect_vec()?;
 
-    let retval = validation::sequence(shard_results).map(concat);
-    // println!(
-    //     "{}:{}: (check_structure): Path: {}; results: {}",
-    //     file!(), line!(),
-    //     by_name_dir.path.as_str(),
-    //     match retval {
-    //         validation::Validation::Failure(ref foo) => foo
-    //             .iter()
-    //             .fold("".to_string(), |acc, elem| (acc + " " + &elem.to_string()))
-    //             .to_owned(),
-    //         validation::Validation::Success(ref foo) => foo
-    //             .iter()
-    //             .fold("".to_string(), |acc, (package_name, attr_name)| (acc
-    //                 + &format!(
-    //                     " (package_name: {}; attr_name: {})",
-    //                     package_name, attr_name
-    //                 )))
-    //             .to_owned(),
-    //     }
-    // );
-    // Combine the package names contained within each shard into a longer list.
-    Ok(retval)
+//     // Combine the package names contained within each shard into a longer list.
+//     Ok(validation::sequence(shard_results).map(concat))
+// }
+#[derive(Serialize)]
+pub struct ByNamePackage<'a> {
+    pub attr_path: String,
+    /*
+        If attr_path is a top-level attribute, package_name is the same.
+        Otherwise, package_name the part after the last dot.
+        Note that (a) package_name is not the same as Nixpkgs' pname, and
+                  (b) package_name is what gets sharded.
+     */ 
+    pub package_name: String,
+    pub by_name_dir_id: &'a String, // ByNameDir.id
 }
 
-fn check_package(
+/// Check the structure of Nixpkgs, returning the attribute names that are defined in
+/// the given config's by-name directory.
+pub fn check_structure<'a>(
+    path: &Path,
+    nix_file_store: &mut NixFileStore,
+    config: &'a Config,
+) -> validation::Result<Vec<ByNamePackage<'a>>> {
+
+    let mut results = Vec::new();
+
+    for by_name_dir in &config.by_name_dirs { 
+        let base_dir = path.join(by_name_dir.path.as_str());
+        if !base_dir.exists() {
+            continue
+        }; 
+        let mut current_dir_results = read_dir_sorted(&base_dir)?
+            .into_iter()
+            .map(|shard_entry| -> validation::Result<_> {
+                let shard_path = shard_entry.path();
+                let shard_name = shard_entry.file_name().to_string_lossy().into_owned();
+
+                Ok(if shard_name == "README.md" {
+                    // README.md is allowed to be a file and not checked
+                    Success(vec![])
+                } else if !shard_path.is_dir() {
+                    // We can't check for any other errors if it's not a directory, since there are no
+                    // subdirectories to check.
+                    npv_109::ByNameShardIsNotDirectory::new(shard_name, by_name_dir.clone()).into()
+                } else {
+                    let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
+                    let result = if !shard_name_valid {
+                        npv_110::ByNameShardIsInvalid::new(&shard_name, by_name_dir.clone()).into()
+                    } else {
+                        Success(())
+                    };
+
+                    let entries = read_dir_sorted(&shard_path)?;
+
+                    let duplicate_results = entries
+                        .iter()
+                        .zip(entries.iter().skip(1))
+                        .filter(|(l, r)| l.file_name().eq_ignore_ascii_case(r.file_name()))
+                        .map(|(l, r)| {
+                            npv_111::ByNameShardIsCaseSensitiveDuplicate::new(
+                                &shard_name,
+                                l.file_name(),
+                                r.file_name(),
+                                by_name_dir.clone(),
+                            )
+                            .into()
+                        });
+
+                    let result = result.and_(validation::sequence_(duplicate_results));
+
+                    let package_results = entries
+                        .into_iter()
+                        .map(|package_entry| {
+                            check_package(
+                                nix_file_store,
+                                path,
+                                &shard_name,
+                                shard_name_valid,
+                                &package_entry,
+                                by_name_dir,
+                            )
+                        })
+                        .collect_vec()?;
+
+                    result.and_(validation::sequence(package_results))
+                })
+            })
+            .collect_vec()?;
+        results.append(&mut current_dir_results);
+    }
+
+    // Combine the package names contained within each shard into a longer list.
+    Ok(validation::sequence(results).map(concat))
+}
+
+fn check_package<'a>(
     nix_file_store: &mut NixFileStore,
     path: &Path,
     shard_name: &str,
     shard_name_valid: bool,
     package_entry: &DirEntry,
-    by_name_dir: &ByNameDir,
-) -> validation::Result<(String, String)> {
+    by_name_dir: &'a ByNameDir,
+) -> validation::Result<ByNamePackage<'a>> {
     let package_path = package_entry.path();
     let package_name = package_entry.file_name().to_string_lossy().into_owned();
     let relative_package_dir = by_name_dir.path.join(shard_name).join(&package_name);
@@ -311,8 +385,7 @@ fn check_package(
         } else {
             "".to_string()
         };
-        let attr_name = attr_path_prefix + &package_name;
-        // result.map(|_| attr_path_prefix.to_owned() + "." + &package_name)
-        result.map(|_| (package_name, attr_name))
+        let attr_path = attr_path_prefix + &package_name;
+        result.map(|_| ByNamePackage { attr_path, package_name, by_name_dir_id: &by_name_dir.id })
     })
 }

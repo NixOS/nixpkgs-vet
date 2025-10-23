@@ -12,7 +12,7 @@ use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::structure::{self, ByNameDir, Config};
+use crate::structure::{self, ByNameDir, ByNamePackage, Config};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::{location, ratchet};
@@ -163,7 +163,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    packages: &[(String, String)],
+    packages: &[ByNamePackage],
     by_name_dir: &ByNameDir,
     config: &Config,
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
@@ -193,7 +193,7 @@ pub fn check_values(
     let packages = packages.to_owned();
     serde_json::to_writer(
         &package_names_file,
-        &packages.into_iter().map(|x| x.1).collect::<Vec<_>>(),
+        &packages,
     )
     .with_context(|| {
         format!(

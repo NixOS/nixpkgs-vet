@@ -12,6 +12,7 @@
   by_name_dirs = [
     # Not quite yet!
     # {
+    #   id = "py";
     #   path = "pkgs/development/python-modules/by-name";
     #   attr_path_regex = "^(python3\\d*Packages|python3\\d*.pkgs)\\..*";
     #   unversioned_attr_prefix = "python3Packages";
@@ -19,12 +20,14 @@
     #   aliases_path = "/pkgs/top-level/python-aliases.nix";
     # }
     {
+      id = "tcl";
       path = "pkgs/development/tcl-modules/by-name";
       attr_path_regex = "^(tcl\\d*Packages)\\..*";
       unversioned_attr_prefix = "tclPackages";
       all_packages_path = "/pkgs/top-level/tcl-packages.nix";
     }
     {
+      id = "main";
       path = "pkgs/by-name";
       attr_path_regex = ".*";
       unversioned_attr_prefix = "";

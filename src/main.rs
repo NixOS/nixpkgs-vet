@@ -261,7 +261,7 @@ fn check_nixpkgs(
             // No pkgs/by-name directory, always valid
             Success(BTreeMap::new())
         } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store, by_name_dir)?;
+            let structure = check_structure(&nixpkgs_path, &mut nix_file_store, config)?;
 
             // Only if we could successfully parse the structure, we do the evaluation checks
             structure.result_map(|package_names| {
