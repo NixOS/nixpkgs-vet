@@ -54,12 +54,12 @@ pub struct Config {
 
 pub fn read_config(config_file: &Path) -> Config {
     let config_file_contents = read(config_file);
-    println!(
-        "{}:{}: config file path {}",
-        file!(),
-        line!(),
-        config_file.to_string_lossy()
-    );
+    // println!(
+    //     "{}:{}: config file path {}",
+    //     file!(),
+    //     line!(),
+    //     config_file.to_string_lossy()
+    // );
     let config: SerializableConfig = serde_json::from_slice(
         config_file_contents
             .with_context(|| {
@@ -140,7 +140,7 @@ pub fn expected_by_name_dir_for_package(attr_name: &str, config: &Config) -> Rel
         2 => {
             let dir1 = matching_dirs[0];
             let dir2 = matching_dirs[1];
-            println!("attr_name: {attr_name}: dir1: {dir1:?}; dir2: {dir2:?}");
+            // println!("attr_name: {attr_name}: dir1: {dir1:?}; dir2: {dir2:?}");
             if dir2.attr_path_regex.as_str() == ".*" {
                 dir1.path.clone()
             } else if dir1.attr_path_regex.as_str() == ".*" {

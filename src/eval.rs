@@ -132,7 +132,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
     work_dir_path: &Path,
     command: &mut process::Command,
 ) -> anyhow::Result<()> {
-    println!("{}:{}: work dir path: {work_dir_path:?}", file!(), line!());
+    // println!("{}:{}: work dir path: {work_dir_path:?}", file!(), line!());
     const MOCK_NIXPKGS: &[u8] = include_bytes!("../tests/mock-nixpkgs.nix");
     let mock_nixpkgs_path = work_dir_path.join("mock-nixpkgs.nix");
     fs::write(&mock_nixpkgs_path, MOCK_NIXPKGS)?;
@@ -174,8 +174,7 @@ pub fn check_values(
 
     // Canonicalize the path so that if a symlink were returned, we wouldn't ask Nix to follow it.
     let work_dir_path = work_dir.path().canonicalize()?;
-    let tmp = nixpkgs_path.join(by_name_dir.path.as_str());
-    let full_path = tmp.to_string_lossy();
+
 
     // println!(
     //     "{}:{}: package_names for {full_path}: {}",
@@ -220,7 +219,7 @@ pub fn check_values(
     let nix_package = env::var("NIXPKGS_VET_NIX_PACKAGE")
         .with_context(|| "Could not get environment variable NIXPKGS_VET_NIX_PACKAGE")?;
 
-    println!("package_names_path: {package_names_path:?}");
+    // println!("package_names_path: {package_names_path:?}");
 
     // With restrict-eval, only paths in NIX_PATH can be accessed. We explicitly specify them here.
     let mut command = process::Command::new(format!("{nix_package}/bin/nix-instantiate"));
@@ -259,21 +258,21 @@ pub fn check_values(
         .output()
         .with_context(|| format!("Failed to run command {command:?}"))?;
 
-    println!(
-        "{}:{}: result for {full_path} (stdout): {}",
-        file!(),
-        line!(),
-        String::from_utf8(result.stdout.clone()).unwrap(),
-    );
-    println!(
-        "{}:{}: result for {full_path} (stderr): {}",
-        file!(),
-        line!(),
-        String::from_utf8(result.stderr.clone()).unwrap(),
-    );
+    // println!(
+    //     "{}:{}: result for {full_path} (stdout): {}",
+    //     file!(),
+    //     line!(),
+    //     String::from_utf8(result.stdout.clone()).unwrap(),
+    // );
+    // println!(
+    //     "{}:{}: result for {full_path} (stderr): {}",
+    //     file!(),
+    //     line!(),
+    //     String::from_utf8(result.stderr.clone()).unwrap(),
+    // );
 
     if !result.status.success() {
-        println!("{}:{}: : eval failed for {full_path}", file!(), line!());
+        // println!("{}:{}: : eval failed for {full_path}", file!(), line!());
         // Early return in case evaluation fails
         return Ok(npv_120::NixEvalError::new(
             String::from_utf8_lossy(&result.stderr),
@@ -295,7 +294,7 @@ pub fn check_values(
         attributes
             .into_iter()
             .map(|(attribute_name, attribute_value)| {
-                println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
+                // println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
@@ -336,11 +335,11 @@ fn by_name(
     config: &Config,
     by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
-    println!(
-        "{}:{}:  attribute_name: {attribute_name}; by_name_attribute: {by_name_attribute:?}",
-        file!(),
-        line!()
-    );
+    // println!(
+    //     "{}:{}:  attribute_name: {attribute_name}; by_name_attribute: {by_name_attribute:?}",
+    //     file!(),
+    //     line!()
+    // );
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exist.  This match
     // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
     // definition could be removed.
@@ -428,11 +427,11 @@ fn by_name(
                                 )
                             })?;
 
-                        println!(
-                            "{}:{}: : attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}; definition: {definition}; location: {location:?}",
-                            file!(),
-                            line!()
-                        );
+                        // println!(
+                        //     "{}:{}: : attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}; definition: {definition}; location: {location:?}",
+                        //     file!(),
+                        //     line!()
+                        // );
 
                         by_name_override(
                             attribute_name,
@@ -452,17 +451,17 @@ fn by_name(
                 }
             };
 
-            println!(
-                "{}:{}: attribute_name: {attribute_name}; is_derivation_result: {is_derivation_result:?}; variant_result: {variant_result:?}",
-                file!(),
-                line!()
-            );
+            // println!(
+            //     "{}:{}: attribute_name: {attribute_name}; is_derivation_result: {is_derivation_result:?}; variant_result: {variant_result:?}",
+            //     file!(),
+            //     line!()
+            // );
             // Independently report problems about whether it's a derivation and the callPackage
             // variant.
             is_derivation_result.and_(variant_result)
         }
     };
-    let result = Ok(
+    /*let result =*/ Ok(
         // Packages being checked in this function are _always_ already defined in a `by-name` directory,
         // so instead of repeating ourselves all the time to define `uses_by_name`, just set it
         // once at the end with a map.
@@ -470,9 +469,9 @@ fn by_name(
             manual_definition,
             uses_by_name: Tight,
         }),
-    );
-    println!("{}:{}: : result: {result:?}", file!(), line!());
-    result
+    )//;
+    // println!("{}:{}: : result: {result:?}", file!(), line!());
+    // result
 }
 
 /// Handles the case for packages in a `by-name` directory that are manually overridden,
@@ -535,11 +534,11 @@ fn by_name_override(
     // Manual definitions with empty arguments are not allowed anymore, but existing ones should
     // continue to be allowed. This is the state to migrate away from.
     if syntactic_call_package.empty_arg {
-        println!(
-            "{}:{}: : here; attribute_name: {attribute_name}",
-            file!(),
-            line!()
-        );
+        // println!(
+        //     "{}:{}: : here; attribute_name: {attribute_name}",
+        //     file!(),
+        //     line!()
+        // );
         Success(Loose(
             npv_107::ByNameOverrideContainsEmptyArgument::new(
                 attribute_name,
@@ -567,7 +566,7 @@ fn handle_non_by_name_attribute(
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
-    println!("{}:{}: attribute_name: {attribute_name}", file!(), line!());
+    // println!("{}:{}: attribute_name: {attribute_name}", file!(), line!());
 
     // The ratchet state whether this attribute uses a `by-name` directory
     //
@@ -642,7 +641,7 @@ fn handle_non_by_name_attribute(
                 format!("Failed to get the definition info for attribute {}", attribute_name)
             })?;
 
-        println!("{}:{}:  attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}", file!(), line!());
+        // println!("{}:{}:  attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}", file!(), line!());
         // At this point, we completed two different checks for whether it's a `callPackage`.
         match (is_semantic_call_package, optional_syntactic_call_package) {
             // Something like `<attr> = { }`
