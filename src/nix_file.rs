@@ -38,6 +38,7 @@ impl NixFileStore {
 }
 
 /// A structure for storing a successfully parsed Nix file.
+#[derive(Clone)]
 pub struct NixFile {
     /// The parent directory of the Nix file, for more convenient error handling.
     pub parent_dir: PathBuf,
@@ -78,7 +79,7 @@ impl NixFile {
 }
 
 /// Information about `callPackage` arguments.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CallPackageArgumentInfo {
     /// The relative path of the first argument, or `None` if it's not a path.
     pub relative_path: Option<RelativePathBuf>,

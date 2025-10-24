@@ -4,9 +4,9 @@
 # In the attrsets that make up by_name_dirs:
 #   * The aliases_path field is optional.
 #   * The ID field must be short and unique.
-#   * At most one attr_path_regex may be a wildcard.
+#   * Exactly one attr_path_regex must be a wildcard ("[^\\.]*").
 #   * All non-wildcard attr_path_regexes must be mutually exclusive.
-#   * At most one unversioned_attr_prefix may be the empty string.
+#   * Exactly one unversioned_attr_prefix must be the empty string.
 #   * All non-wildcard unversioned_attr_prefixes must be mutually exclusive.
 {
   by_name_dirs = [
@@ -29,7 +29,7 @@
     {
       id = "main";
       path = "pkgs/by-name";
-      attr_path_regex = ".*";
+      attr_path_regex = "[^\\.]*";
       unversioned_attr_prefix = "";
       all_packages_path = "/pkgs/top-level/all-packages.nix";
       aliases_path = "/pkgs/top-level/aliases.nix";

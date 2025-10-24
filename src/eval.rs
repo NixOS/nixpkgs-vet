@@ -12,7 +12,7 @@ use crate::problem::{
     npv_100, npv_101, npv_102, npv_103, npv_104, npv_105, npv_106, npv_107, npv_108, npv_120,
 };
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::structure::{self, ByNameDir, ByNamePackage, Config};
+use crate::structure::{self, ByNamePackage, Config};
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::{location, ratchet};
@@ -164,7 +164,6 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     packages: &[ByNamePackage],
-    by_name_dir: &ByNameDir,
     config: &Config,
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
@@ -174,7 +173,6 @@ pub fn check_values(
 
     // Canonicalize the path so that if a symlink were returned, we wouldn't ask Nix to follow it.
     let work_dir_path = work_dir.path().canonicalize()?;
-
 
     // println!(
     //     "{}:{}: package_names for {full_path}: {}",
@@ -191,11 +189,7 @@ pub fn check_values(
     let package_names_path = work_dir_path.join("package-names.json");
     let package_names_file = fs::File::create(&package_names_path)?;
     let packages = packages.to_owned();
-    serde_json::to_writer(
-        &package_names_file,
-        &packages,
-    )
-    .with_context(|| {
+    serde_json::to_writer(&package_names_file, &packages).with_context(|| {
         format!(
             "Failed to serialise the package names to the work dir {}",
             work_dir_path.display()
@@ -258,28 +252,17 @@ pub fn check_values(
         .output()
         .with_context(|| format!("Failed to run command {command:?}"))?;
 
-    // println!(
-    //     "{}:{}: result for {full_path} (stdout): {}",
-    //     file!(),
-    //     line!(),
-    //     String::from_utf8(result.stdout.clone()).unwrap(),
-    // );
-    // println!(
-    //     "{}:{}: result for {full_path} (stderr): {}",
-    //     file!(),
-    //     line!(),
-    //     String::from_utf8(result.stderr.clone()).unwrap(),
-    // );
-
     if !result.status.success() {
         // println!("{}:{}: : eval failed for {full_path}", file!(), line!());
         // Early return in case evaluation fails
         return Ok(npv_120::NixEvalError::new(
             String::from_utf8_lossy(&result.stderr),
-            by_name_dir.clone(),
         )
         .into());
     }
+
+    println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
+    println!("{}:{}: result (stdout): {}", file!(), line!(), std::str::from_utf8(result.stdout.as_slice()).unwrap());
 
     // Parse the resulting JSON value
     let attributes: Vec<(Vec<String>, Attribute)> = serde_json::from_slice(&result.stdout)
@@ -294,7 +277,7 @@ pub fn check_values(
         attributes
             .into_iter()
             .map(|(attribute_name, attribute_value)| {
-                // println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
+                println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
@@ -302,7 +285,6 @@ pub fn check_values(
                         &attribute_name.join("."),
                         non_by_name_attribute,
                         config,
-                        by_name_dir,
                     )?,
                     Attribute::ByName(by_name_attribute) => by_name(
                         nix_file_store,
@@ -310,7 +292,6 @@ pub fn check_values(
                         &attribute_name.join("."),
                         by_name_attribute,
                         config,
-                        by_name_dir,
                     )?,
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
@@ -321,7 +302,10 @@ pub fn check_values(
     Ok(check_result.map(|elems| {
         elems
             .into_iter()
-            .map(|(attribute_name, package)| (attribute_name.join("."), package))
+            .map(|(attribute_name, package)| {
+                println!("{}:{}: attribute_name: {}, package: {package:?}", file!(), line!(), attribute_name.join("."));
+                (attribute_name.join("."), package)
+            })
             .collect()
     }))
 }
@@ -333,7 +317,6 @@ fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
     config: &Config,
-    by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
     // println!(
     //     "{}:{}:  attribute_name: {attribute_name}; by_name_attribute: {by_name_attribute:?}",
@@ -348,7 +331,7 @@ fn by_name(
         ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically define attributes in a `by-name` directory
-            npv_100::ByNameUndefinedAttribute::new(attribute_name, by_name_dir.clone()).into()
+            npv_100::ByNameUndefinedAttribute::new(attribute_name, structure::expected_by_name_dir_for_package(attribute_name, config).unwrap()).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -362,7 +345,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            npv_101::ByNameNonDerivation::new(attribute_name, by_name_dir.clone()).into()
+            npv_101::ByNameNonDerivation::new(attribute_name, structure::expected_by_name_dir_for_package(attribute_name, config).unwrap()).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -378,7 +361,7 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                npv_101::ByNameNonDerivation::new(attribute_name, by_name_dir.clone()).into()
+                npv_101::ByNameNonDerivation::new(attribute_name, structure::expected_by_name_dir_for_package(attribute_name, config).unwrap()).into()
             };
 
             // If the definition looks correct
@@ -440,7 +423,6 @@ fn by_name(
                             definition,
                             location,
                             config,
-                            by_name_dir,
                         )
                     } else {
                         // If manual definitions don't have a location, it's likely `mapAttrs`'d
@@ -461,7 +443,8 @@ fn by_name(
             is_derivation_result.and_(variant_result)
         }
     };
-    /*let result =*/ Ok(
+    /*let result =*/
+    Ok(
         // Packages being checked in this function are _always_ already defined in a `by-name` directory,
         // so instead of repeating ourselves all the time to define `uses_by_name`, just set it
         // once at the end with a map.
@@ -469,7 +452,7 @@ fn by_name(
             manual_definition,
             uses_by_name: Tight,
         }),
-    )//;
+    ) //;
     // println!("{}:{}: : result: {result:?}", file!(), line!());
     // result
 }
@@ -483,7 +466,6 @@ fn by_name_override(
     definition: String,
     location: location::Location,
     config: &Config,
-    by_name_dir: &ByNameDir,
 ) -> validation::Validation<ratchet::RatchetState<ratchet::ManualDefinition>> {
     let Some(syntactic_call_package) = optional_syntactic_call_package else {
         // Something like `<attr> = foo`
@@ -491,7 +473,7 @@ fn by_name_override(
             attribute_name,
             location,
             definition,
-            by_name_dir.clone(),
+            structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
         )
         .into();
     };
@@ -502,7 +484,7 @@ fn by_name_override(
             attribute_name,
             location,
             definition,
-            by_name_dir.clone(),
+            structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
         )
         .into();
     }
@@ -512,21 +494,27 @@ fn by_name_override(
             attribute_name,
             location,
             definition,
-            by_name_dir.clone(),
+            structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
         )
         .into();
     };
 
     let expected_by_name_dir = structure::expected_by_name_dir_for_package(attribute_name, config);
 
-    let expected_package_path =
-        structure::relative_file_for_package(attribute_name, &expected_by_name_dir);
+    
+    let expected_package_path = match expected_by_name_dir {
+        None => return Success(ratchet::RatchetState::NonApplicable), // The package doesn't belong in a by-name directory.
+        Some(x) => {
+            structure::relative_file_for_package(attribute_name, &x.path)
+        }
+    };
+
     if actual_package_path != expected_package_path {
         return npv_106::ByNameOverrideContainsWrongCallPackagePath::new(
             attribute_name,
             actual_package_path,
             location,
-            by_name_dir.clone(),
+            structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
         )
         .into();
     }
@@ -544,7 +532,7 @@ fn by_name_override(
                 attribute_name,
                 location,
                 definition,
-                by_name_dir.clone(),
+                structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
             )
             .into(),
         ))
@@ -562,10 +550,10 @@ fn handle_non_by_name_attribute(
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
     config: &Config,
-    by_name_dir: &ByNameDir,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
+
     // println!("{}:{}: attribute_name: {attribute_name}", file!(), line!());
 
     // The ratchet state whether this attribute uses a `by-name` directory
@@ -574,119 +562,127 @@ fn handle_non_by_name_attribute(
     // - Know that the attribute _could_ be migrated to a `by-name` directory, which is `Loose`
     // - Or we're unsure, in which case we use `NonApplicable`
     let uses_by_name =
-        // This is a big ol' match on various properties of the attribute
-        //
-        // First, it needs to succeed evaluation. We can't know whether an attribute could be
-        // migrated to a `by-name` directory if it doesn't evaluate, since we need to check that it's a
-        // derivation.
-        //
-        // This only has the minor negative effect that if a PR that breaks evaluation gets merged,
-        // fixing those failures won't force anything into a `by-name` directory.
-        //
-        // For now this isn't our problem, but in the future we might have another check to enforce
-        // that evaluation must not be broken.
-        //
-        // The alternative of assuming that failing attributes would have been fit for
-        // a `by-name` directory has the problem that if a package evaluation gets broken temporarily,
-        // fixing it requires a move to a `by-name` directory, which could happen more often and isn't
-        // really justified.
-        if let EvalSuccess(AttributeInfo {
-            // We're only interested in attributes that are attribute sets, which all derivations
-            // are. Anything else can't be in a `by-name` directory.
-            attribute_variant: AttributeVariant::AttributeSet {
-                // As of today, non-derivation attribute sets can't be in a `by-name` directory.
-                is_derivation: true,
-                // Of the two definition variants, really only the manual one makes sense here.
+        // Only process attributes that could belong to the current by name directory.
+        match structure::expected_by_name_dir_for_package(attribute_name, config) {
+            None => {println!("{}:{}: attribute_name {attribute_name} has expected by-name dir None", file!(), line!()); NonApplicable},
+            // Some(by_name_dir) if by_name_dir.id !=  => {println!("{}:{}: attribute_name {attribute_name} has expected by-name dir Some({x}), which is not {}", file!(), line!(), by_name_dir.path); NonApplicable},
+            Some(_) => {
+                // This is a big ol' match on various properties of the attribute
                 //
-                // Special cases are:
+                // First, it needs to succeed evaluation. We can't know whether an attribute could be
+                // migrated to a `by-name` directory if it doesn't evaluate, since we need to check that it's a
+                // derivation.
                 //
-                // - Manual aliases to auto-called packages are not treated as manual definitions,
-                //   due to limitations in the semantic `callPackage` detection.
-                //   So those should be ignored.
+                // This only has the minor negative effect that if a PR that breaks evaluation gets merged,
+                // fixing those failures won't force anything into a `by-name` directory.
                 //
-                // - Manual definitions using the internal `_internalCallByNamePackageFile` are
-                //   not treated as manual definitions, since `_internalCallByNamePackageFile` is
-                //   used to detect automatic ones. We can't distinguish from the above case, so we
-                //   just need to ignore this one too, even if that internal attribute should never
-                //   be called manually.
-                definition_variant: DefinitionVariant::ManualDefinition {
-                    is_semantic_call_package
-                }
-            },
-            // We need the location of the manual definition, because otherwise we can't figure out
-            // whether it's a syntactic `callPackage`.
-            location: Some(location),
-        }) = non_by_name_attribute {
-
-        // Parse the Nix file in the location
-        let nix_file = nix_file_store.get(&location.file)?;
-
-        // The relative location of the Nix file, for error messages
-        let location = location.relative(nixpkgs_path).with_context(|| {
-            format!("Failed to resolve the file where attribute {attribute_name} is defined")
-        })?;
-
-        // Figure out whether it's an attribute definition of the form
-        // `= callPackage <arg1> <arg2>`, returning the arguments if so.
-        let (optional_syntactic_call_package, _definition) = nix_file
-            .call_package_argument_info_at(
-                location.line,
-                location.column,
-                // Passing the Nixpkgs path here both checks that the <arg1> is within Nixpkgs,
-                // and strips the absolute Nixpkgs path from it, such that
-                // syntactic_call_package.relative_path is relative to Nixpkgs
-                nixpkgs_path
-            )
-            .with_context(|| {
-                format!("Failed to get the definition info for attribute {}", attribute_name)
-            })?;
-
-        // println!("{}:{}:  attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}", file!(), line!());
-        // At this point, we completed two different checks for whether it's a `callPackage`.
-        match (is_semantic_call_package, optional_syntactic_call_package) {
-            // Something like `<attr> = { }`
-            (false, None)
-            // Something like `<attr> = pythonPackages.callPackage ...`
-            | (false, Some(_))
-            // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
-            | (true, None) => {
-                // In all of these cases, it's not possible to migrate the package to
-                // a `by-name` directory
-                NonApplicable
-            }
-
-            // Something like `<attr> = pkgs.callPackage ...`
-            (true, Some(syntactic_call_package)) => {
-                // It's only possible to migrate such a definitions if..
-                match syntactic_call_package.relative_path {
-                    Some(ref rel_path) if config.by_name_dirs.iter().any(|base| rel_path.starts_with(base.path.as_str())) => {
-                        // ..the path is not already within a `by-name` directory like
+                // For now this isn't our problem, but in the future we might have another check to enforce
+                // that evaluation must not be broken.
+                //
+                // The alternative of assuming that failing attributes would have been fit for
+                // a `by-name` directory has the problem that if a package evaluation gets broken temporarily,
+                // fixing it requires a move to a `by-name` directory, which could happen more often and isn't
+                // really justified.
+                if let EvalSuccess(AttributeInfo {
+                    // We're only interested in attributes that are attribute sets, which all derivations
+                    // are. Anything else can't be in a `by-name` directory.
+                    attribute_variant: AttributeVariant::AttributeSet {
+                        // As of today, non-derivation attribute sets can't be in a `by-name` directory.
+                        is_derivation: true,
+                        // Of the two definition variants, really only the manual one makes sense here.
                         //
-                        //   foo-variant = callPackage ../by-name/fo/foo/package.nix {
-                        //     someFlag = true;
-                        //   }
+                        // Special cases are:
                         //
-                        // While such definitions could be moved to a `by-name` directory by using
-                        // `.override { someFlag = true; }` instead, this changes the semantics in
-                        // relation with overlays, so migration is generally not possible.
+                        // - Manual aliases to auto-called packages are not treated as manual definitions,
+                        //   due to limitations in the semantic `callPackage` detection.
+                        //   So those should be ignored.
                         //
-                        // See also "package variants" in RFC 140:
-                        // https://github.com/NixOS/rfcs/blob/master/rfcs/0140-simple-package-paths.md#package-variants
-                        NonApplicable
+                        // - Manual definitions using the internal `_internalCallByNamePackageFile` are
+                        //   not treated as manual definitions, since `_internalCallByNamePackageFile` is
+                        //   used to detect automatic ones. We can't distinguish from the above case, so we
+                        //   just need to ignore this one too, even if that internal attribute should never
+                        //   be called manually.
+                        definition_variant: DefinitionVariant::ManualDefinition {
+                            is_semantic_call_package
+                        }
+                    },
+                    // We need the location of the manual definition, because otherwise we can't figure out
+                    // whether it's a syntactic `callPackage`.
+                    location: Some(location),
+                }) = non_by_name_attribute {
+
+                    // Parse the Nix file in the location
+                    let nix_file = nix_file_store.get(&location.file)?;
+
+                    // The relative location of the Nix file, for error messages
+                    let location = location.relative(nixpkgs_path).with_context(|| {
+                        format!("Failed to resolve the file where attribute {attribute_name} is defined")
+                    })?;
+
+                    // Figure out whether it's an attribute definition of the form
+                    // `= callPackage <arg1> <arg2>`, returning the arguments if so.
+                    let (optional_syntactic_call_package, _definition) = nix_file
+                        .call_package_argument_info_at(
+                            location.line,
+                            location.column,
+                            // Passing the Nixpkgs path here both checks that the <arg1> is within Nixpkgs,
+                            // and strips the absolute Nixpkgs path from it, such that
+                            // syntactic_call_package.relative_path is relative to Nixpkgs
+                            nixpkgs_path
+                        )
+                        .with_context(|| {
+                            format!("Failed to get the definition info for attribute {}", attribute_name)
+                        })?;
+
+                    // println!("{}:{}:  attribute_name: {attribute_name}; is_semantic_call_package: {is_semantic_call_package}; optional_syntactic_call_package: {optional_syntactic_call_package:?}", file!(), line!());
+                    // At this point, we completed two different checks for whether it's a `callPackage`.
+                    match (is_semantic_call_package, optional_syntactic_call_package) {
+                        // Something like `<attr> = { }`
+                        (false, None)
+                        // Something like `<attr> = pythonPackages.callPackage ...`
+                        | (false, Some(_))
+                        // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
+                        | (true, None) => {
+                            // In all of these cases, it's not possible to migrate the package to
+                            // a `by-name` directory
+                            NonApplicable
+                        }
+
+                        // Something like `<attr> = pkgs.callPackage ...`
+                        (true, Some(syntactic_call_package)) => {
+                            // It's only possible to migrate such a definitions if..
+                            match syntactic_call_package.relative_path {
+                                Some(ref rel_path) if config.by_name_dirs.iter().any(|base| rel_path.starts_with(base.path.as_str())) => {
+                                    // ..the path is not already within a `by-name` directory like
+                                    //
+                                    //   foo-variant = callPackage ../by-name/fo/foo/package.nix {
+                                    //     someFlag = true;
+                                    //   }
+                                    //
+                                    // While such definitions could be moved to a `by-name` directory by using
+                                    // `.override { someFlag = true; }` instead, this changes the semantics in
+                                    // relation with overlays, so migration is generally not possible.
+                                    //
+                                    // See also "package variants" in RFC 140:
+                                    // https://github.com/NixOS/rfcs/blob/master/rfcs/0140-simple-package-paths.md#package-variants
+                                    NonApplicable
+                                }
+                                _ => {
+                                    // Otherwise, the path is outside a `by-name` directory, which means it can be
+                                    // migrated.
+                                    Loose((syntactic_call_package, location.file, config.clone()))
+                                }
+                            }
+                        }
                     }
-                    _ => {
-                        // Otherwise, the path is outside a `by-name` directory, which means it can be
-                        // migrated.
-                        Loose((syntactic_call_package, location.file, by_name_dir.to_owned()))
-                    }
+                } else {
+                    // This catches all the cases not matched by the above `if let`, falling back to not being
+                    // able to migrate such attributes.
+                    NonApplicable
                 }
             }
-        }
-    } else {
-        // This catches all the cases not matched by the above `if let`, falling back to not being
-        // able to migrate such attributes.
-        NonApplicable
-    };
+        };
+
     Ok(Success(ratchet::Package {
         // Packages being checked in this function _always_ need a manual definition, because
         // they're not using a `by-name` directory which would allow avoiding it. So instead of repeating

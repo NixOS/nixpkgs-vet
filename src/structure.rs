@@ -45,7 +45,7 @@ pub struct ByNameDir {
     pub aliases_path: Option<String>, // Includes a leading slash, but is still a relative path.
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[readonly::make]
 pub struct Config {
     #[serde(skip)]
@@ -132,27 +132,30 @@ pub fn relative_file_for_package(
     relative_dir_for_package(package_name, by_name_dir_path).join(PACKAGE_NIX_FILENAME)
 }
 
-pub fn expected_by_name_dir_for_package(attr_name: &str, config: &Config) -> RelativePathBuf {
+pub fn expected_by_name_dir_for_package(
+    attr_name: &str,
+    config: &Config,
+) -> Option<ByNameDir> {
     let matching_dirs: Vec<&ByNameDir> = config
         .by_name_dirs
         .iter()
         .filter(|x| x.attr_path_regex.is_match(attr_name))
         .collect();
     match matching_dirs.len() {
-        1 => matching_dirs[0].path.clone(),
+        1 => Some(matching_dirs[0].clone()),
         2 => {
             let dir1 = matching_dirs[0];
             let dir2 = matching_dirs[1];
-            // println!("attr_name: {attr_name}: dir1: {dir1:?}; dir2: {dir2:?}");
-            if dir2.attr_path_regex.as_str() == ".*" {
-                dir1.path.clone()
-            } else if dir1.attr_path_regex.as_str() == ".*" {
-                dir2.path.clone()
+            // println!("{}:{}: attr_name is {attr_name}, dirs are {dir1:?} and {dir2:?}", file!(), line!());
+            if dir2.attr_path_regex.as_str() == "[^\\.]*" {
+                Some(dir1.clone())
+            } else if dir1.attr_path_regex.as_str() == "[^\\.]*" {
+                Some(dir2.clone())
             } else {
                 panic!("Multiple wildcard regexes, or overlapping regexes, detected.")
             }
         }
-        0 => panic!("There should be exactly one wildcard regex."),
+        0 => None,
         _ => panic!("Multiple wildcard regexes, or overlapping regexes, detected."),
     }
 }
@@ -231,11 +234,11 @@ pub fn expected_by_name_dir_for_package(attr_name: &str, config: &Config) -> Rel
 pub struct ByNamePackage<'a> {
     pub attr_path: String,
     /*
-        If attr_path is a top-level attribute, package_name is the same.
-        Otherwise, package_name the part after the last dot.
-        Note that (a) package_name is not the same as Nixpkgs' pname, and
-                  (b) package_name is what gets sharded.
-     */ 
+       If attr_path is a top-level attribute, package_name is the same.
+       Otherwise, package_name the part after the last dot.
+       Note that (a) package_name is not the same as Nixpkgs' pname, and
+                 (b) package_name is what gets sharded.
+    */
     pub package_name: String,
     pub by_name_dir_id: &'a String, // ByNameDir.id
 }
@@ -247,14 +250,13 @@ pub fn check_structure<'a>(
     nix_file_store: &mut NixFileStore,
     config: &'a Config,
 ) -> validation::Result<Vec<ByNamePackage<'a>>> {
-
     let mut results = Vec::new();
 
-    for by_name_dir in &config.by_name_dirs { 
+    for by_name_dir in &config.by_name_dirs {
         let base_dir = path.join(by_name_dir.path.as_str());
         if !base_dir.exists() {
-            continue
-        }; 
+            continue;
+        };
         let mut current_dir_results = read_dir_sorted(&base_dir)?
             .into_iter()
             .map(|shard_entry| -> validation::Result<_> {
@@ -386,6 +388,10 @@ fn check_package<'a>(
             "".to_string()
         };
         let attr_path = attr_path_prefix + &package_name;
-        result.map(|_| ByNamePackage { attr_path, package_name, by_name_dir_id: &by_name_dir.id })
+        result.map(|_| ByNamePackage {
+            attr_path,
+            package_name,
+            by_name_dir_id: &by_name_dir.id,
+        })
     })
 }
