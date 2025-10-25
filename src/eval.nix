@@ -8,17 +8,19 @@
   configPath,
 }:
 let
-  # attrs = builtins.fromJSON (builtins.readFile attrsPath);
-  rawAttrs = builtins.trace "rawAttrs = ${(builtins.toJSON (builtins.fromJSON (builtins.readFile attrsPath)))}" (
+  # trace = builtins.trace
+  trace = (e1: e2: e2);
+
+  rawAttrs = trace "rawAttrs = ${(builtins.toJSON (builtins.fromJSON (builtins.readFile attrsPath)))}" (
     builtins.fromJSON (builtins.readFile attrsPath)
   );
   # an attrset where the key is the ID field from by-name-config.nix and the value is a list of attr paths.
-  attrsByDir = builtins.trace "attrsByDir = ${
+  attrsByDir = trace "attrsByDir = ${
     (builtins.toJSON (builtins.groupBy (a: a.by_name_dir_id) rawAttrs))
   }" (builtins.groupBy (a: a.by_name_dir_id) rawAttrs);
 
   # TODO: make this name accurate
-  allAttrPaths = builtins.trace "allAttrPaths = ${builtins.toJSON (map (a: a.attr_path) rawAttrs)}" (
+  allAttrPaths = trace "allAttrPaths = ${builtins.toJSON (map (a: a.attr_path) rawAttrs)}" (
     map (a: a.attr_path) rawAttrs
   );
   byNameConfig = builtins.fromJSON (builtins.readFile configPath);
@@ -86,10 +88,10 @@ let
           pkgs.lib.attrsets.getAttrFromPath (pkgs.lib.take (attrPathLength - 1) attrPath) pkgs;
     in
     {
-      location = builtins.unsafeGetAttrPos (builtins.trace "eval.nix:89: attrPath = ${builtins.toJSON attrPath}; location = ${builtins.toJSON (builtins.unsafeGetAttrPos pname parent)}" pname) parent;
+      location = builtins.unsafeGetAttrPos (trace "eval.nix:89: attrPath = ${builtins.toJSON attrPath}; location = ${builtins.toJSON (builtins.unsafeGetAttrPos pname parent)}" pname) parent;
       # location = builtins.unsafeGetAttrPos pname parent;
       attribute_variant = (
-        if (builtins.trace "path ${builtins.toJSON attrPath}; isAttrs: ${pkgs.lib.boolToString (builtins.isAttrs value)}; (value ? \"_callPackageVariant\") = ${pkgs.lib.boolToString (value ? "_callPackageVariant")}" (!(builtins.isAttrs value))) then
+        if (trace "path ${builtins.toJSON attrPath}; isAttrs: ${pkgs.lib.boolToString (builtins.isAttrs value)}; (value ? \"_callPackageVariant\") = ${pkgs.lib.boolToString (value ? "_callPackageVariant")}" (!(builtins.isAttrs value))) then
           { NonAttributeSet = null; }
         else
           {
@@ -113,7 +115,7 @@ let
       map (
         package:
         let
-          # attrPath = builtins.trace "eval.nix:106: name = ${name}" (pkgs.lib.splitString "." name);
+          # attrPath = trace "eval.nix:106: name = ${name}" (pkgs.lib.splitString "." name);
           attrPath = pkgs.lib.splitString "." package.attr_path;
           result = pkgs.lib.setAttrByPath attrPath {
             ByName =
@@ -140,37 +142,37 @@ let
     name: value:
     if (!((builtins.tryEval value).success) || !(builtins.isAttrs value)) then
       false
-    #  (builtins.trace "attrSetIsOrContainsDerivation: returning false for ${name}. tryEval is ${pkgs.lib.boolToString ((builtins.tryEval value).success)}, and isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}" false)
+    #  (trace "attrSetIsOrContainsDerivation: returning false for ${name}. tryEval is ${pkgs.lib.boolToString ((builtins.tryEval value).success)}, and isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}" false)
     else
       (
         if pkgs.lib.isDerivation value then
-          builtins.trace "isDerivation ${name} is true" true
+          trace "isDerivation ${name} is true" true
         else if
           (
-            (builtins.trace "${name}'s recurseForDerivations exists?: ${
+            (trace "${name}'s recurseForDerivations exists?: ${
               pkgs.lib.boolToString (value ? "recurseForDerivations")
             }" (value ? "recurseForDerivations"))
             && (builtins.isBool value.recurseForDerivations)
-            && (builtins.trace "evaluating value.recurseForDerivations for ${name}" (
-              builtins.trace "it has type ${builtins.typeOf (builtins.deepSeq value.recurseForDerivations value.recurseForDerivations)}" value.recurseForDerivations
+            && (trace "evaluating value.recurseForDerivations for ${name}" (
+              trace "it has type ${builtins.typeOf (builtins.deepSeq value.recurseForDerivations value.recurseForDerivations)}" value.recurseForDerivations
             ))
           )
         #  then (builtins.any pkgs.lib.id (pkgs.lib.mapAttrsToList attrSetIsOrContainsDerivation value))
         then
-          (builtins.trace "${name} has recurseForDerivations true" (
+          (trace "${name} has recurseForDerivations true" (
             let result = builtins.any pkgs.lib.id (
               pkgs.lib.mapAttrsToList (
                 k: v:
-                (builtins.trace "Seeing if ${k} is or contains a derivation" (attrSetIsOrContainsDerivation k v))
+                (trace "Seeing if ${k} is or contains a derivation" (attrSetIsOrContainsDerivation k v))
               ) value
             );
-            in builtins.trace "`attrSetIsOrContainsDerivation ${name}` is ${pkgs.lib.boolToString result}" result
+            in trace "`attrSetIsOrContainsDerivation ${name}` is ${pkgs.lib.boolToString result}" result
           ))
         else
-          builtins.trace "isDerivation ${name} is false" false
+          trace "isDerivation ${name} is false" false
       );
-  #  then (builtins.trace "attrSetIsOrContainsDerivation: returning true for ${name}" true)
-  #  else builtins.trace "attrSetIsOrContainsDerivation: recursing into ${name}" (let result = (builtins.any pkgs.lib.id (pkgs.lib.mapAttrsToList attrSetIsOrContainsDerivation value)); in builtins.seq result (builtins.trace "result of recursing into ${name} reached" result)));
+  #  then (trace "attrSetIsOrContainsDerivation: returning true for ${name}" true)
+  #  else trace "attrSetIsOrContainsDerivation: recursing into ${name}" (let result = (builtins.any pkgs.lib.id (pkgs.lib.mapAttrsToList attrSetIsOrContainsDerivation value)); in builtins.seq result (trace "result of recursing into ${name} reached" result)));
   #  else builtins.any (x: x) (pkgs.lib.mapAttrsToListRecursiveCond (k: v: !(attrSetIsOrContainsDerivation k v)) attrSetIsOrContainsDerivation value);
 
   markNonByNameAttribute =
@@ -205,14 +207,14 @@ let
         let
           recursiveResult = builtins.mapAttrs (newName: newValue: markNonByNameAttribute (attrPath ++ [newName]) newValue) value;
         in
-        (builtins.trace "recursing into name = ${builtins.toJSON pname}" (
-          builtins.seq (builtins.trace "result of recursing into ${builtins.toJSON pname}: ${builtins.toJSON recursiveResult}" recursiveResult) (
-            builtins.trace "done recursing into ${builtins.toJSON pname}" recursiveResult
+        (trace "recursing into name = ${builtins.toJSON pname}" (
+          builtins.seq (trace "result of recursing into ${builtins.toJSON pname}: ${builtins.toJSON recursiveResult}" recursiveResult) (
+            trace "done recursing into ${builtins.toJSON pname}" recursiveResult
           )
         ))
       )
     else if result.success then
-      builtins.trace
+      trace
         "eval.nix:207: name is ${builtins.toJSON pname}, value isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}, value attrSetIsOrContainsDerivation is ${pkgs.lib.boolToString (attrSetIsOrContainsDerivation pname value)}"
         {
           NonByName = {

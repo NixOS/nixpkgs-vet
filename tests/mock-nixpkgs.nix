@@ -147,7 +147,7 @@ let
         && (byNameDir.all_packages_path != null)
         && (builtins.pathExists (root + byNameDir.all_packages_path))
       ) byNameDirs;
-      paths = builtins.trace (builtins.toJSON (map (byNameDir: byNameDir.all_packages_path) filteredByNameDirs)) (map (byNameDir: byNameDir.all_packages_path) filteredByNameDirs);
+      paths = map (byNameDir: byNameDir.all_packages_path) filteredByNameDirs;
       forEachPath = relativePath: import (root + relativePath);
     in
     map forEachPath paths;
