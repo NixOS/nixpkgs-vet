@@ -192,7 +192,7 @@ fn process(
     main_nixpkgs: &Path,
     config: &Config,
 ) -> Status {
-    println!("{}:{}: base_nixpkgs {base_nixpkgs:?}, main_nixpkgs {main_nixpkgs:?}", file!(), line!());
+    // println!("{}:{}: base_nixpkgs {base_nixpkgs:?}, main_nixpkgs {main_nixpkgs:?}", file!(), line!());
     let (base_result, main_result) = std::thread::scope(|s| {
         let base_thread = s.spawn(move || check_nixpkgs(base_nixpkgs, config));
         let main_thread = s.spawn(move || check_nixpkgs(main_nixpkgs, config));

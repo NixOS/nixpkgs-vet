@@ -147,9 +147,9 @@ pub fn expected_by_name_dir_for_package(
             let dir1 = matching_dirs[0];
             let dir2 = matching_dirs[1];
             // println!("{}:{}: attr_name is {attr_name}, dirs are {dir1:?} and {dir2:?}", file!(), line!());
-            if dir2.attr_path_regex.as_str() == "[^\\.]*" {
+            if dir2.attr_path_regex.as_str() == "^[^\\.]*$" {
                 Some(dir1.clone())
-            } else if dir1.attr_path_regex.as_str() == "[^\\.]*" {
+            } else if dir1.attr_path_regex.as_str() == "^[^\\.]*$" {
                 Some(dir2.clone())
             } else {
                 panic!("Multiple wildcard regexes, or overlapping regexes, detected.")

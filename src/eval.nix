@@ -111,7 +111,8 @@ let
   # Information on all attributes that are in a `by-name` directory.
   byNameAttrsForDir =
     byNameDir:
-    pkgs.lib.foldl pkgs.lib.recursiveUpdate { } (
+    pkgs.lib.mergeAttrsList (
+    # pkgs.lib.foldl pkgs.lib.recursiveUpdate { } (
       map (
         package:
         let
@@ -141,7 +142,8 @@ let
   attrSetIsOrContainsDerivation =
     name: value:
     if (!((builtins.tryEval value).success) || !(builtins.isAttrs value)) then
-     (builtins.trace "attrSetIsOrContainsDerivation: returning false for ${name}. tryEval is ${pkgs.lib.boolToString ((builtins.tryEval value).success)}, and isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}" false)
+      false
+    #  (builtins.trace "attrSetIsOrContainsDerivation: returning false for ${name}. tryEval is ${pkgs.lib.boolToString ((builtins.tryEval value).success)}, and isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}" false)
     else
       (
         if pkgs.lib.isDerivation value then

@@ -261,8 +261,8 @@ pub fn check_values(
         .into());
     }
 
-    println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
-    println!("{}:{}: result (stdout): {}", file!(), line!(), std::str::from_utf8(result.stdout.as_slice()).unwrap());
+    // println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
+    // println!("{}:{}: result (stdout): {}", file!(), line!(), std::str::from_utf8(result.stdout.as_slice()).unwrap());
 
     // Parse the resulting JSON value
     let attributes: Vec<(Vec<String>, Attribute)> = serde_json::from_slice(&result.stdout)
@@ -277,7 +277,7 @@ pub fn check_values(
         attributes
             .into_iter()
             .map(|(attribute_name, attribute_value)| {
-                println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
+                // println!("{}:{}: attribute_name: {attribute_name:?}; attribute_value: {attribute_value:?}", file!(), line!());
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
@@ -303,7 +303,7 @@ pub fn check_values(
         elems
             .into_iter()
             .map(|(attribute_name, package)| {
-                println!("{}:{}: attribute_name: {}, package: {package:?}", file!(), line!(), attribute_name.join("."));
+                // println!("{}:{}: attribute_name: {}, package: {package:?}", file!(), line!(), attribute_name.join("."));
                 (attribute_name.join("."), package)
             })
             .collect()
@@ -564,7 +564,10 @@ fn handle_non_by_name_attribute(
     let uses_by_name =
         // Only process attributes that could belong to the current by name directory.
         match structure::expected_by_name_dir_for_package(attribute_name, config) {
-            None => {println!("{}:{}: attribute_name {attribute_name} has expected by-name dir None", file!(), line!()); NonApplicable},
+            None => {
+                // println!("{}:{}: attribute_name {attribute_name} has expected by-name dir None", file!(), line!());
+                NonApplicable
+            },
             // Some(by_name_dir) if by_name_dir.id !=  => {println!("{}:{}: attribute_name {attribute_name} has expected by-name dir Some({x}), which is not {}", file!(), line!(), by_name_dir.path); NonApplicable},
             Some(_) => {
                 // This is a big ol' match on various properties of the attribute

@@ -29,7 +29,7 @@ impl fmt::Display for NewTopLevelPackageShouldBeByName {
             structure::expected_by_name_dir_for_package(package_name, config).unwrap().path;
         let relative_package_file =
             structure::relative_file_for_package(package_name, &by_name_path);
-        println!("{}:{}: package_name {package_name}, by_name_path {by_name_path}, relative_package_file {relative_package_file}", file!(), line!());
+        // println!("{}:{}: package_name {package_name}, by_name_path {by_name_path}, relative_package_file {relative_package_file}", file!(), line!());
         let call_package_arg = call_package_path
             .as_ref()
             .map_or_else(|| "...".into(), |path| format!("./{}", path));
