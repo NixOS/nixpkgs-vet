@@ -261,8 +261,8 @@ pub fn check_values(
         .into());
     }
 
-    // println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
-    // println!("{}:{}: result (stdout): {}", file!(), line!(), std::str::from_utf8(result.stdout.as_slice()).unwrap());
+    println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
+    println!("{}:{}: result (stdout): {}", file!(), line!(), std::str::from_utf8(result.stdout.as_slice()).unwrap());
 
     // Parse the resulting JSON value
     let attributes: Vec<(Vec<String>, Attribute)> = serde_json::from_slice(&result.stdout)

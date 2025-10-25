@@ -119,34 +119,34 @@ pub fn relative_dir_for_shard(shard_name: &str, byname_basedir: &RelativePath) -
 }
 
 pub fn relative_dir_for_package(
-    package_name: &str,
+    attr_path: &str,
     by_name_dir_path: &RelativePath,
 ) -> RelativePathBuf {
+    let package_name = attr_path.split(".").last().unwrap();
     relative_dir_for_shard(&shard_for_package(package_name), by_name_dir_path).join(package_name)
 }
 
 pub fn relative_file_for_package(
-    package_name: &str,
+    attr_path: &str,
     by_name_dir_path: &RelativePath,
 ) -> RelativePathBuf {
-    relative_dir_for_package(package_name, by_name_dir_path).join(PACKAGE_NIX_FILENAME)
+    relative_dir_for_package(attr_path, by_name_dir_path).join(PACKAGE_NIX_FILENAME)
 }
 
 pub fn expected_by_name_dir_for_package(
-    attr_name: &str,
+    attr_path: &str,
     config: &Config,
 ) -> Option<ByNameDir> {
     let matching_dirs: Vec<&ByNameDir> = config
         .by_name_dirs
         .iter()
-        .filter(|x| x.attr_path_regex.is_match(attr_name))
+        .filter(|x| x.attr_path_regex.is_match(attr_path))
         .collect();
     match matching_dirs.len() {
         1 => Some(matching_dirs[0].clone()),
         2 => {
             let dir1 = matching_dirs[0];
             let dir2 = matching_dirs[1];
-            // println!("{}:{}: attr_name is {attr_name}, dirs are {dir1:?} and {dir2:?}", file!(), line!());
             if dir2.attr_path_regex.as_str() == "^[^\\.]*$" {
                 Some(dir1.clone())
             } else if dir1.attr_path_regex.as_str() == "^[^\\.]*$" {
@@ -159,6 +159,7 @@ pub fn expected_by_name_dir_for_package(
         _ => panic!("Multiple wildcard regexes, or overlapping regexes, detected."),
     }
 }
+
 
 // /// Check the structure of Nixpkgs, returning the attribute names that are defined in
 // /// the given by-name directory.
