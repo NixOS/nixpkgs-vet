@@ -307,10 +307,28 @@ mod tests {
 
     use super::process;
 
-    #[fixtures::fixtures(["tests/*"])]
+    // Manually repeat this for each subdir under tests/ in order to disambiguate
+    #[fixtures::fixtures(["tests/top-level/*"])]
     #[allow(non_snake_case)] // the test directories don't use snake case, and the macro expansion causes a warning.
     #[test]
-    fn test_dir(path: &Path) -> anyhow::Result<()> {
+    fn test_top_level_dir(path: &Path) -> anyhow::Result<()> {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !path.is_dir() {
+            return Ok(());
+        }
+
+        let expected_errors = fs::read_to_string(path.join("expected"))
+            .with_context(|| format!("No expected file for test {name}"))?;
+
+        test_nixpkgs(&name, path, &expected_errors);
+        Ok(())
+    }
+
+    // Manually repeat this for each subdir under tests/ in order to disambiguate
+    #[fixtures::fixtures(["tests/tcl/*"])]
+    #[allow(non_snake_case)] // the test directories don't use snake case, and the macro expansion causes a warning.
+    #[test]
+    fn test_tcl_dir(path: &Path) -> anyhow::Result<()> {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
         if !path.is_dir() {
             return Ok(());
@@ -382,7 +400,7 @@ mod tests {
         temp_env::with_var("TMPDIR", Some(&tmpdir), || {
             test_nixpkgs(
                 "symlinked_tmpdir",
-                Path::new("tests/success"),
+                Path::new("tests/top-level/success"),
                 "Validated successfully\n",
             );
         });
@@ -406,7 +424,7 @@ mod tests {
         let base_nixpkgs = if base_path.exists() {
             base_path
         } else {
-            Path::new("tests/empty-base/main").to_owned()
+            Path::new("tests/top-level/empty-base/main").to_owned()
         };
 
         // Empty dir, needed so that no warnings are printed when testing older Nix versions
