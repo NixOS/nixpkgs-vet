@@ -10,15 +10,14 @@
 #   * All non-wildcard unversioned_attr_prefixes must be mutually exclusive.
 {
   by_name_dirs = [
-    # Not quite yet!
-    # {
-    #   id = "py";
-    #   path = "pkgs/development/python-modules/by-name";
-    #   attr_path_regex = "^(python3\\d*Packages|python3\\d*.pkgs)\\..*$";
-    #   unversioned_attr_prefix = "python3Packages";
-    #   all_packages_path = "/pkgs/top-level/python-packages.nix";
-    #   aliases_path = "/pkgs/top-level/python-aliases.nix";
-    # }
+    {
+      id = "py";
+      path = "pkgs/development/python-modules/by-name";
+      attr_path_regex = "^(python3\\d*Packages|python3\\d*.pkgs)\\..*$";
+      unversioned_attr_prefix = "python3Packages";
+      all_packages_path = "/pkgs/top-level/python-packages.nix";
+      aliases_path = "/pkgs/top-level/python-aliases.nix";
+    }
     {
       id = "tcl";
       path = "pkgs/development/tcl-modules/by-name";
