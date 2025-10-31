@@ -25,10 +25,10 @@ impl fmt::Display for NewTopLevelPackageShouldBeByName {
             file,
             config,
         } = self;
-        let by_name_path =
-            structure::expected_by_name_dir_for_package(attr_path, config).unwrap().path;
-        let relative_package_file =
-            structure::relative_file_for_package(attr_path, &by_name_path);
+        let by_name_path = structure::expected_by_name_dir_for_package(attr_path, config)
+            .unwrap()
+            .path;
+        let relative_package_file = structure::relative_file_for_package(attr_path, &by_name_path);
         // println!("{}:{}: attr_path {attr_path}, by_name_path {by_name_path}, relative_package_file {relative_package_file}", file!(), line!());
         let call_package_arg = call_package_path
             .as_ref()

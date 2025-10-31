@@ -45,8 +45,7 @@ let
     # This overrides the above `callPackage` information. It's OK because we don't need that one,
     # since `pkgs/by-name` always uses `callPackage` underneath.
     _internalCallByNamePackageFile =
-      file:
-      addVariantInfo (prev._internalCallByNamePackageFile file) { AutoDefinition = null; };
+      file: addVariantInfo (prev._internalCallByNamePackageFile file) { AutoDefinition = null; };
   };
 
   # We can't just replace attribute values with their info in the overlay, because attributes can
@@ -91,7 +90,14 @@ let
       location = builtins.unsafeGetAttrPos (trace "eval.nix:89: attrPath = ${builtins.toJSON attrPath}; location = ${builtins.toJSON (builtins.unsafeGetAttrPos pname parent)}" pname) parent;
       # location = builtins.unsafeGetAttrPos pname parent;
       attribute_variant = (
-        if (trace "path ${builtins.toJSON attrPath}; isAttrs: ${pkgs.lib.boolToString (builtins.isAttrs value)}; (value ? \"_callPackageVariant\") = ${pkgs.lib.boolToString (value ? "_callPackageVariant")}" (!(builtins.isAttrs value))) then
+        if
+          (trace
+            "path ${builtins.toJSON attrPath}; isAttrs: ${pkgs.lib.boolToString (builtins.isAttrs value)}; (value ? \"_callPackageVariant\") = ${
+              pkgs.lib.boolToString (value ? "_callPackageVariant")
+            }"
+            (!(builtins.isAttrs value))
+          )
+        then
           { NonAttributeSet = null; }
         else
           {
@@ -111,7 +117,7 @@ let
   byNameAttrsForDir =
     byNameDir:
     pkgs.lib.mergeAttrsList (
-    # pkgs.lib.foldl pkgs.lib.recursiveUpdate { } (
+      # pkgs.lib.foldl pkgs.lib.recursiveUpdate { } (
       map (
         package:
         let
@@ -160,13 +166,14 @@ let
         #  then (builtins.any pkgs.lib.id (pkgs.lib.mapAttrsToList attrSetIsOrContainsDerivation value))
         then
           (trace "${name} has recurseForDerivations true" (
-            let result = builtins.any pkgs.lib.id (
-              pkgs.lib.mapAttrsToList (
-                k: v:
-                (trace "Seeing if ${k} is or contains a derivation" (attrSetIsOrContainsDerivation k v))
-              ) value
-            );
-            in trace "`attrSetIsOrContainsDerivation ${name}` is ${pkgs.lib.boolToString result}" result
+            let
+              result = builtins.any pkgs.lib.id (
+                pkgs.lib.mapAttrsToList (
+                  k: v: (trace "Seeing if ${k} is or contains a derivation" (attrSetIsOrContainsDerivation k v))
+                ) value
+              );
+            in
+            trace "`attrSetIsOrContainsDerivation ${name}` is ${pkgs.lib.boolToString result}" result
           ))
         else
           trace "isDerivation ${name} is false" false
@@ -205,7 +212,9 @@ let
     then
       (
         let
-          recursiveResult = builtins.mapAttrs (newName: newValue: markNonByNameAttribute (attrPath ++ [newName]) newValue) value;
+          recursiveResult = builtins.mapAttrs (
+            newName: newValue: markNonByNameAttribute (attrPath ++ [ newName ]) newValue
+          ) value;
         in
         (trace "recursing into name = ${builtins.toJSON pname}" (
           builtins.seq (trace "result of recursing into ${builtins.toJSON pname}: ${builtins.toJSON recursiveResult}" recursiveResult) (
@@ -233,8 +242,7 @@ let
 
   # Second-newest
   nonByNameAttrs = (
-    builtins.mapAttrs markNonByNameAttribute 
-     (
+    builtins.mapAttrs markNonByNameAttribute (
       builtins.removeAttrs pkgs (
         allAttrPaths ++ [ "lib" ] # Need to exclude lib to avoid infinite recursion
       )

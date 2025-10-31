@@ -133,10 +133,7 @@ pub fn relative_file_for_package(
     relative_dir_for_package(attr_path, by_name_dir_path).join(PACKAGE_NIX_FILENAME)
 }
 
-pub fn expected_by_name_dir_for_package(
-    attr_path: &str,
-    config: &Config,
-) -> Option<ByNameDir> {
+pub fn expected_by_name_dir_for_package(attr_path: &str, config: &Config) -> Option<ByNameDir> {
     let matching_dirs: Vec<&ByNameDir> = config
         .by_name_dirs
         .iter()
@@ -159,7 +156,6 @@ pub fn expected_by_name_dir_for_package(
         _ => panic!("Multiple wildcard regexes, or overlapping regexes, detected."),
     }
 }
-
 
 // /// Check the structure of Nixpkgs, returning the attribute names that are defined in
 // /// the given by-name directory.

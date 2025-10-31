@@ -63,8 +63,7 @@ fn main() -> ExitCode {
     let config_file = Path::new(&config_file);
     let config = read_config(config_file);
 
-    let status: ColoredStatus =
-        process(&args.base, &args.nixpkgs, &config).into();
+    let status: ColoredStatus = process(&args.base, &args.nixpkgs, &config).into();
     eprintln!("{status}");
     status.into()
 }
@@ -187,11 +186,7 @@ fn main() -> ExitCode {
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
 /// - `config`: The by-name configuration object
-fn process(
-    base_nixpkgs: &Path,
-    main_nixpkgs: &Path,
-    config: &Config,
-) -> Status {
+fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status {
     // println!("{}:{}: base_nixpkgs {base_nixpkgs:?}, main_nixpkgs {main_nixpkgs:?}", file!(), line!());
     let (base_result, main_result) = std::thread::scope(|s| {
         let base_thread = s.spawn(move || check_nixpkgs(base_nixpkgs, config));
@@ -230,9 +225,13 @@ fn process(
         let main_result = main_result.unwrap();
         match (base_result, main_result) {
             (Failure(base_errors), Failure(errors)) => {
-                println!("{}:{}: base_errors {base_errors:?}, main errors {errors:?}", file!(), line!());
+                println!(
+                    "{}:{}: base_errors {base_errors:?}, main errors {errors:?}",
+                    file!(),
+                    line!()
+                );
                 Status::BranchStillBroken(errors)
-            },
+            }
             (Success(..), Failure(errors)) => Status::ProblemsIntroduced(errors),
             (Failure(..), Success(..)) => Status::BranchHealed,
             (Success(base), Success(main)) => {
@@ -251,10 +250,7 @@ fn process(
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-fn check_nixpkgs(
-    nixpkgs_path: &Path,
-    config: &Config,
-) -> validation::Result<ratchet::Nixpkgs> {
+fn check_nixpkgs(nixpkgs_path: &Path, config: &Config) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
             "Nixpkgs path {} could not be resolved",
@@ -265,7 +261,7 @@ fn check_nixpkgs(
     let mut nix_file_store = NixFileStore::default();
 
     let package_result = {
-         let structure = check_structure(&nixpkgs_path, &mut nix_file_store, config)?;
+        let structure = check_structure(&nixpkgs_path, &mut nix_file_store, config)?;
 
         // Only if we could successfully parse the structure, we do the evaluation checks
         structure.result_map(|package_names| {

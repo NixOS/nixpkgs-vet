@@ -25,8 +25,9 @@ impl fmt::Display for TopLevelPackageMovedOutOfByNameWithCustomArguments {
             file,
             config,
         } = self;
-        let by_name_path =
-            structure::expected_by_name_dir_for_package(package_name, config).unwrap().path;
+        let by_name_path = structure::expected_by_name_dir_for_package(package_name, config)
+            .unwrap()
+            .path;
         let relative_package_file =
             structure::relative_file_for_package(package_name, &by_name_path);
         let call_package_arg = call_package_path

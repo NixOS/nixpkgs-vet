@@ -1,1 +1,1 @@
-{ someDrv }: someDrv# // {type = "derivation";}
+{ someDrv }: someDrv

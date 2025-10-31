@@ -34,13 +34,13 @@ impl Nixpkgs {
             // comparison
             to.packages
                 .iter()
-                .map(|(name, pkg)| {
-                    Package::compare(name, from.packages.get(name), pkg)
-                }),
+                .map(|(name, pkg)| Package::compare(name, from.packages.get(name), pkg)),
         )
-        .and_(validation::sequence_(to.files.iter().map(
-            |(name, file)| File::compare(name, from.files.get(name), file),
-        )))
+        .and_(validation::sequence_(
+            to.files
+                .iter()
+                .map(|(name, file)| File::compare(name, from.files.get(name), file)),
+        ))
     }
 }
 

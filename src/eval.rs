@@ -255,10 +255,7 @@ pub fn check_values(
     if !result.status.success() {
         // println!("{}:{}: : eval failed for {full_path}", file!(), line!());
         // Early return in case evaluation fails
-        return Ok(npv_120::NixEvalError::new(
-            String::from_utf8_lossy(&result.stderr),
-        )
-        .into());
+        return Ok(npv_120::NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
     }
 
     // println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
@@ -331,7 +328,11 @@ fn by_name(
         ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
             // automatically define attributes in a `by-name` directory
-            npv_100::ByNameUndefinedAttribute::new(attribute_name, structure::expected_by_name_dir_for_package(attribute_name, config).unwrap()).into()
+            npv_100::ByNameUndefinedAttribute::new(
+                attribute_name,
+                structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
+            )
+            .into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -345,7 +346,11 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            npv_101::ByNameNonDerivation::new(attribute_name, structure::expected_by_name_dir_for_package(attribute_name, config).unwrap()).into()
+            npv_101::ByNameNonDerivation::new(
+                attribute_name,
+                structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
+            )
+            .into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -361,7 +366,11 @@ fn by_name(
             let is_derivation_result = if is_derivation {
                 Success(())
             } else {
-                npv_101::ByNameNonDerivation::new(attribute_name, structure::expected_by_name_dir_for_package(attribute_name, config).unwrap()).into()
+                npv_101::ByNameNonDerivation::new(
+                    attribute_name,
+                    structure::expected_by_name_dir_for_package(attribute_name, config).unwrap(),
+                )
+                .into()
             };
 
             // If the definition looks correct
@@ -501,12 +510,9 @@ fn by_name_override(
 
     let expected_by_name_dir = structure::expected_by_name_dir_for_package(attribute_name, config);
 
-    
     let expected_package_path = match expected_by_name_dir {
         None => return Success(ratchet::RatchetState::NonApplicable), // The package doesn't belong in a by-name directory.
-        Some(x) => {
-            structure::relative_file_for_package(attribute_name, &x.path)
-        }
+        Some(x) => structure::relative_file_for_package(attribute_name, &x.path),
     };
 
     if actual_package_path != expected_package_path {
