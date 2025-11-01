@@ -81,7 +81,11 @@ let
         updateScripts = {
           npins = pkgs.writeShellApplication {
             name = "update-npins";
-            runtimeInputs = with pkgs; [ npins ];
+            runtimeInputs = [
+              defaultNixPackage
+              pkgs.npins
+              pkgs.openssh
+            ];
             text = ''
               echo "<details><summary>npins changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
@@ -102,6 +106,7 @@ let
               cargo-audit
               cargo-edit # provides `cargo upgrade`
               cargo-outdated
+              openssh
             ];
             text = ''
               echo "<details><summary>cargo changes</summary>"
