@@ -265,14 +265,12 @@ fn check_nixpkgs(nixpkgs_path: &Path, config: &Config) -> validation::Result<rat
 
         // Only if we could successfully parse the structure, we do the evaluation checks
         structure.result_map(|package_names| {
-            let eval_result = eval::check_values(
+            eval::check_values(
                 &nixpkgs_path,
                 &mut nix_file_store,
                 package_names.as_slice(),
                 config,
-            );
-            // println!("{}:{}: eval_result: {eval_result:?}", file!(), line!());
-            eval_result
+            )
         })?
     };
 
