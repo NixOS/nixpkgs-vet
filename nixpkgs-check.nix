@@ -3,6 +3,7 @@
   runCommand,
   nixpkgs-vet,
   initNix,
+  writeText,
   nixpkgs,
   nix,
   nixVersions,
@@ -20,6 +21,10 @@ let
       eval.success && lib.isDerivation eval.value
     ) attrset;
 
+  configFile = writeText "by-name-config-generated.json" (
+    builtins.toJSON (import ./by-name-config.nix)
+  );
+
   mkNixpkgsCheck =
     name: nix:
     runCommand "test-nixpkgs-vet-with-${nix.name}"
@@ -29,7 +34,10 @@ let
           nix
         ];
 
-        env.NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
+        env = {
+          NIXPKGS_VET_NIX_PACKAGE = lib.getBin nix;
+          NIXPKGS_VET_CONFIG_FILE = configFile;
+        };
 
         passthru = {
           # Allow running against all other Nix versions.
@@ -46,6 +54,7 @@ let
         ${initNix}
         # This is what nixpkgs-vet uses
         export NIXPKGS_VET_NIX_PACKAGE=${lib.getBin nix}
+        export NIXPKGS_VET_CONFIG_FILE=${configFile}
         ${nixpkgs-vet}/bin/.nixpkgs-vet-wrapped --base "${nixpkgs}" "${nixpkgs}"
         touch $out
       '';

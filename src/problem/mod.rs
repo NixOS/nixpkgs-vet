@@ -34,7 +34,7 @@ pub mod npv_161;
 pub mod npv_162;
 pub mod npv_163;
 
-#[derive(Clone, Display, EnumFrom)]
+#[derive(Clone, Display, EnumFrom, Debug)]
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
     ByNameUndefinedAttribute(npv_100::ByNameUndefinedAttribute),

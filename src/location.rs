@@ -22,6 +22,7 @@ impl Location {
 ///
 /// This doesn't do any Unicode handling, though that probably doesn't matter because newlines
 /// can't split up Unicode characters. This is only used for error reporting.
+#[derive(Clone)]
 pub struct LineIndex {
     /// Stores the indices of newlines
     newlines: Vec<usize>,

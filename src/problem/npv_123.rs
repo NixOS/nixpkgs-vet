@@ -6,7 +6,7 @@ use relative_path::RelativePathBuf;
 
 use crate::structure::PACKAGE_NIX_FILENAME;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct NixFileContainsPathOutsideDirectory {
     #[new(into)]
     relative_package_dir: RelativePathBuf,
@@ -33,7 +33,7 @@ impl fmt::Display for NixFileContainsPathOutsideDirectory {
               Alternatives include:
               - If you are creating a new version of a package with a common file between versions, consider following the recommendation in https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name#recommendation-for-new-packages-with-multiple-versions.
               - If the path being referenced could be considered a stable interface with multiple uses, consider exposing it via a `pkgs` attribute, then taking it as a attribute argument in {PACKAGE_NIX_FILENAME}.
-              - If the path being referenced is internal and has multiple uses, consider passing the file as an explicit `callPackage` argument in `pkgs/top-level/all-packages.nix`.
+              - If the path being referenced is internal and has multiple uses, consider passing the file as an explicit `callPackage` argument in `pkgs/top-level/all-packages.nix` or equivalent.
               - If the path being referenced is internal and will need to be modified independently of the original, consider copying it into the {relative_package_dir} directory.
             "
         )

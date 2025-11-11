@@ -1,0 +1,4 @@
+@REDACTED@trace: This should be on stderr!@REDACTED@
+@REDACTED@error: This is an error!@REDACTED@
+- Nix evaluation failed for some package in a by-name directory, see error above
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

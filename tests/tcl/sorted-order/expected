@@ -1,0 +1,31 @@
+- Because pkgs/development/tcl-modules/by-name/a/a exists, the attribute `tclPackages.a` must be defined like
+
+    tclPackages.a = callPackage ./../development/tcl-modules/by-name/a/a/package.nix { /* ... */ };
+
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/tcl-packages.nix:18:
+
+    a = tclSelf.callPackage ../development/tcl-modules/by-name/a/a/package.nix { };
+
+  Such a definition is provided automatically and therefore not necessary. Please remove it.
+
+- Attribute `tclPackages.b` is a new top-level package using `callPackage ... { /* ... */ }`.
+  Please define it in pkgs/development/tcl-modules/by-name/b/b/package.nix instead.
+  See `pkgs/by-name/README.md` for more details.
+  Since the second `callPackage` argument is `{ }`, no manual `callPackage` in pkgs/top-level/tcl-packages.nix is needed anymore.
+
+- Because pkgs/development/tcl-modules/by-name/c/c exists, the attribute `tclPackages.c` must be defined like
+
+    tclPackages.c = callPackage ./../development/tcl-modules/by-name/c/c/package.nix { /* ... */ };
+
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/tcl-packages.nix:20:
+
+    c = tclSelf.callPackage ../development/tcl-modules/by-name/c/c/package.nix { };
+
+  Such a definition is provided automatically and therefore not necessary. Please remove it.
+
+- Attribute `tclPackages.d` is a new top-level package using `callPackage ... { /* ... */ }`.
+  Please define it in pkgs/development/tcl-modules/by-name/d/d/package.nix instead.
+  See `pkgs/by-name/README.md` for more details.
+  Since the second `callPackage` argument is `{ }`, no manual `callPackage` in pkgs/top-level/tcl-packages.nix is needed anymore.
+
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.

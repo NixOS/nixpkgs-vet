@@ -3,7 +3,7 @@ use std::fmt;
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct InvalidPackageDirectoryName {
     #[new(into)]
     package_name: String,
