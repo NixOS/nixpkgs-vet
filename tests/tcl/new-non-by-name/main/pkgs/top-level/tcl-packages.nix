@@ -12,8 +12,11 @@ in
 {
   tclPackages = self.lib.makeScope newScope (
     tclSelf:
-    self.lib.recurseIntoAttrs {
-      foo = tclSelf.callPackage ../development/tcl-modules/foo.nix { };
-    }
+    (
+      self.lib.recurseIntoAttrs (super.tclPackages or { })
+      // {
+        foo = tclSelf.callPackage ../development/tcl-modules/foo.nix { };
+      }
+    )
   );
 }

@@ -68,19 +68,10 @@ let
     byNameDir:
     let
       entries = builtins.readDir (
-        builtins.trace
-          "mock-nixpkgs.nix:73: full path = ${
-            (lib.concatStringsSep "/" [
-              (builtins.toString root)
-              byNameDir.path
-            ])
-          }"
-          (
-            lib.concatStringsSep "/" [
-              (builtins.toString root)
-              byNameDir.path
-            ]
-          )
+        lib.concatStringsSep "/" [
+          (builtins.toString root)
+          byNameDir.path
+        ]
       );
 
       namesForShard =
@@ -120,9 +111,8 @@ let
                 ]
               )
             ) fileNames;
-            merged = lib.mergeAttrsList attrSetList;
           in
-          merged;
+          builtins.foldl' lib.recursiveUpdate { } attrSetList;
     in
     builtins.foldl' (acc: el: acc // el) { } (map namesForShard (builtins.attrNames entries));
 
@@ -147,8 +137,8 @@ let
         && (byNameDir.all_packages_path != null)
         && (builtins.pathExists (root + byNameDir.all_packages_path))
       ) byNameDirs;
-      paths = map (byNameDir: byNameDir.all_packages_path) filteredByNameDirs;
-      forEachPath = relativePath: import (root + relativePath);
+      paths = map (byNameDir: (root + byNameDir.all_packages_path)) filteredByNameDirs;
+      forEachPath = path: import path;
     in
     map forEachPath paths;
 

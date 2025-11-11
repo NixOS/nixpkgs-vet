@@ -227,7 +227,7 @@ pub fn expected_by_name_dir_for_package(attr_path: &str, config: &Config) -> Opt
 //     // Combine the package names contained within each shard into a longer list.
 //     Ok(validation::sequence(shard_results).map(concat))
 // }
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct ByNamePackage<'a> {
     pub attr_path: String,
     /*

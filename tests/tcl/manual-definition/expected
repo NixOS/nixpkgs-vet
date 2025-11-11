@@ -1,0 +1,21 @@
+- Because pkgs/development/tcl-modules/by-name/no/noEval exists, the attribute `tclPackages.noEval` must be defined like
+
+    tclPackages.noEval = callPackage ./../development/tcl-modules/by-name/no/noEval/package.nix { /* ... */ };
+
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/tcl-packages.nix:26:
+
+    noEval = tclSelf.callPackage ./../development/tcl-modules/by-name/no/noEval/package.nix { };
+
+  Such a definition is provided automatically and therefore not necessary. Please remove it.
+
+- Because pkgs/development/tcl-modules/by-name/on/onlyMove exists, the attribute `tclPackages.onlyMove` must be defined like
+
+    tclPackages.onlyMove = callPackage ./../development/tcl-modules/by-name/on/onlyMove/package.nix { /* ... */ };
+
+  However, in this PR, the second argument is empty. See the definition in pkgs/top-level/tcl-packages.nix:24:
+
+    onlyMove = tclSelf.callPackage ./../development/tcl-modules/by-name/on/onlyMove/package.nix { };
+
+  Such a definition is provided automatically and therefore not necessary. Please remove it.
+
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.

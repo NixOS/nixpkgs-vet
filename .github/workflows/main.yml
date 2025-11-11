@@ -52,3 +52,5 @@ jobs:
           xrefcheck-args: >
             --ignore tests/top-level/symlink-invalid/main/pkgs/by-name/fo/foo/foo
             --ignore tests/top-level/multiple-failures/main/pkgs/by-name/A/fo@/foo
+            --ignore tests/tcl/multiple-failures/main/pkgs/development/tcl-modules/by-name/A/fo@/foo
+            --ignore tests/tcl/symlink-invalid/main/pkgs/development/tcl-modules/by-name/fo/foo/foo

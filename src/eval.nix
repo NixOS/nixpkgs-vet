@@ -8,8 +8,23 @@
   configPath,
 }:
 let
-  # trace = builtins.trace
+  # trace = builtins.trace;
   trace = (e1: e2: e2);
+
+  # https://discourse.nixos.org/t/modify-an-attrset-in-nix/29919/5
+  removeAttrByPath =
+    attrPath: set:
+    pkgs.lib.updateManyAttrsByPath [
+      {
+        path = pkgs.lib.init attrPath;
+        update = old: pkgs.lib.filterAttrs (n: v: n != (pkgs.lib.last attrPath)) old;
+      }
+    ] set;
+  removeAttrsByPaths =
+    set: attrPathStrings:
+    builtins.foldl' (acc: elem: removeAttrByPath elem acc) set (
+      map (s: pkgs.lib.splitString "." s) attrPathStrings
+    );
 
   rawAttrs = trace "rawAttrs = ${(builtins.toJSON (builtins.fromJSON (builtins.readFile attrsPath)))}" (
     builtins.fromJSON (builtins.readFile attrsPath)
@@ -116,12 +131,10 @@ let
   # Information on all attributes that are in a `by-name` directory.
   byNameAttrsForDir =
     byNameDir:
-    pkgs.lib.mergeAttrsList (
-      # pkgs.lib.foldl pkgs.lib.recursiveUpdate { } (
+    builtins.foldl' pkgs.lib.recursiveUpdate { } (
       map (
         package:
         let
-          # attrPath = trace "eval.nix:106: name = ${name}" (pkgs.lib.splitString "." name);
           attrPath = pkgs.lib.splitString "." package.attr_path;
           result = pkgs.lib.setAttrByPath attrPath {
             ByName =
@@ -216,7 +229,7 @@ let
             newName: newValue: markNonByNameAttribute (attrPath ++ [ newName ]) newValue
           ) value;
         in
-        (trace "recursing into name = ${builtins.toJSON pname}" (
+        (trace "recursing into name = ${builtins.toJSON pname}, which has attributes ${builtins.toJSON (builtins.attrNames recursiveResult)}" (
           builtins.seq (trace "result of recursing into ${builtins.toJSON pname}: ${builtins.toJSON recursiveResult}" recursiveResult) (
             trace "done recursing into ${builtins.toJSON pname}" recursiveResult
           )
@@ -241,9 +254,17 @@ let
   # We need this to enforce placement in a `by-name` directory for new packages.
 
   # Second-newest
+  # nonByNameAttrs = (
+  #   builtins.mapAttrs markNonByNameAttribute (
+  #     builtins.removeAttrs pkgs (
+  #       allAttrPaths ++ [ "lib" ] # Need to exclude lib to avoid infinite recursion
+  #     )
+  #   )
+  # );
+
   nonByNameAttrs = (
     builtins.mapAttrs markNonByNameAttribute (
-      builtins.removeAttrs pkgs (
+      removeAttrsByPaths pkgs (
         allAttrPaths ++ [ "lib" ] # Need to exclude lib to avoid infinite recursion
       )
     )
@@ -269,8 +290,80 @@ let
   #   }
   # ) (builtins.removeAttrs pkgs (attrs ++ [ "lib" ])); # Need to exclude lib to avoid infinite recursion
 
+  customMergeAttrs =
+    byName: nonByName:
+    let
+      inherit (builtins) isAttrs;
+      byNameNames = builtins.trace "byNameNames is ${builtins.toJSON (builtins.attrNames byName)}" (
+        builtins.attrNames byName
+      );
+      nonByNameNames = builtins.trace "nonByNameNames is ${builtins.toJSON (builtins.attrNames nonByName)}" (
+        builtins.attrNames nonByName
+      );
+      onlyByName = pkgs.lib.subtractLists nonByNameNames byNameNames;
+      onlyNonByName = pkgs.lib.subtractLists byNameNames nonByNameNames;
+      inBothLists = pkgs.lib.intersectLists byNameNames nonByNameNames;
+    in
+    builtins.listToAttrs (
+      (map (x: {
+        name = x;
+        value = byName.${x};
+      }) onlyByName)
+      ++ (map (x: {
+        name = x;
+        value = nonByName.${x};
+      }) onlyNonByName)
+      ++ (map (
+        x:
+        builtins.trace
+          "x = ${x}; byName.${x} = ${builtins.toJSON byName.${x}}; nonByName.${x} = ${builtins.toJSON nonByName.${x}}"
+          (
+            if
+              !(isAttrs byName.${x}) # And nonByName.${x} is or is not an attrset, we don't care.
+            then
+              {
+                name = x;
+                value = nonByName.${x};
+              }
+            else if !(isAttrs nonByName.${x}) then
+              throw "Shouldn't happen??? "
+            else if byName.${x} ? "ByName" && nonByName.${x} ? "NonByName" then
+              {
+                name = x;
+                value = {
+                  ByName = nonByName.${x}.NonByName;
+                };
+              }
+            else if
+              (builtins.removeAttrs byName.${x} [
+                "NonByName"
+                "ByName"
+              ]) != { }
+              && nonByName.${x} ? "NonByName"
+            then
+              {
+                name = x;
+                value = byName.${x};
+              }
+            else
+              {
+                name = x;
+                value = customMergeAttrs byName.${x} nonByName.${x};
+              }
+          )
+      ) inBothLists)
+    );
+
   # All attributes
-  attributes = byNameAttrs // nonByNameAttrs;
+  # attributes = pkgs.lib.recursiveUpdateUntil (attrPath: left: right:
+  #   trace "eval.nix:293: attrPath ${builtins.toJSON attrPath}; left attrNames are ${if builtins.isAttrs left then (builtins.toJSON (builtins.attrNames left)) else "not an attrset"}; right attrNames are ${if builtins.isAttrs right then builtins.toJSON (builtins.attrNames right) else "not an attrset"}"
+  #     ((builtins.removeAttrs left ["NonByName" "ByName"]) != { } && right ? "NonByName")
+  #     # ||
+  #     # ((left ? "ByName" || left ? "NonByName") && (right ? "ByName" || right ? "NonByName"))
+  #   ) byNameAttrs nonByNameAttrs;
+
+  attributes = customMergeAttrs byNameAttrs nonByNameAttrs;
+
   result =
     pkgs.lib.mapAttrsToListRecursiveCond
       (attrPath: attrValue: !((attrValue ? "NonByName") || (attrValue ? "ByName")))

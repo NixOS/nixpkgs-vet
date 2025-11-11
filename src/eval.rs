@@ -213,7 +213,7 @@ pub fn check_values(
     let nix_package = env::var("NIXPKGS_VET_NIX_PACKAGE")
         .with_context(|| "Could not get environment variable NIXPKGS_VET_NIX_PACKAGE")?;
 
-    // println!("package_names_path: {package_names_path:?}");
+    println!("packages: {packages:?}");
 
     // With restrict-eval, only paths in NIX_PATH can be accessed. We explicitly specify them here.
     let mut command = process::Command::new(format!("{nix_package}/bin/nix-instantiate"));
@@ -252,14 +252,24 @@ pub fn check_values(
         .output()
         .with_context(|| format!("Failed to run command {command:?}"))?;
 
+    println!(
+        "{}:{}: result (stderr): {}",
+        file!(),
+        line!(),
+        std::str::from_utf8(result.stderr.as_slice()).unwrap()
+    );
+    println!(
+        "{}:{}: result (stdout): {}",
+        file!(),
+        line!(),
+        std::str::from_utf8(result.stdout.as_slice()).unwrap()
+    );
+
     if !result.status.success() {
         // println!("{}:{}: : eval failed for {full_path}", file!(), line!());
         // Early return in case evaluation fails
         return Ok(npv_120::NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
     }
-
-    // println!("{}:{}: result (stderr): {}", file!(), line!(), std::str::from_utf8(result.stderr.as_slice()).unwrap());
-    // println!("{}:{}: result (stdout): {}", file!(), line!(), std::str::from_utf8(result.stdout.as_slice()).unwrap());
 
     // Parse the resulting JSON value
     let attributes: Vec<(Vec<String>, Attribute)> = serde_json::from_slice(&result.stdout)
