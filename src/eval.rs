@@ -561,6 +561,30 @@ fn handle_non_by_name_attribute(
                         NonApplicable
                     }
                     _ => {
+                        // TODO: Insert check to make sure that all files under the referenced path can be
+                        // moved without breakage
+                        //
+                        // foo = callPackage ../applications/foo { };         # already there before
+                        //
+                        // foo_2 = callPackage ../applications/foo/2.nix { }; # new
+                        //
+                        //
+                        // # foo/common.nix exists
+                        // # foo/default.nix and foo/2.nix reference foo/common.nix
+                        //
+                        // Currently this gives an error, saying that `foo_2` should be migrated.
+                        //
+                        // To do:
+                        // - Collect all files transitively referenced by the entry-point file
+                        // - Check that they all are within the directory of the entry-point file
+                        // - Check that they all have a movable ancestor within the directory of the entry-point file
+                        //   - Ignore the one reference being considered in all-packages.nix
+                        //
+                        // Logic in
+                        // https://github.com/nixpkgs-architecture/nix-spp/blob/2a6ff6cb2a74f55032aa48531eac5a14dc4fc2bb/src/main.rs#L22C1-L22C6
+                        // is really good
+
+
                         // Otherwise, the path is outside `pkgs/by-name`, which means it can be
                         // migrated.
                         Loose((syntactic_call_package, location.file))
