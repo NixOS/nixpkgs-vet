@@ -9,10 +9,11 @@ use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163};
+use crate::structure::Config;
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Nixpkgs {
     /// The ratchet values for all packages
     pub packages: BTreeMap<String, Package>,
@@ -21,21 +22,30 @@ pub struct Nixpkgs {
 
 impl Nixpkgs {
     /// Validates the ratchet checks for Nixpkgs
-    pub fn compare(from: &Self, to: Self) -> Validation<()> {
+    pub fn compare(from: &Self, to: &Self) -> Validation<()> {
+        // let mut comparison: Vec<Validation<'a, ()>> = Vec::new();
+        // comparison.reserve(to.packages.len());
+        // for (name, pkg) in to.packages.iter() {
+        //     comparison.push(Package::compare(name, from.packages.get(name), &pkg))
+        // }
         validation::sequence_(
             // We only loop over the current attributes,
             // we don't need to check ones that were removed
+            // comparison
             to.packages
-                .into_iter()
-                .map(|(name, pkg)| Package::compare(&name, from.packages.get(&name), &pkg)),
+                .iter()
+                .map(|(name, pkg)| Package::compare(name, from.packages.get(name), pkg)),
         )
-        .and_(validation::sequence_(to.files.into_iter().map(
-            |(name, file)| File::compare(&name, from.files.get(&name), &file),
-        )))
+        .and_(validation::sequence_(
+            to.files
+                .iter()
+                .map(|(name, file)| File::compare(name, from.files.get(name), file)),
+        ))
     }
 }
 
 /// The ratchet value for a top-level package
+#[derive(Debug, Clone)]
 pub struct Package {
     /// The ratchet value for the check for non-auto-called empty arguments
     pub manual_definition: RatchetState<ManualDefinition>,
@@ -62,6 +72,7 @@ impl Package {
     }
 }
 
+#[derive(Debug)]
 pub struct File {}
 
 impl File {
@@ -76,6 +87,7 @@ impl File {
 }
 
 /// The ratchet state of a generic ratchet check.
+#[derive(Debug, Clone)]
 pub enum RatchetState<Ratchet: ToProblem> {
     /// The ratchet is loose. It can be tightened more. In other words, this is the legacy state
     /// we're trying to move away from.
@@ -102,10 +114,10 @@ pub trait ToProblem {
     fn to_problem(name: &str, optional_from: Option<()>, to: &Self::ToContext) -> Problem;
 }
 
-impl<Context: ToProblem> RatchetState<Context> {
+impl<'a, Context: ToProblem> RatchetState<Context> {
     /// Compare the previous ratchet state of an attribute to the new state.
     /// The previous state may be `None` in case the attribute is new.
-    fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+    fn compare(name: &str, optional_from: Option<&Self>, to: &'a Self) -> Validation<()> {
         match (optional_from, to) {
             // Loosening a ratchet is not allowed.
             (Some(RatchetState::Tight), RatchetState::Loose(loose_context)) => {
@@ -142,6 +154,7 @@ impl<Context: ToProblem> RatchetState<Context> {
 ///
 /// - Are defined in `pkgs/by-name` with a manual definition that doesn't have any
 ///   custom argument overrides.
+#[derive(Debug, Clone)]
 pub enum ManualDefinition {}
 
 impl ToProblem for ManualDefinition {
@@ -157,35 +170,48 @@ impl ToProblem for ManualDefinition {
 /// This checks that all new package defined using `callPackage` must be defined via
 /// `pkgs/by-name`. It also checks that once a package uses `pkgs/by-name`, it can't switch back
 /// to `pkgs/top-level/all-packages.nix`.
+#[derive(Debug, Clone)]
 pub enum UsesByName {}
 
 impl ToProblem for UsesByName {
-    type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
+    type ToContext = (CallPackageArgumentInfo, RelativePathBuf, Config);
 
-    fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
+    fn to_problem(
+        name: &str,
+        optional_from: Option<()>,
+        (to, file, config): &Self::ToContext,
+    ) -> Problem {
         let is_new = optional_from.is_none();
         let is_empty = to.empty_arg;
         match (is_new, is_empty) {
-            (false, true) => {
-                npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
+            (false, true) => npv_160::TopLevelPackageMovedOutOfByName::new(
+                name,
+                to.relative_path.clone(),
+                file,
+                config.clone(),
+            )
+            .into(),
             // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
             // for custom arguments.
             (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
                 name,
                 to.relative_path.clone(),
                 file,
+                config.clone(),
             )
             .into(),
-            (true, true) => {
-                npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
+            (true, true) => npv_162::NewTopLevelPackageShouldBeByName::new(
+                name,
+                to.relative_path.clone(),
+                file,
+                config.clone(),
+            )
+            .into(),
             (true, false) => npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
                 name,
                 to.relative_path.clone(),
                 file,
+                config.clone(),
             )
             .into(),
         }

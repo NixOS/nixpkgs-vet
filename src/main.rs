@@ -22,16 +22,14 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
-use std::collections::BTreeMap;
+use std::panic;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::{panic, thread};
 
 use crate::nix_file::NixFileStore;
 use crate::status::{ColoredStatus, Status};
-use crate::structure::check_structure;
-use crate::validation::Validation::Failure;
-use crate::validation::Validation::Success;
+use crate::structure::{Config, check_structure, read_config};
+use crate::validation::Validation::{Failure, Success};
 
 /// Program to check the validity of pkgs/by-name
 ///
@@ -60,43 +58,188 @@ pub struct Args {
 
 fn main() -> ExitCode {
     let args = Args::parse();
-    let status: ColoredStatus = process(args.base, &args.nixpkgs).into();
+    let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE")
+        .expect("Could not get environment variable NIXPKGS_VET_CONFIG_FILE");
+    let config_file = Path::new(&config_file);
+    let config = read_config(config_file);
+
+    let status: ColoredStatus = process(&args.base, &args.nixpkgs, &config).into();
     eprintln!("{status}");
     status.into()
 }
+// /// Does the actual work. This is the abstraction used both by `main` and the tests.
+// ///
+// /// # Arguments
+// /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
+// /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
+// fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status {
+//     let by_name_dirs: &Vec<ByNameDir> = &config.by_name_dirs;
+//     let mut thread_results: Vec<Status> = vec![];
+//     // std::thread::scope(|s| {
+//     // let mut threads: Vec<std::thread::ScopedJoinHandle<Status>> = vec![];
+//     for dir in by_name_dirs {
+//         //     let new_thread =
+//         //         s.spawn(move || process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config));
+//         //     threads.push(new_thread);
+//         thread_results.push(process_by_name_dir(base_nixpkgs, main_nixpkgs, dir, config))
+//     }
+//     // for thread in threads {
+//     //     thread_results.push(thread.join().unwrap())
+//     // }
+//     // });
+
+//     if thread_results
+//         .iter()
+//         .all(|x| matches!(x, Status::ValidatedSuccessfully))
+//     {
+//         println!(
+//             "{}:{}: thread_results: {thread_results:?}",
+//             file!(),
+//             line!()
+//         );
+//         Status::ValidatedSuccessfully
+//     } else if thread_results
+//         .iter()
+//         .all(|x| matches!(x, Status::ValidatedSuccessfully | Status::BranchHealed))
+//     {
+//         println!(
+//             "{}:{}: thread_results: {thread_results:?}",
+//             file!(),
+//             line!()
+//         );
+//         Status::BranchHealed
+//     } else if thread_results
+//         .iter()
+//         .any(|x| matches!(x, Status::Error(..)))
+//     {
+//         println!(
+//             "{}:{}: thread_results: {thread_results:?}",
+//             file!(),
+//             line!()
+//         );
+//         thread_results
+//             .into_iter()
+//             .find(|x| matches!(x, Status::Error(..)))
+//             .unwrap()
+//     } else if thread_results
+//         .iter()
+//         .any(|x| matches!(x, Status::BranchStillBroken(..)))
+//     {
+//         println!(
+//             "{}:{}: thread_results: {thread_results:?}",
+//             file!(),
+//             line!()
+//         );
+//         let problems: Vec<Problem> = thread_results
+//             .into_iter()
+//             .filter_map(|x| match x {
+//                 Status::BranchStillBroken(these_problems) => Some(these_problems),
+//                 _ => None,
+//             })
+//             .flatten()
+//             .collect();
+//         Status::BranchStillBroken(problems)
+//     } else if thread_results
+//         .iter()
+//         .any(|x| matches!(x, Status::ProblemsIntroduced(..)))
+//     {
+//         println!(
+//             "{}:{}: thread_results: {thread_results:?}",
+//             file!(),
+//             line!()
+//         );
+//         let problems: Vec<Problem> = thread_results
+//             .into_iter()
+//             .filter_map(|x| match x {
+//                 Status::ProblemsIntroduced(these_problems) => Some(these_problems),
+//                 _ => None,
+//             })
+//             .flatten()
+//             .collect();
+//         Status::ProblemsIntroduced(problems)
+//     } else if thread_results
+//         .iter()
+//         .any(|x| matches!(x, Status::DiscouragedPatternedIntroduced(..)))
+//     {
+//         println!(
+//             "{}:{}: thread_results: {thread_results:?}",
+//             file!(),
+//             line!()
+//         );
+//         let problems: Vec<Problem> = thread_results
+//             .into_iter()
+//             .filter_map(|x| match x {
+//                 Status::DiscouragedPatternedIntroduced(these_problems) => Some(these_problems),
+//                 _ => None,
+//             })
+//             .flatten()
+//             .collect();
+//         Status::DiscouragedPatternedIntroduced(problems)
+//     } else {
+//         panic!("Expected this nixpkgs-vet status check to be exhaustive, but it isn't.")
+//     }
+// }
 
 /// Does the actual work. This is the abstraction used both by `main` and the tests.
 ///
 /// # Arguments
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
-fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
-    // Very easy to parallelise this, since both operations are totally independent of each other.
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs));
-    let main_result = match check_nixpkgs(main_nixpkgs) {
-        Ok(result) => result,
-        Err(error) => {
-            return error.into();
-        }
-    };
+/// - `config`: The by-name configuration object
+fn process(base_nixpkgs: &Path, main_nixpkgs: &Path, config: &Config) -> Status {
+    // println!("{}:{}: base_nixpkgs {base_nixpkgs:?}, main_nixpkgs {main_nixpkgs:?}", file!(), line!());
+    let (base_result, main_result) = std::thread::scope(|s| {
+        let base_thread = s.spawn(move || check_nixpkgs(base_nixpkgs, config));
+        let main_thread = s.spawn(move || check_nixpkgs(main_nixpkgs, config));
 
-    let base_result = match base_thread.join() {
-        Ok(Ok(status)) => status,
-        Ok(Err(error)) => {
-            return error.into();
-        }
-        Err(e) => panic::resume_unwind(e),
-    };
+        let base_result = match base_thread.join() {
+            Ok(Ok(result)) => Ok(result),
+            Ok(Err(error)) => Err(error),
+            Err(e) => panic::resume_unwind(e),
+        };
 
-    match (base_result, main_result) {
-        (Failure(..), Failure(errors)) => Status::BranchStillBroken(errors),
-        (Success(..), Failure(errors)) => Status::ProblemsIntroduced(errors),
-        (Failure(..), Success(..)) => Status::BranchHealed,
-        (Success(base), Success(main)) => {
-            // Both base and main branch succeed. Check ratchet state between them...
-            match ratchet::Nixpkgs::compare(&base, main) {
-                Failure(errors) => Status::DiscouragedPatternedIntroduced(errors),
-                Success(..) => Status::ValidatedSuccessfully,
+        let main_result = match main_thread.join() {
+            Ok(Ok(result)) => Ok(result),
+            Ok(Err(error)) => Err(error),
+            Err(e) => panic::resume_unwind(e),
+        };
+
+        // println!("Checking base with by_name_dir {}", by_name_dir.path);
+        // let base_result = check_nixpkgs(base_nixpkgs, by_name_dir, config);
+        // println!("Checking main with by_name_dir {}", by_name_dir.path);
+        // let main_result = check_nixpkgs(main_nixpkgs, by_name_dir, config);
+        // println!(
+        //     "Done with both base and main for by_name_dir {}",
+        //     by_name_dir.path
+        // );
+
+        (base_result, main_result)
+    });
+
+    if let Err(error) = main_result {
+        error.into()
+    } else if let Err(error) = base_result {
+        error.into()
+    } else {
+        let base_result = base_result.unwrap();
+        let main_result = main_result.unwrap();
+        match (base_result, main_result) {
+            (Failure(base_errors), Failure(errors)) => {
+                println!(
+                    "{}:{}: base_errors {base_errors:?}, main errors {errors:?}",
+                    file!(),
+                    line!()
+                );
+                Status::BranchStillBroken(errors)
+            }
+            (Success(..), Failure(errors)) => Status::ProblemsIntroduced(errors),
+            (Failure(..), Success(..)) => Status::BranchHealed,
+            (Success(base), Success(main)) => {
+                // Both base and main branch succeed. Check ratchet state between them...
+                match ratchet::Nixpkgs::compare(&base, &main) {
+                    Failure(errors) => Status::DiscouragedPatternedIntroduced(errors),
+                    Success(..) => Status::ValidatedSuccessfully,
+                }
             }
         }
     }
@@ -107,7 +250,7 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
+fn check_nixpkgs(nixpkgs_path: &Path, config: &Config) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
             "Nixpkgs path {} could not be resolved",
@@ -118,27 +261,35 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
     let mut nix_file_store = NixFileStore::default();
 
     let package_result = {
-        if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
-            // No pkgs/by-name directory, always valid
-            Success(BTreeMap::new())
-        } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
+        let structure = check_structure(&nixpkgs_path, &mut nix_file_store, config)?;
 
-            // Only if we could successfully parse the structure, we do the evaluation checks
-            structure.result_map(|package_names| {
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
-            })?
-        }
+        // Only if we could successfully parse the structure, we do the evaluation checks
+        structure.result_map(|package_names| {
+            eval::check_values(
+                &nixpkgs_path,
+                &mut nix_file_store,
+                package_names.as_slice(),
+                config,
+            )
+        })?
     };
 
     let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
 
+    // println!(
+    //     "{}:{}: file_result: {file_result:?}; package_result: {package_result:?}",
+    //     file!(),
+    //     line!()
+    // );
+    /*let check_result =*/
     Ok(
         package_result.and(file_result, |packages, files| ratchet::Nixpkgs {
             packages,
             files,
         }),
-    )
+    ) //;
+    // println!("{}:{}: check_result = {check_result:?}", file!(), line!());
+    // check_result
 }
 
 #[cfg(test)]
@@ -150,24 +301,41 @@ mod tests {
     use pretty_assertions::StrComparison;
     use tempfile::{TempDir, tempdir_in};
 
-    use super::{process, structure::BASE_SUBPATH};
+    use crate::structure;
 
+    use super::process;
+
+    // Manually repeat this for each subdir under tests/ in order to disambiguate
+    #[fixtures::fixtures(["tests/top-level/*"])]
+    #[allow(non_snake_case)] // the test directories don't use snake case, and the macro expansion causes a warning.
     #[test]
-    fn tests_dir() -> anyhow::Result<()> {
-        for entry in Path::new("tests").read_dir()? {
-            let entry = entry?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-
-            if !path.is_dir() {
-                continue;
-            }
-
-            let expected_errors = fs::read_to_string(path.join("expected"))
-                .with_context(|| format!("No expected file for test {name}"))?;
-
-            test_nixpkgs(&name, &path, &expected_errors);
+    fn test_top_level_dir(path: &Path) -> anyhow::Result<()> {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !path.is_dir() {
+            return Ok(());
         }
+
+        let expected_errors = fs::read_to_string(path.join("expected"))
+            .with_context(|| format!("No expected file for test {name}"))?;
+
+        test_nixpkgs(&name, path, &expected_errors);
+        Ok(())
+    }
+
+    // Manually repeat this for each subdir under tests/ in order to disambiguate
+    #[fixtures::fixtures(["tests/tcl/*"])]
+    #[allow(non_snake_case)] // the test directories don't use snake case, and the macro expansion causes a warning.
+    #[test]
+    fn test_tcl_dir(path: &Path) -> anyhow::Result<()> {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !path.is_dir() {
+            return Ok(());
+        }
+
+        let expected_errors = fs::read_to_string(path.join("expected"))
+            .with_context(|| format!("No expected file for test {name}"))?;
+
+        test_nixpkgs(&name, path, &expected_errors);
         Ok(())
     }
 
@@ -190,7 +358,7 @@ mod tests {
             return Ok(());
         }
 
-        let base = path.join("main").join(BASE_SUBPATH);
+        let base = path.join("main").join("pkgs/by-name");
 
         fs::create_dir_all(base.join("fo/foo"))?;
         fs::write(base.join("fo/foo/package.nix"), "{ someDrv }: someDrv")?;
@@ -230,7 +398,7 @@ mod tests {
         temp_env::with_var("TMPDIR", Some(&tmpdir), || {
             test_nixpkgs(
                 "symlinked_tmpdir",
-                Path::new("tests/success"),
+                Path::new("tests/top-level/success"),
                 "Validated successfully\n",
             );
         });
@@ -254,17 +422,30 @@ mod tests {
         let base_nixpkgs = if base_path.exists() {
             base_path
         } else {
-            Path::new("tests/empty-base").to_owned()
+            Path::new("tests/top-level/empty-base/main").to_owned()
         };
 
         // Empty dir, needed so that no warnings are printed when testing older Nix versions
         // that don't recognise certain newer keys in nix.conf
         let nix_conf_dir = tempdir().expect("directory");
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
+        let config_file = std::env::var("NIXPKGS_VET_CONFIG_FILE")
+            .unwrap_or("by-name-config-generated.json".to_string());
+        let config_file = Path::new(&config_file);
 
-        let status = temp_env::with_var("NIX_CONF_DIR", Some(nix_conf_dir), || {
-            process(base_nixpkgs, &main_path)
-        });
+        let status = temp_env::with_vars(
+            [
+                ("NIX_CONF_DIR", Some(nix_conf_dir)),
+                ("NIXPKGS_VET_CONFIG_FILE", Some(config_file.as_os_str())),
+            ],
+            || {
+                process(
+                    &base_nixpkgs,
+                    &main_path,
+                    &structure::read_config(config_file),
+                )
+            },
+        );
 
         let actual_errors = format!("{status}\n");
 

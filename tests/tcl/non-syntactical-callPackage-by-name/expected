@@ -1,0 +1,9 @@
+- Because pkgs/development/tcl-modules/by-name/fo/foo exists, the attribute `tclPackages.foo` must be defined like
+
+    tclPackages.foo = callPackage ./../development/tcl-modules/by-name/fo/foo/package.nix { /* ... */ };
+
+  However, in this PR, it isn't defined that way. See the definition in pkgs/top-level/tcl-packages.nix:21
+
+    foo = tclSelf.bar;
+
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

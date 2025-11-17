@@ -2,18 +2,23 @@ use std::fmt;
 
 use derive_new::new;
 
-use crate::structure::{self, PACKAGE_NIX_FILENAME};
+use crate::structure::{self, ByNameDir, PACKAGE_NIX_FILENAME};
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct PackageNixIsNotFile {
     #[new(into)]
     package_name: String,
+    by_name_dir: ByNameDir,
 }
 
 impl fmt::Display for PackageNixIsNotFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { package_name } = self;
-        let relative_package_dir = structure::relative_dir_for_package(package_name);
+        let Self {
+            package_name,
+            by_name_dir,
+        } = self;
+        let relative_package_dir =
+            structure::relative_dir_for_package(package_name, &by_name_dir.path);
         write!(
             f,
             "- {relative_package_dir}: \"{PACKAGE_NIX_FILENAME}\" must be a file.",

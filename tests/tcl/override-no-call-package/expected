@@ -1,0 +1,9 @@
+- Because pkgs/development/tcl-modules/by-name/no/nonDerivation exists, the attribute `tclPackages.nonDerivation` must be defined like
+
+    tclPackages.nonDerivation = callPackage ./../development/tcl-modules/by-name/no/nonDerivation/package.nix { /* ... */ };
+
+  However, in this PR, it isn't defined that way. See the definition in pkgs/top-level/tcl-packages.nix:18
+
+    nonDerivation = self.someDrv;
+
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

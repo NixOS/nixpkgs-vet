@@ -1,4 +1,0 @@
-trace: This should be on stderr!
-@REDACTED@error: This is an error!@REDACTED@
-- Nix evaluation failed for some package in `pkgs/by-name`, see error above
-This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

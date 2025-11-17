@@ -5,6 +5,7 @@ use colored::Colorize as _;
 
 use crate::problem::Problem;
 
+#[derive(Debug)]
 pub enum Status {
     /// It's all green.
     ValidatedSuccessfully,

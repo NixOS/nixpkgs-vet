@@ -2,10 +2,43 @@
 #
 # Returns a value containing information on all Nixpkgs attributes which is decoded on the Rust
 # side. See ./eval.rs for the meaning of the returned values.
-{ attrsPath, nixpkgsPath }:
+{
+  attrsPath,
+  nixpkgsPath,
+  configPath,
+}:
 let
-  attrs = builtins.fromJSON (builtins.readFile attrsPath);
+  # trace = builtins.trace;
+  trace = (e1: e2: e2);
 
+  # https://discourse.nixos.org/t/modify-an-attrset-in-nix/29919/5
+  removeAttrByPath =
+    attrPath: set:
+    pkgs.lib.updateManyAttrsByPath [
+      {
+        path = pkgs.lib.init attrPath;
+        update = old: pkgs.lib.filterAttrs (n: v: n != (pkgs.lib.last attrPath)) old;
+      }
+    ] set;
+  removeAttrsByPaths =
+    set: attrPathStrings:
+    builtins.foldl' (acc: elem: removeAttrByPath elem acc) set (
+      map (s: pkgs.lib.splitString "." s) attrPathStrings
+    );
+
+  rawAttrs = trace "rawAttrs = ${(builtins.toJSON (builtins.fromJSON (builtins.readFile attrsPath)))}" (
+    builtins.fromJSON (builtins.readFile attrsPath)
+  );
+  # an attrset where the key is the ID field from by-name-config.nix and the value is a list of attr paths.
+  attrsByDir = trace "attrsByDir = ${
+    (builtins.toJSON (builtins.groupBy (a: a.by_name_dir_id) rawAttrs))
+  }" (builtins.groupBy (a: a.by_name_dir_id) rawAttrs);
+
+  # TODO: make this name accurate
+  allAttrPaths = trace "allAttrPaths = ${builtins.toJSON (map (a: a.attr_path) rawAttrs)}" (
+    map (a: a.attr_path) rawAttrs
+  );
+  byNameConfig = builtins.fromJSON (builtins.readFile configPath);
   # We need to check whether attributes are defined manually e.g. in `all-packages.nix`,
   # automatically by the `pkgs/by-name` overlay, or neither. The only way to do so is to override
   # `callPackage` and `_internalCallByNamePackageFile` with our own version that adds this
@@ -42,66 +75,307 @@ let
       # don't return the value directly and treat it as if it wasn't a `callPackage`.
       value;
 
-  pkgs = import nixpkgsPath {
-    # Don't let the user's home directory influence this result.
-    config = { };
-    overlays = [ overlay ];
-    # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
-    system = "x86_64-linux";
-  };
-
-  # See AttributeInfo in ./eval.rs for the meaning of this.
-  attrInfo = name: value: {
-    location = builtins.unsafeGetAttrPos name pkgs;
-    attribute_variant =
-      if !builtins.isAttrs value then
-        { NonAttributeSet = null; }
-      else
-        {
-          AttributeSet = {
-            is_derivation = pkgs.lib.isDerivation value;
-            definition_variant =
-              if !value ? _callPackageVariant then
-                { ManualDefinition.is_semantic_call_package = false; }
-              else
-                value._callPackageVariant;
-          };
-        };
-  };
-
-  # Information on all attributes that are in `pkgs/by-name`.
-  byNameAttrs = builtins.listToAttrs (
-    map (name: {
-      inherit name;
-      value.ByName =
-        if !pkgs ? ${name} then
-          { Missing = null; }
-        else
-          # Evaluation failures are not allowed, so don't try to catch them.
-          { Existing = attrInfo name pkgs.${name}; };
-    }) attrs
+  pkgs = import nixpkgsPath (
+    {
+      # Don't let the user's home directory influence this result.
+      config = { };
+      overlays = [ overlay ];
+      # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
+      system = "x86_64-linux";
+    }
+    // {
+      inherit byNameConfig;
+    }
   );
 
-  # Information on all attributes that exist but are not in `pkgs/by-name`.
-  # We need this to enforce `pkgs/by-name` for new packages.
-  nonByNameAttrs = builtins.mapAttrs (
-    name: value:
+  # See AttributeInfo in ./eval.rs for the meaning of this.
+  attrInfo =
+    attrPath_0: value:
     let
-      # Packages outside `pkgs/by-name` often fail evaluation, so we need to handle that.
-      output = attrInfo name value;
-      result = builtins.tryEval (builtins.deepSeq output null);
+      attrPath = if builtins.isList attrPath_0 then attrPath_0 else [ attrPath_0 ];
+      attrPathLength = builtins.length attrPath;
+      pname = pkgs.lib.last attrPath;
+      parent =
+        if attrPathLength == 1 then
+          pkgs
+        else
+          pkgs.lib.attrsets.getAttrFromPath (pkgs.lib.take (attrPathLength - 1) attrPath) pkgs;
     in
     {
-      NonByName = if result.success then { EvalSuccess = output; } else { EvalFailure = null; };
-    }
-  ) (builtins.removeAttrs pkgs attrs);
+      location = builtins.unsafeGetAttrPos (trace "eval.nix:89: attrPath = ${builtins.toJSON attrPath}; location = ${builtins.toJSON (builtins.unsafeGetAttrPos pname parent)}" pname) parent;
+      # location = builtins.unsafeGetAttrPos pname parent;
+      attribute_variant = (
+        if
+          (trace
+            "path ${builtins.toJSON attrPath}; isAttrs: ${pkgs.lib.boolToString (builtins.isAttrs value)}; (value ? \"_callPackageVariant\") = ${
+              pkgs.lib.boolToString (value ? "_callPackageVariant")
+            }"
+            (!(builtins.isAttrs value))
+          )
+        then
+          { NonAttributeSet = null; }
+        else
+          {
+            AttributeSet = {
+              is_derivation = pkgs.lib.isDerivation value;
+              definition_variant =
+                if !(value ? "_callPackageVariant") then
+                  { ManualDefinition.is_semantic_call_package = false; }
+                else
+                  value._callPackageVariant;
+            };
+          }
+      );
+    };
+
+  # Information on all attributes that are in a `by-name` directory.
+  byNameAttrsForDir =
+    byNameDir:
+    builtins.foldl' pkgs.lib.recursiveUpdate { } (
+      map (
+        package:
+        let
+          attrPath = pkgs.lib.splitString "." package.attr_path;
+          result = pkgs.lib.setAttrByPath attrPath {
+            ByName =
+              if !(pkgs.lib.hasAttrByPath attrPath pkgs) then
+                { Missing = null; }
+              else
+                # Evaluation failures are not allowed, so don't try to catch them.
+                {
+                  Existing = attrInfo attrPath (pkgs.lib.getAttrFromPath attrPath pkgs);
+                };
+          };
+        in
+        result
+      ) attrsByDir.${byNameDir.id}
+    );
+
+  byNameAttrs = pkgs.lib.foldl pkgs.lib.recursiveUpdate { } (
+    map byNameAttrsForDir (
+      builtins.filter (dir: builtins.hasAttr dir.id attrsByDir) byNameConfig.by_name_dirs
+    )
+  );
+
+  attrSetIsOrContainsDerivation =
+    name: value:
+    if (!((builtins.tryEval value).success) || !(builtins.isAttrs value)) then
+      false
+    #  (trace "attrSetIsOrContainsDerivation: returning false for ${name}. tryEval is ${pkgs.lib.boolToString ((builtins.tryEval value).success)}, and isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}" false)
+    else
+      (
+        if pkgs.lib.isDerivation value then
+          trace "isDerivation ${name} is true" true
+        else if
+          (
+            (trace "${name}'s recurseForDerivations exists?: ${
+              pkgs.lib.boolToString (value ? "recurseForDerivations")
+            }" (value ? "recurseForDerivations"))
+            && (builtins.isBool value.recurseForDerivations)
+            && (trace "evaluating value.recurseForDerivations for ${name}" (
+              trace "it has type ${builtins.typeOf (builtins.deepSeq value.recurseForDerivations value.recurseForDerivations)}" value.recurseForDerivations
+            ))
+          )
+        #  then (builtins.any pkgs.lib.id (pkgs.lib.mapAttrsToList attrSetIsOrContainsDerivation value))
+        then
+          (trace "${name} has recurseForDerivations true" (
+            let
+              result = builtins.any pkgs.lib.id (
+                pkgs.lib.mapAttrsToList (
+                  k: v: (trace "Seeing if ${k} is or contains a derivation" (attrSetIsOrContainsDerivation k v))
+                ) value
+              );
+            in
+            trace "`attrSetIsOrContainsDerivation ${name}` is ${pkgs.lib.boolToString result}" result
+          ))
+        else
+          trace "isDerivation ${name} is false" false
+      );
+  #  then (trace "attrSetIsOrContainsDerivation: returning true for ${name}" true)
+  #  else trace "attrSetIsOrContainsDerivation: recursing into ${name}" (let result = (builtins.any pkgs.lib.id (pkgs.lib.mapAttrsToList attrSetIsOrContainsDerivation value)); in builtins.seq result (trace "result of recursing into ${name} reached" result)));
+  #  else builtins.any (x: x) (pkgs.lib.mapAttrsToListRecursiveCond (k: v: !(attrSetIsOrContainsDerivation k v)) attrSetIsOrContainsDerivation value);
+
+  markNonByNameAttribute =
+    attrPath_0: value:
+    let
+      # Packages outside `by-name` directories often fail evaluation, so we need to handle that.
+      attrPath = if builtins.isList attrPath_0 then attrPath_0 else [ attrPath_0 ];
+      output = attrInfo attrPath value;
+      pname = pkgs.lib.last attrPath;
+      result = builtins.tryEval (builtins.deepSeq output null);
+    in
+    if
+      (
+        result.success
+        && (builtins.isAttrs value)
+        && !((value ? "type") && (value.type == "derivation"))
+        && !(builtins.elem pname [
+          "buildPackages"
+          "targetPackages"
+          "__splicedPackages"
+          "_callPackageVariant"
+          "lib"
+        ])
+        # && !(pkgs.lib.hasPrefix "pkgs" name) # pkgsBuildBuild and friends cause infinite recursion
+        && (attrSetIsOrContainsDerivation pname value)
+      )
+    # (builtins.tryEval ((pkgs.lib.collect (x: (pkgs.lib.isDerivation x) || (x ? "passthru")) value) != [])
+    # (let evalResult = (builtins.tryEval (builtins.deepSeq (pkgs.lib.collect (x: (x ? "passthru") || (pkgs.lib.isDerivation x)) value) (pkgs.lib.collect (x: (x ? "passthru") || (pkgs.lib.isDerivation x)) value)));
+    # in (evalResult.success && (evalResult.value != [])))
+    then
+      (
+        let
+          recursiveResult = builtins.mapAttrs (
+            newName: newValue: markNonByNameAttribute (attrPath ++ [ newName ]) newValue
+          ) value;
+        in
+        (trace "recursing into name = ${builtins.toJSON pname}, which has attributes ${builtins.toJSON (builtins.attrNames recursiveResult)}" (
+          builtins.seq (trace "result of recursing into ${builtins.toJSON pname}: ${builtins.toJSON recursiveResult}" recursiveResult) (
+            trace "done recursing into ${builtins.toJSON pname}" recursiveResult
+          )
+        ))
+      )
+    else if result.success then
+      trace
+        "eval.nix:207: name is ${builtins.toJSON pname}, value isAttrs is ${pkgs.lib.boolToString (builtins.isAttrs value)}, value attrSetIsOrContainsDerivation is ${pkgs.lib.boolToString (attrSetIsOrContainsDerivation pname value)}"
+        {
+          NonByName = {
+            EvalSuccess = output;
+          };
+        }
+    else
+      {
+        NonByName = {
+          EvalFailure = null;
+        };
+      };
+
+  # Information on all attributes that exist but are not in a `by-name` directory.
+  # We need this to enforce placement in a `by-name` directory for new packages.
+
+  # Second-newest
+  # nonByNameAttrs = (
+  #   builtins.mapAttrs markNonByNameAttribute (
+  #     builtins.removeAttrs pkgs (
+  #       allAttrPaths ++ [ "lib" ] # Need to exclude lib to avoid infinite recursion
+  #     )
+  #   )
+  # );
+
+  nonByNameAttrs = (
+    builtins.mapAttrs markNonByNameAttribute (
+      removeAttrsByPaths pkgs (
+        allAttrPaths ++ [ "lib" ] # Need to exclude lib to avoid infinite recursion
+      )
+    )
+  );
+
+  # This one is the newest. Doesn't work in the case where eval fails tho.
+  # nonByNameAttrs = pkgs.lib.mapAttrsRecursiveCond (
+  #   as:
+  #   ((builtins.tryEval (builtins.deepSeq as null)).success)
+  #   && !((as ? "type") && (as.type == "derivation"))
+  # ) markNonByNameAttribute (builtins.removeAttrs pkgs (allAttrPaths ++ [ "lib" ])); # Need to exclude lib to avoid infinite recursion
+
+  # Original???
+  # nonByNameAttrs = pkgs.lib.mapAttrsRecursiveCond (as: !(as ? "type" && as.type == "derivation")) (
+  #   name: value:
+  #   let
+  #     # Packages outside  `by-name` directories often fail evaluation, so we need to handle that.
+  #     output = attrInfo name value;
+  #     result = builtins.tryEval (builtins.deepSeq output null);
+  #   in
+  #   {
+  #     NonByName = if result.success then { EvalSuccess = output; } else { EvalFailure = null; };
+  #   }
+  # ) (builtins.removeAttrs pkgs (attrs ++ [ "lib" ])); # Need to exclude lib to avoid infinite recursion
+
+  customMergeAttrs =
+    byName: nonByName:
+    let
+      inherit (builtins) isAttrs;
+      byNameNames = builtins.trace "byNameNames is ${builtins.toJSON (builtins.attrNames byName)}" (
+        builtins.attrNames byName
+      );
+      nonByNameNames = builtins.trace "nonByNameNames is ${builtins.toJSON (builtins.attrNames nonByName)}" (
+        builtins.attrNames nonByName
+      );
+      onlyByName = pkgs.lib.subtractLists nonByNameNames byNameNames;
+      onlyNonByName = pkgs.lib.subtractLists byNameNames nonByNameNames;
+      inBothLists = pkgs.lib.intersectLists byNameNames nonByNameNames;
+    in
+    builtins.listToAttrs (
+      (map (x: {
+        name = x;
+        value = byName.${x};
+      }) onlyByName)
+      ++ (map (x: {
+        name = x;
+        value = nonByName.${x};
+      }) onlyNonByName)
+      ++ (map (
+        x:
+        builtins.trace
+          "x = ${x}; byName.${x} = ${builtins.toJSON byName.${x}}; nonByName.${x} = ${builtins.toJSON nonByName.${x}}"
+          (
+            if
+              !(isAttrs byName.${x}) # And nonByName.${x} is or is not an attrset, we don't care.
+            then
+              {
+                name = x;
+                value = nonByName.${x};
+              }
+            else if !(isAttrs nonByName.${x}) then
+              throw "Shouldn't happen??? "
+            else if byName.${x} ? "ByName" && nonByName.${x} ? "NonByName" then
+              {
+                name = x;
+                value = {
+                  ByName = nonByName.${x}.NonByName;
+                };
+              }
+            else if
+              (builtins.removeAttrs byName.${x} [
+                "NonByName"
+                "ByName"
+              ]) != { }
+              && nonByName.${x} ? "NonByName"
+            then
+              {
+                name = x;
+                value = byName.${x};
+              }
+            else
+              {
+                name = x;
+                value = customMergeAttrs byName.${x} nonByName.${x};
+              }
+          )
+      ) inBothLists)
+    );
 
   # All attributes
-  attributes = byNameAttrs // nonByNameAttrs;
+  # attributes = pkgs.lib.recursiveUpdateUntil (attrPath: left: right:
+  #   trace "eval.nix:293: attrPath ${builtins.toJSON attrPath}; left attrNames are ${if builtins.isAttrs left then (builtins.toJSON (builtins.attrNames left)) else "not an attrset"}; right attrNames are ${if builtins.isAttrs right then builtins.toJSON (builtins.attrNames right) else "not an attrset"}"
+  #     ((builtins.removeAttrs left ["NonByName" "ByName"]) != { } && right ? "NonByName")
+  #     # ||
+  #     # ((left ? "ByName" || left ? "NonByName") && (right ? "ByName" || right ? "NonByName"))
+  #   ) byNameAttrs nonByNameAttrs;
+
+  attributes = customMergeAttrs byNameAttrs nonByNameAttrs;
+
+  result =
+    pkgs.lib.mapAttrsToListRecursiveCond
+      (attrPath: attrValue: !((attrValue ? "NonByName") || (attrValue ? "ByName")))
+      (attrPath: attrValue: [
+        attrPath
+        attrValue
+      ])
+      attributes;
 in
 # We output them in the form [ [ <name> <value> ] ]` such that the Rust side doesn't need to sort
 # them again to get deterministic behavior. This is good for testing.
-map (name: [
-  name
-  attributes.${name}
-]) (builtins.attrNames attributes)
+# result
+result
+# attributes
+# pkgs.lib.traceSeq "eval.nix:154: result'' = ${toStringRec result''}" result'' # (throw "")

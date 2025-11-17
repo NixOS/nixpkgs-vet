@@ -4,9 +4,9 @@ use derive_new::new;
 use indoc::writedoc;
 use relative_path::RelativePathBuf;
 
-use crate::structure;
+use crate::structure::{self, Config};
 
-#[derive(Clone, new)]
+#[derive(Clone, new, Debug)]
 pub struct NewTopLevelPackageShouldBeByNameWithCustomArgument {
     #[new(into)]
     package_name: String,
@@ -14,6 +14,7 @@ pub struct NewTopLevelPackageShouldBeByNameWithCustomArgument {
     call_package_path: Option<RelativePathBuf>,
     #[new(into)]
     file: RelativePathBuf,
+    config: Config,
 }
 
 impl fmt::Display for NewTopLevelPackageShouldBeByNameWithCustomArgument {
@@ -22,15 +23,20 @@ impl fmt::Display for NewTopLevelPackageShouldBeByNameWithCustomArgument {
             package_name,
             call_package_path,
             file,
+            config,
         } = self;
-        let relative_package_file = structure::relative_file_for_package(package_name);
+        let by_name_path = structure::expected_by_name_dir_for_package(package_name, config)
+            .unwrap()
+            .path;
+        let relative_package_file =
+            structure::relative_file_for_package(package_name, &by_name_path);
         let call_package_arg = call_package_path
             .as_ref()
             .map_or_else(|| "...".into(), |path| format!("./{}", path));
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+            - Attribute `{package_name}` is a new top-level package using `callPackage {call_package_arg} {{ /* ... */ }}`.
               Please define it in {relative_package_file} instead.
               See `pkgs/by-name/README.md` for more details.
               Since the second `callPackage` argument is not `{{ }}`, the manual `callPackage` in {file} is still needed.

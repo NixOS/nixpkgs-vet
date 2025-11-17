@@ -59,7 +59,7 @@ fn collect_nix_files(
 ) -> anyhow::Result<()> {
     for entry in structure::read_dir_sorted(&dir.to_path(base))? {
         let mut relative_path = dir.to_relative_path_buf();
-        relative_path.push(entry.file_name().to_string_lossy().into_owned());
+        relative_path.push(entry.file_name().to_string_lossy().as_ref());
 
         let absolute_path = entry.path();
 
