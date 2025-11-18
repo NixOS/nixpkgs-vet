@@ -6,36 +6,19 @@
 let
   attrs = builtins.fromJSON (builtins.readFile attrsPath);
 
-  # We need to check whether attributes are defined manually e.g. in `all-packages.nix`,
-  # automatically by the `pkgs/by-name` overlay, or neither. The only way to do so is to override
-  # `callPackage` and `_internalCallByNamePackageFile` with our own version that adds this
-  # information to the result, and then try to access it.
+  # We need to check whether attributes are defined via callPackage of the same scope or not.
   overlay = final: prev: {
 
-    # Adds information to each attribute about whether it's manually defined using `callPackage`
-    callPackage =
-      fn: args:
-      addVariantInfo (prev.callPackage fn args) {
-        # This is a manual definition of the attribute, and it's a `1callPackage`, specifically a
-        # semantic `callPackage`.
-        ManualDefinition.is_semantic_call_package = true;
-      };
-
-    # Adds information to each attribute about whether it's automatically defined by the
-    # `pkgs/by-name` overlay. This internal attribute is only used by that overlay.
-    #
-    # This overrides the above `callPackage` information. It's OK because we don't need that one,
-    # since `pkgs/by-name` always uses `callPackage` underneath.
-    _internalCallByNamePackageFile =
-      file: addVariantInfo (prev._internalCallByNamePackageFile file) { AutoDefinition = null; };
+    # Adds information to each attribute about whether it's defined using this scope's `callPackage`
+    callPackage = fn: args: addCallPackageReference (prev.callPackage fn args);
   };
 
   # We can't just replace attribute values with their info in the overlay, because attributes can
   # depend on other attributes, so this would break evaluation.
-  addVariantInfo =
-    value: variant:
+  addCallPackageReference =
+    value:
     if builtins.isAttrs value then
-      value // { _callPackageVariant = variant; }
+      value // { _callPackage = true; }
     else
       # It's very rare that `callPackage` doesn't return an attribute set, but it can occur.
       # In such a case we can't really return anything sensible that would include the info, so just
@@ -60,11 +43,7 @@ let
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
-            definition_variant =
-              if !value ? _callPackageVariant then
-                { ManualDefinition.is_semantic_call_package = false; }
-              else
-                value._callPackageVariant;
+            is_same_scope_call_package = value._callPackage or false;
           };
         };
   };
