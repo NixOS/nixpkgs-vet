@@ -38,7 +38,7 @@ jobs:
 
       - name: Create Pull Request
         if: ${{ github.event_name != 'pull_request' }}
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           # To trigger CI for automated PRs, we use a separate machine account
           # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#workarounds-to-trigger-further-workflow-runs
