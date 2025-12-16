@@ -9,9 +9,9 @@
       },
       "branch": "master",
       "submodules": false,
-      "revision": "96ca3529c27caa2ba3e8c17327ec551193cb12dd",
-      "url": "https://github.com/nixos/nixpkgs/archive/96ca3529c27caa2ba3e8c17327ec551193cb12dd.tar.gz",
-      "hash": "0df8d2x0sxkcf13863qssxlp67gcbi29dmgcb78h337n99l47qf6"
+      "revision": "88b3c158c151e06b34b978b59eb8196df370ef83",
+      "url": "https://github.com/nixos/nixpkgs/archive/88b3c158c151e06b34b978b59eb8196df370ef83.tar.gz",
+      "hash": "0gygfkb5gxsgbhrcswb7hkz8xvvsll98snsj3rlb01q97258ndra"
     },
     "treefmt-nix": {
       "type": "Git",
