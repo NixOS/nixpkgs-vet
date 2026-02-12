@@ -3,6 +3,9 @@
 use crate::location::LineIndex;
 use anyhow::Context;
 use itertools::Either::{self, Left, Right};
+use relative_path::Component;
+use relative_path::FromPathError;
+use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 use rnix::ast;
 use rnix::ast::Expr;
@@ -326,7 +329,8 @@ impl NixFile {
         // Check that <arg2> is a path expression.
         let path = if let Expr::Path(actual_path) = arg2 {
             // Try to statically resolve the path and turn it into a nixpkgs-relative path.
-            if let ResolvedPath::Within(p) = self.static_resolve_path(&actual_path, relative_to) {
+            if let ResolvedPath::Within(p, _) = self.static_resolve_path(&actual_path, relative_to)
+            {
                 Some(p)
             } else {
                 // We can't statically know an existing path inside Nixpkgs used as <arg2>.
@@ -404,12 +408,15 @@ pub enum ResolvedPath {
     /// have the right permissions.
     Unresolvable(std::io::Error),
 
+    // The reference is not relative or another `FromPathError` problem
+    RelativeFromPathError(FromPathError),
+
     /// The path is outside the given absolute path.
     Outside,
 
     /// The path is within the given absolute path. The `RelativePathBuf` is the relative path
     /// under the given absolute path.
-    Within(RelativePathBuf),
+    Within(RelativePathBuf, RelativePathBuf),
 }
 
 impl NixFile {
@@ -431,12 +438,37 @@ impl NixFile {
             return ResolvedPath::SearchPath;
         }
 
-        // Join the file's parent directory and the path expression, then resolve it.
-        //
-        // FIXME: Expressions like `../../../../foo/bar/baz/qux` or absolute paths
-        // may resolve close to the original file, but may have left the relative_to.
-        // That should be checked more strictly.
-        match self.parent_dir.join(Path::new(&text)).canonicalize() {
+        let components = match RelativePath::from_path(Path::new(&text)) {
+            Ok(raw_rel_path) => raw_rel_path.components(),
+            Err(e) => return ResolvedPath::RelativeFromPathError(e),
+        };
+
+        let mut target = match self.parent_dir.strip_prefix(relative_to) {
+            Err(_prefix_error) => return ResolvedPath::Outside,
+            Ok(suffix) => RelativePathBuf::from_path(suffix).unwrap(),
+        };
+
+        let mut common_ancestor = target.clone();
+        for component in components {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    let Some(parent) = target.parent() else {
+                        return ResolvedPath::Outside;
+                    };
+
+                    target = parent.to_relative_path_buf();
+                    if !target.starts_with(&common_ancestor) {
+                        common_ancestor = target.clone();
+                    }
+                }
+                Component::Normal(segment) => {
+                    target = target.join(segment);
+                }
+            }
+        }
+
+        match target.to_path(relative_to).canonicalize() {
             Err(resolution_error) => ResolvedPath::Unresolvable(resolution_error),
             Ok(resolved) => {
                 // Check if it's within relative_to.
@@ -444,6 +476,7 @@ impl NixFile {
                     Err(_prefix_error) => ResolvedPath::Outside,
                     Ok(suffix) => ResolvedPath::Within(
                         RelativePathBuf::from_path(suffix).expect("a relative path"),
+                        common_ancestor,
                     ),
                 }
             }

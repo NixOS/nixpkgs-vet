@@ -6,7 +6,7 @@
 - pkgs/by-name/ba/bar: This path is a file, but it should be a directory.
 - pkgs/by-name/ba/baz: "package.nix" must be a file.
 - pkgs/by-name/ba/foo: Incorrect directory location, should be pkgs/by-name/fo/foo instead.
-- pkgs/by-name/ba/foo: File package.nix at line 4 contains the path expression "/bar" which cannot be resolved: No such file or directory (os error 2).
+- pkgs/by-name/ba/foo: File package.nix at line 4 contains the path expression "/bar" which is not valid: path contains non-relative component.
 - pkgs/by-name/ba/foo: File package.nix at line 5 contains the path expression "../." which may point outside the directory of that package.
   This is undesirable because it creates dependencies between internal paths, making it harder to reorganise Nixpkgs in the future.
   Alternatives include:
