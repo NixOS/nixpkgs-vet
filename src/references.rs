@@ -7,7 +7,7 @@ use rowan::ast::AstNode;
 
 use crate::NixFileStore;
 use crate::nix_file::ResolvedPath;
-use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126};
+use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126, npv_127, npv_128};
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 
@@ -163,6 +163,22 @@ fn check_nix_file(
                     err,
                 )
                 .into(),
+                ResolvedPath::AbsolutePath => npv_127::NixFileContainsAbsolutePath::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
+                ResolvedPath::HomeRelativePath => {
+                    npv_128::NixFileContainsHomeRelativePath::new(
+                        relative_package_dir,
+                        subpath,
+                        line,
+                        text,
+                    )
+                    .into()
+                }
                 ResolvedPath::Within(..) => {
                     // No need to handle the case of it being inside the directory, since we scan
                     // through the entire directory recursively in any case.
