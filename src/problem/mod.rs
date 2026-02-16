@@ -31,6 +31,8 @@ pub mod npv_141;
 pub mod npv_142;
 pub mod npv_143;
 pub mod npv_144;
+pub mod npv_145;
+pub mod npv_146;
 
 pub mod npv_160;
 pub mod npv_161;
@@ -119,6 +121,12 @@ pub enum Problem {
     /// NPV-144: `package.nix` is not a file
     PackageNixIsNotFile(npv_144::PackageNixIsNotFile),
 
+    /// NPV-145: Nix file is executable without shebang
+    NixFileIsExecutableWithoutShebang(npv_145::NixFileIsExecutableWithoutShebang),
+
+    /// NPV-146: Nix file has shebang but is not executable
+    NixFileHasShebangButNotExecutable(npv_146::NixFileHasShebangButNotExecutable),
+
     /// NPV-160: top-level package moved out of by-name
     TopLevelPackageMovedOutOfByName(npv_160::TopLevelPackageMovedOutOfByName),
 
@@ -166,6 +174,8 @@ impl Problem {
             Self::PackageInWrongShard(..) => "NPV-142",
             Self::PackageNixMissing(..) => "NPV-143",
             Self::PackageNixIsNotFile(..) => "NPV-144",
+            Self::NixFileIsExecutableWithoutShebang(..) => "NPV-145",
+            Self::NixFileHasShebangButNotExecutable(..) => "NPV-146",
             Self::TopLevelPackageMovedOutOfByName(..) => "NPV-160",
             Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(..) => "NPV-161",
             Self::NewTopLevelPackageShouldBeByName(..) => "NPV-162",
@@ -208,6 +218,8 @@ impl fmt::Display for Problem {
             Self::PackageInWrongShard(inner) => inner.fmt(f),
             Self::PackageNixMissing(inner) => inner.fmt(f),
             Self::PackageNixIsNotFile(inner) => inner.fmt(f),
+            Self::NixFileIsExecutableWithoutShebang(inner) => inner.fmt(f),
+            Self::NixFileHasShebangButNotExecutable(inner) => inner.fmt(f),
             Self::TopLevelPackageMovedOutOfByName(inner) => inner.fmt(f),
             Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => inner.fmt(f),
             Self::NewTopLevelPackageShouldBeByName(inner) => inner.fmt(f),
