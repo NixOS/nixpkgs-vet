@@ -69,6 +69,7 @@ The following checks are performed when calling the binary:
 - `pkgs/by-name` must only contain subdirectories of the form `${shard}/${name}`, called _package directories_.
 - The `name`'s of package directories must be unique when lowercased.
 - `name` is a string only consisting of the ASCII characters `a-z`, `A-Z`, `0-9`, `-` or `_`.
+- `name` must not start with a digit or `-`.
 - `shard` is the lowercased first two letters of `name`, expressed in Nix: `shard = toLower (substring 0 2 name)`.
 - Each package directory must contain a `package.nix` file and may contain arbitrary other files.
 

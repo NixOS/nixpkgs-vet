@@ -1,2 +1,2 @@
-- pkgs/by-name/fo/fo@: Invalid package directory name "fo@", must be ASCII characters consisting of a-z, A-Z, 0-9, "-" or "_".
+- pkgs/by-name/fo/fo@: Invalid package directory name "fo@", must start with a letter (a-z, A-Z) or "_", followed by ASCII characters a-z, A-Z, 0-9, "-" or "_".
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

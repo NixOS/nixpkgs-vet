@@ -16,9 +16,9 @@ pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
 static SHARD_NAME_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[a-z0-9_-]{1,2}$").unwrap());
+    LazyLock::new(|| Regex::new(r"^[a-z_][a-z0-9_-]?$").unwrap());
 static PACKAGE_NAME_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap());
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_-]*$").unwrap());
 
 /// Deterministic file listing so that tests are reproducible.
 pub fn read_dir_sorted(base_dir: &Path) -> anyhow::Result<Vec<DirEntry>> {

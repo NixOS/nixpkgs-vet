@@ -19,7 +19,7 @@ impl fmt::Display for InvalidPackageDirectoryName {
         } = self;
         write!(
             f,
-            "- {relative_package_dir}: Invalid package directory name \"{package_name}\", must be ASCII characters consisting of a-z, A-Z, 0-9, \"-\" or \"_\".",
+            "- {relative_package_dir}: Invalid package directory name \"{package_name}\", must start with a letter (a-z, A-Z) or \"_\", followed by ASCII characters a-z, A-Z, 0-9, \"-\" or \"_\".",
         )
     }
 }
