@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use crate::nix_file::NixFileStore;
-use crate::problem::npv_145;
+use crate::problem::{npv_145, npv_146};
 use crate::validation::ResultIteratorExt;
 use crate::validation::Validation::Success;
 use crate::{nix_file, ratchet, structure, validation};
@@ -18,7 +18,7 @@ pub fn check_files(
     nix_file_store: &mut NixFileStore,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
     process_nix_files(nixpkgs_path, nix_file_store, |relative_path, nix_file| {
-        let result = check_not_executable(relative_path, &nix_file.path)?;
+        let result = check_executable_iff_shebang(relative_path, &nix_file.path)?;
         Ok(result.map(|()| ratchet::File {}))
     })
 }
@@ -54,28 +54,28 @@ fn process_nix_files(
     }))
 }
 
-/// Check that a Nix file is not executable, unless it has a shebang (`#!`) line.
-fn check_not_executable(
+/// Check that a Nix file is executable if and only if it has a shebang (`#!`) line.
+fn check_executable_iff_shebang(
     relative_path: &RelativePath,
     absolute_path: &Path,
 ) -> validation::Result<()> {
     let metadata = fs::metadata(absolute_path)?;
     let mode = metadata.permissions().mode();
+    let is_executable = mode & 0o111 != 0;
 
-    // If not executable, it's fine
-    if mode & 0o111 == 0 {
-        return Ok(Success(()));
-    }
-
-    // If executable, check for a shebang
     let mut file = fs::File::open(absolute_path)?;
     let mut buf = [0u8; 2];
     let bytes_read = file.read(&mut buf)?;
-    if bytes_read >= 2 && buf == *b"#!" {
-        return Ok(Success(()));
-    }
+    let has_shebang = bytes_read >= 2 && buf == *b"#!";
 
-    Ok(npv_145::NixFileIsExecutableWithoutShebang::new(relative_path).into())
+    match (is_executable, has_shebang) {
+        // Executable without shebang: error
+        (true, false) => Ok(npv_145::NixFileIsExecutableWithoutShebang::new(relative_path).into()),
+        // Shebang without executable: error
+        (false, true) => Ok(npv_146::NixFileHasShebangButNotExecutable::new(relative_path).into()),
+        // Both or neither: fine
+        _ => Ok(Success(())),
+    }
 }
 
 /// Recursively collects all Nix files in the relative `dir` within `base`

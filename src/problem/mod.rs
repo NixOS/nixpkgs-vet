@@ -29,6 +29,7 @@ pub mod npv_142;
 pub mod npv_143;
 pub mod npv_144;
 pub mod npv_145;
+pub mod npv_146;
 
 pub mod npv_160;
 pub mod npv_161;
@@ -111,6 +112,9 @@ pub enum Problem {
 
     /// NPV-145: Nix file is executable without shebang
     NixFileIsExecutableWithoutShebang(npv_145::NixFileIsExecutableWithoutShebang),
+
+    /// NPV-146: Nix file has shebang but is not executable
+    NixFileHasShebangButNotExecutable(npv_146::NixFileHasShebangButNotExecutable),
 
     /// NPV-160: top-level package moved out of by-name
     TopLevelPackageMovedOutOfByName(npv_160::TopLevelPackageMovedOutOfByName),
