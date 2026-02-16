@@ -323,17 +323,21 @@ impl NixFile {
         // At this point we know it's something like `foo = <fun2> <arg2> <arg1>`.
         // For a callPackage, `<fun2>` would be `callPackage`, `<arg2>` would be `./file`.
 
-        // Check that <arg2> is a path expression.
-        let path = if let Expr::Path(actual_path) = arg2 {
+        // Check that <arg2> is a relative path expression.
+        // Only PathRel can meaningfully resolve for callPackage; other path variants
+        // (absolute, home-relative, search) cannot point to a file within nixpkgs.
+        let path = if let Expr::PathRel(rel_path) = arg2 {
+            let unified = ast::Path::PathRel(rel_path);
             // Try to statically resolve the path and turn it into a nixpkgs-relative path.
-            if let ResolvedPath::Within(p) = self.static_resolve_path(&actual_path, relative_to) {
+            if let ResolvedPath::Within(p) = self.static_resolve_path(&unified, relative_to) {
                 Some(p)
             } else {
                 // We can't statically know an existing path inside Nixpkgs used as <arg2>.
                 None
             }
         } else {
-            // <arg2> is not a path, but rather e.g. an inline expression.
+            // <arg2> is not a relative path, but rather e.g. an inline expression or other
+            // path type.
             None
         };
 
@@ -400,6 +404,12 @@ pub enum ResolvedPath {
     /// Something like `<nixpkgs>`. This can't be known statically.
     SearchPath,
 
+    /// An absolute path like `/foo/bar`. Not allowed in nixpkgs.
+    AbsolutePath,
+
+    /// A home-relative path like `~/foo`. Not allowed in nixpkgs.
+    HomeRelativePath,
+
     /// Path couldn't be resolved due to an IO error, e.g. if the path doesn't exist or you don't
     /// have the right permissions.
     Unresolvable(std::io::Error),
@@ -418,24 +428,22 @@ impl NixFile {
     /// Given the path expression `./bar.nix` in `./foo.nix` and an absolute path of the
     /// current directory, the function returns `ResolvedPath::Within(./bar.nix)`.
     pub fn static_resolve_path(&self, node: &ast::Path, relative_to: &Path) -> ResolvedPath {
-        if node.parts().count() != 1 {
-            // If there's more than 1 interpolated part, it's of the form `./foo/${bar}/baz`.
-            return ResolvedPath::Interpolated;
+        match node {
+            ast::Path::PathAbs(_) => return ResolvedPath::AbsolutePath,
+            ast::Path::PathHome(_) => return ResolvedPath::HomeRelativePath,
+            ast::Path::PathSearch(_) => return ResolvedPath::SearchPath,
+            ast::Path::PathRel(rel) => {
+                if rel.parts().len() != 1 {
+                    // If there's more than 1 interpolated part, it's of the form
+                    // `./foo/${bar}/baz`.
+                    return ResolvedPath::Interpolated;
+                }
+            }
         }
 
         let text = node.to_string();
 
-        if text.starts_with('<') {
-            // A search path like `<nixpkgs>`. There doesn't appear to be better way to detect
-            // these in rnix.
-            return ResolvedPath::SearchPath;
-        }
-
         // Join the file's parent directory and the path expression, then resolve it.
-        //
-        // FIXME: Expressions like `../../../../foo/bar/baz/qux` or absolute paths
-        // may resolve close to the original file, but may have left the relative_to.
-        // That should be checked more strictly.
         match self.parent_dir.join(Path::new(&text)).canonicalize() {
             Err(resolution_error) => ResolvedPath::Unresolvable(resolution_error),
             Ok(resolved) => {
