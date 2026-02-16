@@ -170,15 +170,13 @@ fn check_nix_file(
                     text,
                 )
                 .into(),
-                ResolvedPath::HomeRelativePath => {
-                    npv_128::NixFileContainsHomeRelativePath::new(
-                        relative_package_dir,
-                        subpath,
-                        line,
-                        text,
-                    )
-                    .into()
-                }
+                ResolvedPath::HomeRelativePath => npv_128::NixFileContainsHomeRelativePath::new(
+                    relative_package_dir,
+                    subpath,
+                    line,
+                    text,
+                )
+                .into(),
                 ResolvedPath::Within(..) => {
                     // No need to handle the case of it being inside the directory, since we scan
                     // through the entire directory recursively in any case.
