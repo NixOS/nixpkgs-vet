@@ -62,16 +62,21 @@ impl Package {
     }
 }
 
-pub struct File {}
+/// The ratchet value for a single Nix file in the Nixpkgs tree.
+pub struct File {
+    /// The ratchet value for the check that files do not introduce top-level `with` expressions
+    /// that shadow scope.
+    pub top_level_with: RatchetState<DoesNotIntroduceToplevelWiths>,
+}
 
 impl File {
-    /// Validates the ratchet checks for a top-level package
-    pub fn compare(
-        _name: &RelativePath,
-        _optional_from: Option<&Self>,
-        _to: &Self,
-    ) -> Validation<()> {
-        Success(())
+    /// Validates the ratchet checks for a Nix file.
+    pub fn compare(name: &RelativePath, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+        validation::sequence_([RatchetState::compare(
+            name.as_str(),
+            optional_from.map(|x| &x.top_level_with),
+            &to.top_level_with,
+        )])
     }
 }
 
@@ -189,5 +194,22 @@ impl ToProblem for UsesByName {
             )
             .into(),
         }
+    }
+}
+
+/// The ratchet value for the check that Nix files do not introduce top-level `with` expressions
+/// whose body contains nested scope-defining constructs (other `with`s, `let...in`, or attribute
+/// sets).
+///
+/// Such `with` expressions shadow variables in the enclosing scope, making static analysis
+/// unreliable. This ratchet is tight when a file has no such `with` expressions, and loose when
+/// one is found.
+pub enum DoesNotIntroduceToplevelWiths {}
+
+impl ToProblem for DoesNotIntroduceToplevelWiths {
+    type ToContext = Problem;
+
+    fn to_problem(_name: &str, _optional_from: Option<()>, to: &Self::ToContext) -> Problem {
+        to.clone()
     }
 }
