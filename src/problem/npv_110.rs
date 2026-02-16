@@ -16,7 +16,7 @@ impl fmt::Display for ByNameShardIsInvalid {
         let relative_shard_path = structure::relative_dir_for_shard(shard_name);
         write!(
             f,
-            "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters consisting of a-z, 0-9, \"-\" or \"_\".",
+            "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters, starting with a-z or \"_\", consisting of a-z, 0-9, \"-\" or \"_\".",
         )
     }
 }
