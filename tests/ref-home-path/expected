@@ -1,2 +1,2 @@
-- pkgs/by-name/aa/aa: File package.nix at line 1 contains the home-relative path expression "~/foo", which is not allowed in nixpkgs.
+- pkgs/by-name/aa/aa: File package.nix at line 1 contains the home-relative path expression "~/foo", which is not allowed in nixpkgs. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-128)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

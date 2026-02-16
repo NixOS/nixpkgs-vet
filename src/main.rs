@@ -201,7 +201,7 @@ mod tests {
         test_nixpkgs(
             "case_sensitive",
             path,
-            "- pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\".\n\
+            "- pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\". (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-111)\n\
             This PR introduces the problems listed above. Please fix them before merging, \
             otherwise the base branch would break.\n",
         );

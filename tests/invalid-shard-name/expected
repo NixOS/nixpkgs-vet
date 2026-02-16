@@ -1,2 +1,2 @@
-- pkgs/by-name/A: Invalid directory name "A", must be at most 2 ASCII characters, starting with a-z or "_", consisting of a-z, 0-9, "-" or "_".
+- pkgs/by-name/A: Invalid directory name "A", must be at most 2 ASCII characters, starting with a-z or "_", consisting of a-z, 0-9, "-" or "_". (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-110)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

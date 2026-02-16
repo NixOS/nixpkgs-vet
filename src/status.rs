@@ -47,8 +47,16 @@ impl Status {
         // If there are errors, print them all out first in red.
         if let Some(errors) = self.errors() {
             for error in errors {
-                let error = format!("{error}\n");
-                fmt::Display::fmt(&maybe_red(&error), f)?;
+                let code = error.npv_code();
+                let url = error.wiki_url();
+                let link = if use_color {
+                    // OSC 8 hyperlink: \e]8;;URL\e\\TEXT\e]8;;\e\\
+                    format!("\x1b]8;;{url}\x1b\\{code}\x1b]8;;\x1b\\")
+                } else {
+                    format!("{url}")
+                };
+                let line = format!("{error} ({link})\n");
+                fmt::Display::fmt(&maybe_red(&line), f)?;
             }
         }
 
