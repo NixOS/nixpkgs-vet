@@ -68,13 +68,7 @@ let
 
   # Turns autoCalledPackageFiles into an overlay that `callPackage`'s all of them
   autoCalledPackages =
-    self: super:
-    {
-      # Needed to be able to detect empty arguments in all-packages.nix
-      # See a more detailed description in pkgs/top-level/by-name-overlay.nix
-      _internalCallByNamePackageFile = file: self.callPackage file { };
-    }
-    // builtins.mapAttrs (name: self._internalCallByNamePackageFile) autoCalledPackageFiles;
+    self: super: builtins.mapAttrs (name: file: self.callPackage file { }) autoCalledPackageFiles;
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
   optionalAllPackagesOverlay =
