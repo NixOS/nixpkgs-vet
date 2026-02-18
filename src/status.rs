@@ -20,8 +20,8 @@ pub enum Status {
     /// branch would break.
     ProblemsIntroduced(Vec<Problem>),
 
-    /// This PR introduces additional instances of discouraged patterns. Merging is discouraged but
-    /// would not break the base branch.
+    /// This PR introduces additional instances of discouraged patterns. Please fix them before
+    /// merging.
     DiscouragedPatternedIntroduced(Vec<Problem>),
 
     /// Some other error occurred.
@@ -70,7 +70,7 @@ impl Status {
             ),
             Self::DiscouragedPatternedIntroduced(..) => maybe_yellow(
                 "This PR introduces additional instances of discouraged patterns as listed above. \
-                 Merging is discouraged but would not break the base branch.",
+                 Please fix them before merging.",
             ),
         };
         fmt::Display::fmt(&message, f)
