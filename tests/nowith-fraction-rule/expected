@@ -1,0 +1,8 @@
+- test.nix: `with` expression covers too much of the file.
+  Large-scoped `with` expressions shadow bindings and make static analysis unreliable.
+  Prefer one of these alternatives:
+  - Use fully qualified names, e.g. `lib.mkOption` instead of `with lib; mkOption`
+  - Use `inherit (lib) mkOption mkIf;` in a `let` block
+  - Limit `with` to small scopes, e.g. `maintainers = with lib.maintainers; [ ... ]`
+
+This PR introduces additional instances of discouraged patterns as listed above. Merging is discouraged but would not break the base branch.
