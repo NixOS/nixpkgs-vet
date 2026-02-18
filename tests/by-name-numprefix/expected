@@ -1,3 +1,3 @@
-- pkgs/by-name/10: Invalid directory name "10", must be at most 2 ASCII characters, starting with a-z or "_", consisting of a-z, 0-9, "-" or "_".
-- pkgs/by-name/10/10foo: Invalid package directory name "10foo", must start with a letter (a-z, A-Z) or "_", followed by ASCII characters a-z, A-Z, 0-9, "-" or "_".
+- pkgs/by-name/10: Invalid directory name "10", must be at most 2 ASCII characters, starting with a-z or "_", consisting of a-z, 0-9, "-" or "_". (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-110)
+- pkgs/by-name/10/10foo: Invalid package directory name "10foo", must start with a letter (a-z, A-Z) or "_", followed by ASCII characters a-z, A-Z, 0-9, "-" or "_". (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-141)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

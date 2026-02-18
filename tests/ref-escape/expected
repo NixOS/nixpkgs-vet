@@ -5,5 +5,5 @@
   - If the path being referenced could be considered a stable interface with multiple uses, consider exposing it via a `pkgs` attribute, then taking it as a attribute argument in package.nix.
   - If the path being referenced is internal and has multiple uses, consider passing the file as an explicit `callPackage` argument in `pkgs/top-level/all-packages.nix`.
   - If the path being referenced is internal and will need to be modified independently of the original, consider copying it into the pkgs/by-name/aa/aa directory.
-
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-123)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

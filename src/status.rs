@@ -42,13 +42,33 @@ impl Status {
         // These all respect the NO_COLOR environment variable even if `use_color` is true.
         let maybe_green = |s: &str| if use_color { s.green() } else { s.into() };
         let maybe_yellow = |s: &str| if use_color { s.yellow() } else { s.into() };
-        let maybe_red = |s: &str| if use_color { s.red() } else { s.into() };
-
-        // If there are errors, print them all out first in red.
+        // Print each error with its wiki link.
         if let Some(errors) = self.errors() {
             for error in errors {
-                let error = format!("{error}\n");
-                fmt::Display::fmt(&maybe_red(&error), f)?;
+                let code = error.npv_code();
+                let url = error.wiki_url();
+
+                if use_color {
+                    let error_str = format!("{error}");
+                    // OSC 8 hyperlink: \e]8;;URL\e\\TEXT\e]8;;\e\\
+                    let link = format!("\x1b]8;;{url}\x1b\\{code}\x1b]8;;\x1b\\");
+
+                    // Most errors follow "- {path}: {message}". When we can identify
+                    // that pattern, make the path bold and the message red. Otherwise
+                    // fall back to coloring the entire error red.
+                    if let Some(rest) = error_str.strip_prefix("- ")
+                        && let Some((location, message)) = rest.split_once(": ")
+                        && !location.contains('\n')
+                    {
+                        writeln!(f, "- {}: {} ({})", location.bold(), message.red(), link)?;
+                        continue;
+                    }
+
+                    // Fallback for messages that don't match the simple pattern.
+                    writeln!(f, "{} ({})", error_str.red(), link)?;
+                } else {
+                    writeln!(f, "{error} ({url})")?;
+                }
             }
         }
 

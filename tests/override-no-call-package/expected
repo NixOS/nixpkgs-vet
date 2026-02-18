@@ -5,5 +5,5 @@
   However, in this PR, it isn't defined that way. See the definition in pkgs/top-level/all-packages.nix:1
 
     nonDerivation = self.someDrv;
-
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-104)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

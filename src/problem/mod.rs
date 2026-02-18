@@ -1,5 +1,6 @@
+use std::fmt;
+
 use derive_enum_from_into::EnumFrom;
-use derive_more::Display;
 use relative_path::RelativePath;
 
 pub mod npv_100;
@@ -36,7 +37,9 @@ pub mod npv_161;
 pub mod npv_162;
 pub mod npv_163;
 
-#[derive(Clone, Display, EnumFrom)]
+const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
+
+#[derive(Clone, EnumFrom)]
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
     ByNameUndefinedAttribute(npv_100::ByNameUndefinedAttribute),
@@ -131,6 +134,86 @@ pub enum Problem {
     NewTopLevelPackageShouldBeByNameWithCustomArgument(
         npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument,
     ),
+}
+
+impl Problem {
+    /// Returns the NPV error code for this problem (e.g. "NPV-100").
+    pub fn npv_code(&self) -> &'static str {
+        match self {
+            Self::ByNameUndefinedAttribute(..) => "NPV-100",
+            Self::ByNameNonDerivation(..) => "NPV-101",
+            Self::ByNameInternalCallPackageUsed(..) => "NPV-102",
+            Self::ByNameCannotDetermineAttributeLocation(..) => "NPV-103",
+            Self::ByNameOverrideOfNonSyntacticCallPackage(..) => "NPV-104",
+            Self::ByNameOverrideOfNonTopLevelPackage(..) => "NPV-105",
+            Self::ByNameOverrideContainsWrongCallPackagePath(..) => "NPV-106",
+            Self::ByNameOverrideContainsEmptyArgument(..) => "NPV-107",
+            Self::ByNameOverrideContainsEmptyPath(..) => "NPV-108",
+            Self::ByNameShardIsNotDirectory(..) => "NPV-109",
+            Self::ByNameShardIsInvalid(..) => "NPV-110",
+            Self::ByNameShardIsCaseSensitiveDuplicate(..) => "NPV-111",
+            Self::NixEvalError(..) => "NPV-120",
+            Self::NixFileContainsPathInterpolation(..) => "NPV-121",
+            Self::NixFileContainsSearchPath(..) => "NPV-122",
+            Self::NixFileContainsPathOutsideDirectory(..) => "NPV-123",
+            Self::NixFileContainsUnresolvablePath(..) => "NPV-124",
+            Self::PackageContainsSymlinkPointingOutside(..) => "NPV-125",
+            Self::PackageContainsUnresolvableSymlink(..) => "NPV-126",
+            Self::NixFileContainsAbsolutePath(..) => "NPV-127",
+            Self::NixFileContainsHomeRelativePath(..) => "NPV-128",
+            Self::PackageDirectoryIsNotDirectory(..) => "NPV-140",
+            Self::InvalidPackageDirectoryName(..) => "NPV-141",
+            Self::PackageInWrongShard(..) => "NPV-142",
+            Self::PackageNixMissing(..) => "NPV-143",
+            Self::PackageNixIsNotFile(..) => "NPV-144",
+            Self::TopLevelPackageMovedOutOfByName(..) => "NPV-160",
+            Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(..) => "NPV-161",
+            Self::NewTopLevelPackageShouldBeByName(..) => "NPV-162",
+            Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(..) => "NPV-163",
+        }
+    }
+
+    /// Returns the wiki URL for this problem's documentation.
+    pub fn wiki_url(&self) -> String {
+        format!("{WIKI_BASE_URL}/{}", self.npv_code())
+    }
+}
+
+impl fmt::Display for Problem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::ByNameUndefinedAttribute(inner) => inner.fmt(f),
+            Self::ByNameNonDerivation(inner) => inner.fmt(f),
+            Self::ByNameInternalCallPackageUsed(inner) => inner.fmt(f),
+            Self::ByNameCannotDetermineAttributeLocation(inner) => inner.fmt(f),
+            Self::ByNameOverrideOfNonSyntacticCallPackage(inner) => inner.fmt(f),
+            Self::ByNameOverrideOfNonTopLevelPackage(inner) => inner.fmt(f),
+            Self::ByNameOverrideContainsWrongCallPackagePath(inner) => inner.fmt(f),
+            Self::ByNameOverrideContainsEmptyArgument(inner) => inner.fmt(f),
+            Self::ByNameOverrideContainsEmptyPath(inner) => inner.fmt(f),
+            Self::ByNameShardIsNotDirectory(inner) => inner.fmt(f),
+            Self::ByNameShardIsInvalid(inner) => inner.fmt(f),
+            Self::ByNameShardIsCaseSensitiveDuplicate(inner) => inner.fmt(f),
+            Self::NixEvalError(inner) => inner.fmt(f),
+            Self::NixFileContainsPathInterpolation(inner) => inner.fmt(f),
+            Self::NixFileContainsSearchPath(inner) => inner.fmt(f),
+            Self::NixFileContainsPathOutsideDirectory(inner) => inner.fmt(f),
+            Self::NixFileContainsUnresolvablePath(inner) => inner.fmt(f),
+            Self::PackageContainsSymlinkPointingOutside(inner) => inner.fmt(f),
+            Self::PackageContainsUnresolvableSymlink(inner) => inner.fmt(f),
+            Self::NixFileContainsAbsolutePath(inner) => inner.fmt(f),
+            Self::NixFileContainsHomeRelativePath(inner) => inner.fmt(f),
+            Self::PackageDirectoryIsNotDirectory(inner) => inner.fmt(f),
+            Self::InvalidPackageDirectoryName(inner) => inner.fmt(f),
+            Self::PackageInWrongShard(inner) => inner.fmt(f),
+            Self::PackageNixMissing(inner) => inner.fmt(f),
+            Self::PackageNixIsNotFile(inner) => inner.fmt(f),
+            Self::TopLevelPackageMovedOutOfByName(inner) => inner.fmt(f),
+            Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => inner.fmt(f),
+            Self::NewTopLevelPackageShouldBeByName(inner) => inner.fmt(f),
+            Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(inner) => inner.fmt(f),
+        }
+    }
 }
 
 fn indent_definition(column: usize, definition: &str) -> String {
