@@ -1,2 +1,2 @@
-- pkgs/by-name/fo/foo/package.nix: Nix files with a shebang (`#!`) line must be executable.
+- pkgs/by-name/fo/foo/package.nix: Nix files with a shebang (`#!`) line must be executable. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-146)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
