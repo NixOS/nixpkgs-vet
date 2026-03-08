@@ -2,6 +2,8 @@
 //!
 //! Each type has a `compare` method that validates the ratchet checks for that item.
 
+use std::marker::PhantomData;
+
 use relative_path::RelativePath;
 use std::collections::BTreeMap;
 
@@ -188,6 +190,27 @@ impl ToProblem for UsesByName {
                 file,
             )
             .into(),
+        }
+    }
+}
+
+pub trait EnabledAttributeProblem {
+    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem;
+    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem;
+}
+
+/// The ratchet value of an evaluated boolean attribute that must be enabled for new packages and
+/// must not regress to `false` once enabled.
+pub struct EnabledAttribute<ProblemKind>(PhantomData<ProblemKind>);
+
+impl<ProblemKind: EnabledAttributeProblem> ToProblem for EnabledAttribute<ProblemKind> {
+    type ToContext = RelativePathBuf;
+
+    fn to_problem(name: &str, optional_from: Option<()>, file: &Self::ToContext) -> Problem {
+        if optional_from.is_some() {
+            ProblemKind::regressed_problem(name, file.clone())
+        } else {
+            ProblemKind::introduced_problem(name, file.clone())
         }
     }
 }
