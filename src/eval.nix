@@ -60,6 +60,7 @@ let
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
+            structured_attrs = value.__structuredAttrs or false;
             definition_variant =
               if !value ? _callPackageVariant then
                 { ManualDefinition.is_semantic_call_package = false; }

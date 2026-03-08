@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163};
+use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163, npv_166, npv_167};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -44,6 +44,9 @@ pub struct Package {
 
     /// The ratchet value for the check for new packages using pkgs/by-name
     pub uses_by_name: RatchetState<UsesByName>,
+
+    /// The ratchet value for the check for enabling `__structuredAttrs`.
+    pub structured_attrs: RatchetState<StructuredAttrs>,
 }
 
 impl Package {
@@ -59,6 +62,11 @@ impl Package {
                 name,
                 optional_from.map(|x| &x.uses_by_name),
                 &to.uses_by_name,
+            ),
+            RatchetState::<StructuredAttrs>::compare(
+                name,
+                optional_from.map(|x| &x.structured_attrs),
+                &to.structured_attrs,
             ),
         ])
     }
@@ -212,5 +220,24 @@ impl<ProblemKind: EnabledAttributeProblem> ToProblem for EnabledAttribute<Proble
         } else {
             ProblemKind::introduced_problem(name, file.clone())
         }
+    }
+}
+
+/// The ratchet value of an attribute for enabling `__structuredAttrs`.
+///
+/// New packages must evaluate with `__structuredAttrs = true` unless their package set already
+/// makes that the default. Once a package evaluates with `__structuredAttrs = true`, it must not
+/// regress.
+pub type StructuredAttrs = EnabledAttribute<StructuredAttrsProblem>;
+
+pub enum StructuredAttrsProblem {}
+
+impl EnabledAttributeProblem for StructuredAttrsProblem {
+    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_166::NewTopLevelPackageMustEnableStructuredAttrs::new(name, file).into()
+    }
+
+    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_167::TopLevelPackageDisabledStructuredAttrs::new(name, file).into()
     }
 }

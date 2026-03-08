@@ -43,6 +43,7 @@ let
     // lib.mapAttrs (name: value: value) {
       someDrv = {
         type = "derivation";
+        __structuredAttrs = true;
       };
     };
 
