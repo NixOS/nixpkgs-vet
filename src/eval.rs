@@ -81,6 +81,8 @@ pub enum AttributeVariant {
     AttributeSet {
         /// Whether the attribute is a derivation (`lib.isDerivation`)
         is_derivation: bool,
+        /// Whether the attribute evaluates with `__structuredAttrs = true`.
+        structured_attrs: bool,
         /// The type of `callPackage` used.
         definition_variant: DefinitionVariant,
     },
@@ -298,6 +300,7 @@ fn by_name(
             attribute_variant:
                 AttributeVariant::AttributeSet {
                     is_derivation,
+                    structured_attrs,
                     definition_variant,
                 },
             location,
@@ -373,18 +376,26 @@ fn by_name(
 
             // Independently report problems about whether it's a derivation and the callPackage
             // variant.
-            is_derivation_result.and_(variant_result)
+            is_derivation_result
+                .and_(variant_result)
+                .map(|manual_definition| ratchet::Package {
+                    manual_definition,
+                    uses_by_name: Tight,
+                    structured_attrs: enabled_attribute_ratchet(
+                        structured_attrs,
+                        structure::relative_file_for_package(attribute_name),
+                    ),
+                })
         }
     };
-    Ok(
-        // Packages being checked in this function are _always_ already defined in `pkgs/by-name`,
-        // so instead of repeating ourselves all the time to define `uses_by_name`, just set it
-        // once at the end with a map.
-        manual_definition_result.map(|manual_definition| ratchet::Package {
-            manual_definition,
-            uses_by_name: Tight,
-        }),
-    )
+    Ok(manual_definition_result)
+}
+
+fn enabled_attribute_ratchet<R>(enabled: bool, file: RelativePathBuf) -> ratchet::RatchetState<R>
+where
+    R: ratchet::ToProblem<ToContext = RelativePathBuf>,
+{
+    if enabled { Tight } else { Loose(file) }
 }
 
 /// Handles the case for packages in `pkgs/by-name` that are manually overridden,
@@ -460,7 +471,7 @@ fn handle_non_by_name_attribute(
     // This is never `Tight`, because we only either:
     // - Know that the attribute _could_ be migrated to `pkgs/by-name`, which is `Loose`
     // - Or we're unsure, in which case we use `NonApplicable`
-    let uses_by_name = match non_by_name_attribute {
+    let (uses_by_name, structured_attrs) = match non_by_name_attribute {
         // This is a big ol' match on various properties of the attribute
         //
         // First, it needs to succeed evaluation. We can't know whether an attribute could be
@@ -484,6 +495,7 @@ fn handle_non_by_name_attribute(
                 AttributeVariant::AttributeSet {
                     // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
                     is_derivation: true,
+                    structured_attrs,
                     // Of the two definition variants, really only the manual one makes sense
                     // here.
                     //
@@ -574,11 +586,29 @@ fn handle_non_by_name_attribute(
                 NonApplicable
             };
 
-            uses_by_name
+            // For evaluated boolean ratchets, point at the package file when we can resolve one.
+            // Otherwise fall back to the file that defines the top-level attribute.
+            let evaluated_attribute_file =
+                parsed_definition
+                    .as_ref()
+                    .map(|(location, optional_syntactic_call_package)| {
+                        optional_syntactic_call_package
+                            .as_ref()
+                            .and_then(|call_package| call_package.relative_path.clone())
+                            .unwrap_or_else(|| location.file.clone())
+                    });
+
+            let structured_attrs = match (structured_attrs, evaluated_attribute_file) {
+                (true, _) => Tight,
+                (false, Some(file)) => Loose(file),
+                (false, None) => NonApplicable,
+            };
+
+            (uses_by_name, structured_attrs)
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
         // being able to make any good calls about the ratchet state.
-        _ => NonApplicable,
+        _ => (NonApplicable, NonApplicable),
     };
     Ok(Success(ratchet::Package {
         // Packages being checked in this function _always_ need a manual definition, because
@@ -586,5 +616,6 @@ fn handle_non_by_name_attribute(
         // ourselves all the time to define `manual_definition`, just set it once at the end here.
         manual_definition: Tight,
         uses_by_name,
+        structured_attrs,
     }))
 }

@@ -96,3 +96,5 @@ The current ratchets are:
   (see [nix evaluation checks](#nix-evaluation-checks)) must not be introduced.
 - New top-level packages defined using `pkgs.callPackage` must be defined with a package directory.
   - Once a top-level package uses `pkgs/by-name`, it also can't be moved back out of it.
+- New top-level packages must evaluate with `__structuredAttrs = true`.
+  - Once a top-level package evaluates with `__structuredAttrs = true`, it also can't regress to `false`.
