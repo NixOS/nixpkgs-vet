@@ -81,6 +81,8 @@ pub enum AttributeVariant {
     AttributeSet {
         /// Whether the attribute is a derivation (`lib.isDerivation`)
         is_derivation: bool,
+        /// Whether the attribute evaluates with `strictDeps = true`.
+        strict_deps: bool,
         /// Whether the attribute evaluates with `__structuredAttrs = true`.
         structured_attrs: bool,
         /// The type of `callPackage` used.
@@ -300,6 +302,7 @@ fn by_name(
             attribute_variant:
                 AttributeVariant::AttributeSet {
                     is_derivation,
+                    strict_deps,
                     structured_attrs,
                     definition_variant,
                 },
@@ -381,6 +384,10 @@ fn by_name(
                 .map(|manual_definition| ratchet::Package {
                     manual_definition,
                     uses_by_name: Tight,
+                    strict_deps: enabled_attribute_ratchet(
+                        strict_deps,
+                        structure::relative_file_for_package(attribute_name),
+                    ),
                     structured_attrs: enabled_attribute_ratchet(
                         structured_attrs,
                         structure::relative_file_for_package(attribute_name),
@@ -491,6 +498,7 @@ fn handle_non_by_name_attribute(
                 AttributeVariant::AttributeSet {
                     // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
                     is_derivation: true,
+                    strict_deps,
                     structured_attrs,
                     // Of the two definition variants, really only the manual one makes sense
                     // here.
@@ -597,6 +605,12 @@ fn handle_non_by_name_attribute(
                             .unwrap_or_else(|| location.file.clone())
                     });
 
+            let strict_deps = match (strict_deps, evaluated_attribute_file.clone()) {
+                (true, _) => Tight,
+                (false, Some(file)) => Loose(file),
+                (false, None) => NonApplicable,
+            };
+
             let structured_attrs = match (structured_attrs, evaluated_attribute_file) {
                 (true, _) => Tight,
                 (false, Some(file)) => Loose(file),
@@ -609,6 +623,7 @@ fn handle_non_by_name_attribute(
                 // ratchet stays `Tight` regardless of the other checks in this function.
                 manual_definition: Tight,
                 uses_by_name,
+                strict_deps,
                 structured_attrs,
             }
         }
@@ -617,6 +632,7 @@ fn handle_non_by_name_attribute(
         _ => ratchet::Package {
             manual_definition: Tight,
             uses_by_name: NonApplicable,
+            strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
         },
     };

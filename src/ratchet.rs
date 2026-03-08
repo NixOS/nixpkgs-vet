@@ -10,7 +10,9 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163, npv_166, npv_167};
+use crate::problem::{
+    Problem, npv_160, npv_161, npv_162, npv_163, npv_164, npv_165, npv_166, npv_167,
+};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -45,6 +47,9 @@ pub struct Package {
     /// The ratchet value for the check for new packages using pkgs/by-name
     pub uses_by_name: RatchetState<UsesByName>,
 
+    /// The ratchet value for the check for enabling `strictDeps`.
+    pub strict_deps: RatchetState<StrictDeps>,
+
     /// The ratchet value for the check for enabling `__structuredAttrs`.
     pub structured_attrs: RatchetState<StructuredAttrs>,
 }
@@ -62,6 +67,11 @@ impl Package {
                 name,
                 optional_from.map(|x| &x.uses_by_name),
                 &to.uses_by_name,
+            ),
+            RatchetState::<StrictDeps>::compare(
+                name,
+                optional_from.map(|x| &x.strict_deps),
+                &to.strict_deps,
             ),
             RatchetState::<StructuredAttrs>::compare(
                 name,
@@ -220,6 +230,24 @@ impl<ProblemKind: EnabledAttributeProblem> ToProblem for EnabledAttribute<Proble
         } else {
             ProblemKind::introduced_problem(name, file.clone())
         }
+    }
+}
+
+/// The ratchet value of an attribute for enabling `strictDeps`.
+///
+/// New packages must evaluate with `strictDeps = true` unless their package set already makes
+/// that the default. Once a package evaluates with `strictDeps = true`, it must not regress.
+pub type StrictDeps = EnabledAttribute<StrictDepsProblem>;
+
+pub enum StrictDepsProblem {}
+
+impl EnabledAttributeProblem for StrictDepsProblem {
+    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_164::NewTopLevelPackageMustEnableStrictDeps::new(name, file).into()
+    }
+
+    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_165::TopLevelPackageDisabledStrictDeps::new(name, file).into()
     }
 }
 
