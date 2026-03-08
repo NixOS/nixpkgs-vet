@@ -1,0 +1,4 @@
+- Attribute `pkgs.foo` previously evaluated with `strictDeps = true`, but now evaluates with `strictDeps = false`.
+  Please re-enable `strictDeps = true;` in pkgs/by-name/fo/foo/package.nix.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-165)
+This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.
