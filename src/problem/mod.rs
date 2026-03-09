@@ -36,6 +36,10 @@ pub mod npv_160;
 pub mod npv_161;
 pub mod npv_162;
 pub mod npv_163;
+pub mod npv_164;
+pub mod npv_165;
+pub mod npv_166;
+pub mod npv_167;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
@@ -134,6 +138,20 @@ pub enum Problem {
     NewTopLevelPackageShouldBeByNameWithCustomArgument(
         npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument,
     ),
+
+    /// NPV-164: new top-level package must enable strictDeps
+    NewTopLevelPackageMustEnableStrictDeps(npv_164::NewTopLevelPackageMustEnableStrictDeps),
+
+    /// NPV-165: top-level package disabled strictDeps
+    TopLevelPackageDisabledStrictDeps(npv_165::TopLevelPackageDisabledStrictDeps),
+
+    /// NPV-166: new top-level package must enable __structuredAttrs
+    NewTopLevelPackageMustEnableStructuredAttrs(
+        npv_166::NewTopLevelPackageMustEnableStructuredAttrs,
+    ),
+
+    /// NPV-167: top-level package disabled __structuredAttrs
+    TopLevelPackageDisabledStructuredAttrs(npv_167::TopLevelPackageDisabledStructuredAttrs),
 }
 
 impl Problem {
@@ -170,6 +188,10 @@ impl Problem {
             Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(..) => "NPV-161",
             Self::NewTopLevelPackageShouldBeByName(..) => "NPV-162",
             Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(..) => "NPV-163",
+            Self::NewTopLevelPackageMustEnableStrictDeps(..) => "NPV-164",
+            Self::TopLevelPackageDisabledStrictDeps(..) => "NPV-165",
+            Self::NewTopLevelPackageMustEnableStructuredAttrs(..) => "NPV-166",
+            Self::TopLevelPackageDisabledStructuredAttrs(..) => "NPV-167",
         }
     }
 
@@ -212,6 +234,10 @@ impl fmt::Display for Problem {
             Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => inner.fmt(f),
             Self::NewTopLevelPackageShouldBeByName(inner) => inner.fmt(f),
             Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(inner) => inner.fmt(f),
+            Self::NewTopLevelPackageMustEnableStrictDeps(inner) => inner.fmt(f),
+            Self::TopLevelPackageDisabledStrictDeps(inner) => inner.fmt(f),
+            Self::NewTopLevelPackageMustEnableStructuredAttrs(inner) => inner.fmt(f),
+            Self::TopLevelPackageDisabledStructuredAttrs(inner) => inner.fmt(f),
         }
     }
 }

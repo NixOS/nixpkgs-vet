@@ -1,0 +1,4 @@
+- Attribute `pkgs.foo` previously evaluated with `__structuredAttrs = true`, but now evaluates with `__structuredAttrs = false`.
+  Please re-enable `__structuredAttrs = true;` in pkgs/by-name/fo/foo/package.nix.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-167)
+This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.
