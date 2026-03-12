@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, npv_160, npv_161, npv_162, npv_163};
+use crate::problem::{Problem, npv_160, npv_162};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -132,16 +132,6 @@ impl<Context: ToProblem> RatchetState<Context> {
 /// This ratchet is only tight for attributes that:
 ///
 /// - Are not defined in `pkgs/by-name`, and rely on a manual definition.
-///
-/// - Are defined in `pkgs/by-name` without any manual definition (no custom argument overrides).
-///
-/// - Are defined with `pkgs/by-name` with a manual definition that can't be removed
-///   because it provides custom argument overrides.
-///
-/// In comparison, this ratchet is loose for attributes that:
-///
-/// - Are defined in `pkgs/by-name` with a manual definition that doesn't have any
-///   custom argument overrides.
 pub enum ManualDefinition {}
 
 impl ToProblem for ManualDefinition {
@@ -164,30 +154,13 @@ impl ToProblem for UsesByName {
 
     fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
         let is_new = optional_from.is_none();
-        let is_empty = to.empty_arg;
-        match (is_new, is_empty) {
-            (false, true) => {
+        match is_new {
+            false => {
                 npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
                     .into()
             }
-            // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
-            // for custom arguments.
-            (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
-                name,
-                to.relative_path.clone(),
-                file,
-            )
-            .into(),
-            (true, true) => {
-                npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
-            (true, false) => npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
-                name,
-                to.relative_path.clone(),
-                file,
-            )
-            .into(),
+            true => npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone())
+                .into(),
         }
     }
 }
