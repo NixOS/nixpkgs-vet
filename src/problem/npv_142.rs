@@ -8,6 +8,8 @@ use crate::structure;
 #[derive(Clone, new)]
 pub struct PackageInWrongShard {
     #[new(into)]
+    by_name_subpath: String,
+    #[new(into)]
     package_name: String,
     #[new(into)]
     relative_package_dir: RelativePathBuf,
@@ -16,10 +18,12 @@ pub struct PackageInWrongShard {
 impl fmt::Display for PackageInWrongShard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self {
+            by_name_subpath,
             package_name,
             relative_package_dir,
         } = self;
-        let correct_relative_package_dir = structure::relative_dir_for_package(package_name);
+        let correct_relative_package_dir =
+            structure::relative_dir_for_package(by_name_subpath, package_name);
         write!(
             f,
             "- {relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
