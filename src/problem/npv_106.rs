@@ -12,6 +12,8 @@ use super::create_path_expr;
 #[derive(Clone, new)]
 pub struct ByNameOverrideContainsWrongCallPackagePath {
     #[new(into)]
+    by_name_subpath: String,
+    #[new(into)]
     package_name: String,
     #[new(into)]
     actual_path: RelativePathBuf,
@@ -21,14 +23,17 @@ pub struct ByNameOverrideContainsWrongCallPackagePath {
 impl fmt::Display for ByNameOverrideContainsWrongCallPackagePath {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self {
+            by_name_subpath,
             package_name,
             location,
             actual_path,
         } = self;
         let Location { file, line, .. } = location;
-        let expected_package_path = structure::relative_file_for_package(package_name);
+        let expected_package_path =
+            structure::relative_file_for_package(by_name_subpath, package_name);
         let expected_path_expr = create_path_expr(file, expected_package_path);
-        let relative_package_dir = structure::relative_dir_for_package(package_name);
+        let relative_package_dir =
+            structure::relative_dir_for_package(by_name_subpath, package_name);
         let actual_path_expr = create_path_expr(file, actual_path);
         writedoc!(
             f,
