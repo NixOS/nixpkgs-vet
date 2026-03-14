@@ -12,7 +12,6 @@ use crate::problem::{npv_109, npv_110, npv_111, npv_140, npv_141, npv_142, npv_1
 use crate::references;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 
-pub const BASE_SUBPATH: &str = "pkgs/by-name";
 pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
 static SHARD_NAME_REGEX: LazyLock<Regex> =
@@ -38,25 +37,26 @@ pub fn shard_for_package(package_name: &str) -> String {
     package_name.to_lowercase().chars().take(2).collect()
 }
 
-pub fn relative_dir_for_shard(shard_name: &str) -> RelativePathBuf {
-    RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}"))
+pub fn relative_dir_for_shard(by_name_subpath: &str, shard_name: &str) -> RelativePathBuf {
+    RelativePathBuf::from(format!("{by_name_subpath}/{shard_name}"))
 }
 
-pub fn relative_dir_for_package(package_name: &str) -> RelativePathBuf {
-    relative_dir_for_shard(&shard_for_package(package_name)).join(package_name)
+pub fn relative_dir_for_package(by_name_subpath: &str, package_name: &str) -> RelativePathBuf {
+    relative_dir_for_shard(by_name_subpath, &shard_for_package(package_name)).join(package_name)
 }
 
-pub fn relative_file_for_package(package_name: &str) -> RelativePathBuf {
-    relative_dir_for_package(package_name).join(PACKAGE_NIX_FILENAME)
+pub fn relative_file_for_package(by_name_subpath: &str, package_name: &str) -> RelativePathBuf {
+    relative_dir_for_package(by_name_subpath, package_name).join(PACKAGE_NIX_FILENAME)
 }
 
 /// Check the structure of Nixpkgs, returning the attribute names that are defined in
-/// `pkgs/by-name`
+/// the given by-name subpath
 pub fn check_structure(
     path: &Path,
     nix_file_store: &mut NixFileStore,
+    by_name_subpath: &str,
 ) -> validation::Result<Vec<String>> {
-    let base_dir = path.join(BASE_SUBPATH);
+    let base_dir = path.join(by_name_subpath);
 
     let shard_results = read_dir_sorted(&base_dir)?
         .into_iter()
@@ -70,11 +70,11 @@ pub fn check_structure(
             } else if !shard_path.is_dir() {
                 // We can't check for any other errors if it's not a directory, since there are no
                 // subdirectories to check.
-                npv_109::ByNameShardIsNotDirectory::new(shard_name).into()
+                npv_109::ByNameShardIsNotDirectory::new(by_name_subpath, shard_name).into()
             } else {
                 let shard_name_valid = SHARD_NAME_REGEX.is_match(&shard_name);
                 let result = if !shard_name_valid {
-                    npv_110::ByNameShardIsInvalid::new(shard_name.clone()).into()
+                    npv_110::ByNameShardIsInvalid::new(by_name_subpath, shard_name.clone()).into()
                 } else {
                     Success(())
                 };
@@ -87,6 +87,7 @@ pub fn check_structure(
                     .filter(|(l, r)| l.file_name().eq_ignore_ascii_case(r.file_name()))
                     .map(|(l, r)| {
                         npv_111::ByNameShardIsCaseSensitiveDuplicate::new(
+                            by_name_subpath,
                             shard_name.clone(),
                             l.file_name(),
                             r.file_name(),
@@ -105,6 +106,7 @@ pub fn check_structure(
                             &shard_name,
                             shard_name_valid,
                             &package_entry,
+                            by_name_subpath,
                         )
                     })
                     .collect_vec()?;
@@ -124,14 +126,15 @@ fn check_package(
     shard_name: &str,
     shard_name_valid: bool,
     package_entry: &DirEntry,
+    by_name_subpath: &str,
 ) -> validation::Result<String> {
     let package_path = package_entry.path();
     let package_name = package_entry.file_name().to_string_lossy().into_owned();
     let relative_package_dir =
-        RelativePathBuf::from(format!("{BASE_SUBPATH}/{shard_name}/{package_name}"));
+        RelativePathBuf::from(format!("{by_name_subpath}/{shard_name}/{package_name}"));
 
     Ok(if !package_path.is_dir() {
-        npv_140::PackageDirectoryIsNotDirectory::new(package_name).into()
+        npv_140::PackageDirectoryIsNotDirectory::new(by_name_subpath, package_name).into()
     } else {
         let package_name_valid = PACKAGE_NAME_REGEX.is_match(&package_name);
         let result = if !package_name_valid {
@@ -144,12 +147,13 @@ fn check_package(
             Success(())
         };
 
-        let correct_relative_package_dir = relative_dir_for_package(&package_name);
+        let correct_relative_package_dir = relative_dir_for_package(by_name_subpath, &package_name);
         let result = result.and_(if relative_package_dir != correct_relative_package_dir {
             // Only show this error if we have a valid shard and package name.
             // If one of those is wrong, you should fix that first.
             if shard_name_valid && package_name_valid {
                 npv_142::PackageInWrongShard::new(
+                    by_name_subpath,
                     package_name.clone(),
                     relative_package_dir.clone(),
                 )
@@ -163,9 +167,9 @@ fn check_package(
 
         let package_nix_path = package_path.join(PACKAGE_NIX_FILENAME);
         let result = result.and_(if !package_nix_path.exists() {
-            npv_143::PackageNixMissing::new(package_name.clone()).into()
+            npv_143::PackageNixMissing::new(by_name_subpath, package_name.clone()).into()
         } else if !package_nix_path.is_file() {
-            npv_144::PackageNixIsNotFile::new(package_name.clone()).into()
+            npv_144::PackageNixIsNotFile::new(by_name_subpath, package_name.clone()).into()
         } else {
             Success(())
         });

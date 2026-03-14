@@ -40,7 +40,7 @@ pub struct Package {
     /// The ratchet value for the check for non-auto-called empty arguments
     pub manual_definition: RatchetState<ManualDefinition>,
 
-    /// The ratchet value for the check for new packages using pkgs/by-name
+    /// The ratchet value for the check for new packages using the by-name structure
     pub uses_by_name: RatchetState<UsesByName>,
 }
 
@@ -131,16 +131,17 @@ impl<Context: ToProblem> RatchetState<Context> {
 ///
 /// This ratchet is only tight for attributes that:
 ///
-/// - Are not defined in `pkgs/by-name`, and rely on a manual definition.
+/// - Are not defined in the by-name subpath, and rely on a manual definition.
 ///
-/// - Are defined in `pkgs/by-name` without any manual definition (no custom argument overrides).
+/// - Are defined in the by-name subpath without any manual definition (no custom argument
+///   overrides).
 ///
-/// - Are defined with `pkgs/by-name` with a manual definition that can't be removed
+/// - Are defined with the by-name subpath with a manual definition that can't be removed
 ///   because it provides custom argument overrides.
 ///
 /// In comparison, this ratchet is loose for attributes that:
 ///
-/// - Are defined in `pkgs/by-name` with a manual definition that doesn't have any
+/// - Are defined in the by-name subpath with a manual definition that doesn't have any
 ///   custom argument overrides.
 pub enum ManualDefinition {}
 
@@ -152,37 +153,51 @@ impl ToProblem for ManualDefinition {
     }
 }
 
-/// The ratchet value of an attribute for the check that new packages use `pkgs/by-name`.
+/// The ratchet value of an attribute for the check that new packages use the by-name subpath given
+/// by ToContext.
 ///
-/// This checks that all new package defined using `callPackage` must be defined via
-/// `pkgs/by-name`. It also checks that once a package uses `pkgs/by-name`, it can't switch back
+/// This checks that all new package defined using `callPackage` must be defined via the by-name
+/// subpath. It also checks that once a package uses by-name subpath, it can't switch back
 /// to `pkgs/top-level/all-packages.nix`.
 pub enum UsesByName {}
 
 impl ToProblem for UsesByName {
-    type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
+    /// callPackage argument info, attribute location relative to the nixpkgs root, by-name subpath
+    type ToContext = (CallPackageArgumentInfo, RelativePathBuf, String);
 
-    fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
+    fn to_problem(
+        name: &str,
+        optional_from: Option<()>,
+        (to, file, by_name_subpath): &Self::ToContext,
+    ) -> Problem {
         let is_new = optional_from.is_none();
         let is_empty = to.empty_arg;
         match (is_new, is_empty) {
-            (false, true) => {
-                npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
-            // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
-            // for custom arguments.
-            (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
+            (false, true) => npv_160::TopLevelPackageMovedOutOfByName::new(
+                by_name_subpath,
                 name,
                 to.relative_path.clone(),
                 file,
             )
             .into(),
-            (true, true) => {
-                npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
+            // This can happen if users mistakenly assume that the by-name directory can't be used
+            // for custom arguments.
+            (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
+                by_name_subpath,
+                name,
+                to.relative_path.clone(),
+                file,
+            )
+            .into(),
+            (true, true) => npv_162::NewTopLevelPackageShouldBeByName::new(
+                by_name_subpath,
+                name,
+                to.relative_path.clone(),
+                file,
+            )
+            .into(),
             (true, false) => npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
+                by_name_subpath,
                 name,
                 to.relative_path.clone(),
                 file,
