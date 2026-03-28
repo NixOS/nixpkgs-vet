@@ -1,0 +1,9 @@
+- pkgs/by-name/fo/foo/package.nix: line 10, column 6 contains the escape "''\\".
+  This escape has no effect; it is equivalent to "\".
+  Change it to that.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-170)
+- pkgs/by-name/fo/foo/package.nix: line 11, column 6 contains the escape "''\.".
+  This escape has no effect; it is equivalent to ".".
+  Change it to that.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-170)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

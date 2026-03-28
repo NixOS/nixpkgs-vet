@@ -1,0 +1,9 @@
+- pkgs/by-name/fo/foo/package.nix: line 2, column 30 contains the escape "\.".
+  This escape has no effect; it is equivalent to ".".
+  Depending on your intention, either change it to that, or to the non-equivalent "\\.".
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-170)
+- pkgs/by-name/fo/foo/package.nix: line 2, column 33 contains the escape "\/".
+  This escape has no effect; it is equivalent to "/".
+  Depending on your intention, either change it to that, or to the non-equivalent "\\/".
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-170)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
