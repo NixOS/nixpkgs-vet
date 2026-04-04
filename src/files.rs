@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 use rnix::ast;
@@ -88,97 +87,81 @@ fn check_invalid_escapes(
     relative_path: &RelativePath,
     nix_file: &NixFile,
 ) -> validation::Result<()> {
-    let strings: Vec<ast::Str> = nix_file
+    let mut problems: Vec<Problem> = Vec::new();
+
+    for str_node in nix_file
         .syntax_root
         .syntax()
         .descendants()
-        .filter(|node| ast::Str::can_cast(node.kind()))
-        .map(|s| ast::Str::cast(s).expect("can_cast was true"))
-        .collect();
-    let mut problems: Vec<Problem> = Vec::new();
-    for str_node in &strings {
-        for part in &str_node.parts().collect_vec() {
-            if let ast::InterpolPart::Literal(lit) = part {
-                let is_multiline: bool = str_node
-                    .syntax()
-                    .children_with_tokens()
-                    .filter_map(rnix::SyntaxElement::into_token)
-                    .next()
-                    .is_some_and(|t| t.text() == "''");
-                let mut input = lit.syntax().text().char_indices().peekable();
-                loop {
-                    match input.next() {
-                        None => break,
-                        Some((_, '\\')) if !is_multiline => {
-                            if let Some((idx2, c)) = input.next()
-                                && !['\\', '$', '"', 'r', 'n', 't'].contains(&c)
-                            {
-                                let index = lit
-                                    .syntax()
-                                    .text_range()
-                                    .start()
-                                    .checked_add(idx2.try_into()?)
-                                    .expect("valid index")
-                                    .into();
-                                problems.push(
-                                    npv_170::NixFileContainsUselessEscape::new(
-                                        location::Location::new(
-                                            relative_path,
-                                            nix_file.line_index.line(index),
-                                            nix_file.line_index.column(index),
-                                        ),
-                                        format!("\\{}", c),
-                                        c.to_string(),
-                                        Some(format!("\\\\{}", c)),
-                                    )
-                                    .into(),
-                                );
-                            }
-                        }
-                        Some((_, '\'')) if is_multiline => {
-                            if let Some((_, '\'')) = input.next() {
-                                match input.next() {
-                                    Some((_, '\'')) => continue,
-                                    Some((_, '$')) => continue,
-                                    Some((_, '\\')) => match input.next() {
-                                        None => break,
-                                        Some((_, 'n')) => continue,
-                                        Some((_, 'r')) => continue,
-                                        Some((_, 't')) => continue,
-                                        Some((_, '\'')) => continue, // "''\'" is the same as "'''", but both are valid.
-                                        Some((str_index, c)) => {
-                                            let index: usize = lit
-                                                .syntax()
-                                                .text_range()
-                                                .start()
-                                                .checked_add(str_index.try_into()?)
-                                                .expect("valid index")
-                                                .into();
-                                            problems.push(
-                                                npv_170::NixFileContainsUselessEscape::new(
-                                                    location::Location::new(
-                                                        relative_path,
-                                                        nix_file.line_index.line(index),
-                                                        nix_file.line_index.column(index),
-                                                    ),
-                                                    format!("''\\{}", c),
-                                                    c.to_string(),
-                                                    // Every character that can be written like "''\x", where x is not
-                                                    // 'n', 't', 'r', or "'", can be better written as simply "x".
-                                                    None,
-                                                )
-                                                .into(),
-                                            );
-                                        }
-                                    },
-                                    _ => break,
-                                }
-                            }
-                        }
-                        Some(_) => continue,
-                    };
-                }
+        .filter_map(ast::Str::cast)
+    {
+        let is_multiline = str_node
+            .syntax()
+            .children_with_tokens()
+            .filter_map(rnix::SyntaxElement::into_token)
+            .next()
+            .is_some_and(|t| t.text() == "''");
+
+        for part in str_node.parts() {
+            let ast::InterpolPart::Literal(lit) = part else {
+                continue;
             };
+            let base: usize = lit.syntax().text_range().start().into();
+            let mut chars = lit.syntax().text().char_indices();
+
+            while let Some((_, ch)) = chars.next() {
+                match (ch, is_multiline) {
+                    ('\\', false) => {
+                        if let Some((i, c)) = chars.next()
+                            && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
+                        {
+                            let index = base + i;
+                            problems.push(
+                                npv_170::NixFileContainsUselessEscape::new(
+                                    location::Location::new(
+                                        relative_path,
+                                        nix_file.line_index.line(index),
+                                        nix_file.line_index.column(index),
+                                    ),
+                                    format!("\\{c}"),
+                                    c.to_string(),
+                                    Some(format!("\\\\{c}")),
+                                )
+                                .into(),
+                            );
+                        }
+                    }
+                    ('\'', true) => {
+                        if let Some((_, '\'')) = chars.next() {
+                            match chars.next() {
+                                Some((_, '\'' | '$')) => continue,
+                                Some((_, '\\')) => match chars.next() {
+                                    Some((_, 'n' | 'r' | 't' | '\'')) => continue,
+                                    Some((i, c)) => {
+                                        let index = base + i;
+                                        problems.push(
+                                            npv_170::NixFileContainsUselessEscape::new(
+                                                location::Location::new(
+                                                    relative_path,
+                                                    nix_file.line_index.line(index),
+                                                    nix_file.line_index.column(index),
+                                                ),
+                                                format!("''\\{c}"),
+                                                c.to_string(),
+                                                None::<String>,
+                                            )
+                                            .into(),
+                                        );
+                                    }
+                                    None => break,
+                                },
+                                _ => break,
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
