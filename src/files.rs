@@ -127,12 +127,12 @@ fn check_invalid_escapes(
             let mut chars = lit.syntax().text().char_indices();
 
             while let Some((_, ch)) = chars.next() {
-                if ch == '\\' && !is_multiline {
-                    if let Some((i, c)) = chars.next()
-                        && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
-                    {
-                        report(base + i, "\\", c, Some(format!("\\\\{c}")));
-                    }
+                if ch == '\\'
+                    && !is_multiline
+                    && let Some((i, c)) = chars.next()
+                    && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
+                {
+                    report(base + i, "\\", c, Some(format!("\\\\{c}")));
                 } else if ch == '\''
                     && is_multiline
                     && let Some((_, '\'')) = chars.next()
