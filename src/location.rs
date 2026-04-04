@@ -49,9 +49,22 @@ impl LineIndex {
         }
     }
 
+    pub fn column(&self, index: usize) -> usize {
+        // 0-indexed line number
+        let line_idx = self.line(index) - 1;
+        // 0-based index of the first character of the current line
+        let line_start_idx =
+            // The first character of the first line has index 0
+            if   line_idx == 0 { 0 }
+            // Otherwise, it's one after the newline of the previous line
+            else { self.newlines[line_idx - 1] + 1 };
+        // +1 because columns are 1-indexed
+        index - line_start_idx + 1
+    }
+
     /// Returns the string index for a line and column.
     pub fn fromlinecolumn(&self, line: usize, column: usize) -> usize {
-        // If it's the 1th line, the column is the index
+        // If it's the 1st line, the column is the index
         if line == 1 {
             // But columns are 1-indexed
             column - 1
@@ -88,6 +101,7 @@ mod tests {
 
         for (index, line, column) in pairs {
             assert_eq!(line_index.line(index), line);
+            assert_eq!(line_index.column(index), column);
             assert_eq!(line_index.fromlinecolumn(line, column), index);
         }
     }
