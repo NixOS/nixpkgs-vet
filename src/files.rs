@@ -109,26 +109,30 @@ fn check_invalid_escapes(
             let base: usize = lit.syntax().text_range().start().into();
             let mut chars = lit.syntax().text().char_indices();
 
+            let mut report = |i: usize, prefix: &str, c: char, fixed: Option<String>| {
+                let index = base + i;
+                problems.push(
+                    npv_170::NixFileContainsUselessEscape::new(
+                        location::Location::new(
+                            relative_path,
+                            nix_file.line_index.line(index),
+                            nix_file.line_index.column(index),
+                        ),
+                        format!("{prefix}{c}"),
+                        c.to_string(),
+                        fixed,
+                    )
+                    .into(),
+                );
+            };
+
             while let Some((_, ch)) = chars.next() {
                 match (ch, is_multiline) {
                     ('\\', false) => {
                         if let Some((i, c)) = chars.next()
                             && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
                         {
-                            let index = base + i;
-                            problems.push(
-                                npv_170::NixFileContainsUselessEscape::new(
-                                    location::Location::new(
-                                        relative_path,
-                                        nix_file.line_index.line(index),
-                                        nix_file.line_index.column(index),
-                                    ),
-                                    format!("\\{c}"),
-                                    c.to_string(),
-                                    Some(format!("\\\\{c}")),
-                                )
-                                .into(),
-                            );
+                            report(i, "\\", c, Some(format!("\\\\{c}")));
                         }
                     }
                     ('\'', true) => {
@@ -137,22 +141,7 @@ fn check_invalid_escapes(
                                 Some((_, '\'' | '$')) => continue,
                                 Some((_, '\\')) => match chars.next() {
                                     Some((_, 'n' | 'r' | 't' | '\'')) => continue,
-                                    Some((i, c)) => {
-                                        let index = base + i;
-                                        problems.push(
-                                            npv_170::NixFileContainsUselessEscape::new(
-                                                location::Location::new(
-                                                    relative_path,
-                                                    nix_file.line_index.line(index),
-                                                    nix_file.line_index.column(index),
-                                                ),
-                                                format!("''\\{c}"),
-                                                c.to_string(),
-                                                None::<String>,
-                                            )
-                                            .into(),
-                                        );
-                                    }
+                                    Some((i, c)) => report(i, "''\\", c, None),
                                     None => break,
                                 },
                                 _ => break,
