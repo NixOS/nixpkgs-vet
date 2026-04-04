@@ -83,14 +83,14 @@ fn check_executable_iff_shebang(
     }
 }
 
+/// Check that a Nix file does not contain useless escape sequences.
 fn check_invalid_escapes(
     relative_path: &RelativePath,
     nix_file: &NixFile,
 ) -> validation::Result<()> {
     let mut problems: Vec<Problem> = Vec::new();
 
-    let mut report = |base: usize, i: usize, prefix: &str, c: char, fixed: Option<String>| {
-        let index = base + i;
+    let mut report = |index: usize, prefix: &str, c: char, fixed: Option<String>| {
         problems.push(
             npv_170::NixFileContainsUselessEscape::new(
                 location::Location::new(
@@ -131,7 +131,7 @@ fn check_invalid_escapes(
                     if let Some((i, c)) = chars.next()
                         && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
                     {
-                        report(base, i, "\\", c, Some(format!("\\\\{c}")));
+                        report(base + i, "\\", c, Some(format!("\\\\{c}")));
                     }
                 } else if ch == '\''
                     && is_multiline
@@ -141,7 +141,7 @@ fn check_invalid_escapes(
                         Some((_, '\'' | '$')) => continue,
                         Some((_, '\\')) => match chars.next() {
                             Some((_, 'n' | 'r' | 't' | '\'')) => continue,
-                            Some((i, c)) => report(base, i, "''\\", c, None),
+                            Some((i, c)) => report(base + i, "''\\", c, None),
                             None => break,
                         },
                         _ => break,
