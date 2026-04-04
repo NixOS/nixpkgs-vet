@@ -127,28 +127,25 @@ fn check_invalid_escapes(
             let mut chars = lit.syntax().text().char_indices();
 
             while let Some((_, ch)) = chars.next() {
-                match (ch, is_multiline) {
-                    ('\\', false) => {
-                        if let Some((i, c)) = chars.next()
-                            && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
-                        {
-                            report(base, i, "\\", c, Some(format!("\\\\{c}")));
-                        }
+                if ch == '\\' && !is_multiline {
+                    if let Some((i, c)) = chars.next()
+                        && !matches!(c, '\\' | '$' | '"' | 'r' | 'n' | 't')
+                    {
+                        report(base, i, "\\", c, Some(format!("\\\\{c}")));
                     }
-                    ('\'', true) => {
-                        if let Some((_, '\'')) = chars.next() {
-                            match chars.next() {
-                                Some((_, '\'' | '$')) => continue,
-                                Some((_, '\\')) => match chars.next() {
-                                    Some((_, 'n' | 'r' | 't' | '\'')) => continue,
-                                    Some((i, c)) => report(base, i, "''\\", c, None),
-                                    None => break,
-                                },
-                                _ => break,
-                            }
-                        }
+                } else if ch == '\''
+                    && is_multiline
+                    && let Some((_, '\'')) = chars.next()
+                {
+                    match chars.next() {
+                        Some((_, '\'' | '$')) => continue,
+                        Some((_, '\\')) => match chars.next() {
+                            Some((_, 'n' | 'r' | 't' | '\'')) => continue,
+                            Some((i, c)) => report(base, i, "''\\", c, None),
+                            None => break,
+                        },
+                        _ => break,
                     }
-                    _ => {}
                 }
             }
         }
