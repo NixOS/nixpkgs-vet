@@ -33,7 +33,7 @@ let
 
   treefmtEval = (import treefmt-nix).evalModule pkgs {
     # Used to find the project root
-    projectRootFile = ".git/config";
+    projectRootFile = "Cargo.toml";
 
     programs.rustfmt.enable = true;
     programs.nixfmt.enable = true;
