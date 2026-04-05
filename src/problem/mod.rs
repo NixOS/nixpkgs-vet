@@ -1,17 +1,9 @@
 use std::fmt;
 
 use derive_enum_from_into::EnumFrom;
-use relative_path::RelativePath;
 
 pub mod npv_100;
 pub mod npv_101;
-pub mod npv_102;
-pub mod npv_103;
-pub mod npv_104;
-pub mod npv_105;
-pub mod npv_106;
-pub mod npv_107;
-pub mod npv_108;
 pub mod npv_109;
 pub mod npv_110;
 pub mod npv_111;
@@ -35,9 +27,7 @@ pub mod npv_145;
 pub mod npv_146;
 
 pub mod npv_160;
-pub mod npv_161;
 pub mod npv_162;
-pub mod npv_163;
 pub mod npv_164;
 pub mod npv_165;
 pub mod npv_166;
@@ -54,27 +44,6 @@ pub enum Problem {
 
     /// NPV-101: attribute is not a derivation
     ByNameNonDerivation(npv_101::ByNameNonDerivation),
-
-    /// NPV-102: attribute uses `_internalCallByNamePackageFile`
-    ByNameInternalCallPackageUsed(npv_102::ByNameInternalCallPackageUsed),
-
-    /// NPV-103: attribute name position cannot be determined
-    ByNameCannotDetermineAttributeLocation(npv_103::ByNameCannotDetermineAttributeLocation),
-
-    /// NPV-104: non-syntactic override of by-name package
-    ByNameOverrideOfNonSyntacticCallPackage(npv_104::ByNameOverrideOfNonSyntacticCallPackage),
-
-    /// NPV-105: by-name override of ill-defined callPackage
-    ByNameOverrideOfNonTopLevelPackage(npv_105::ByNameOverrideOfNonTopLevelPackage),
-
-    /// NPV-106: by-name override contains wrong callPackage path
-    ByNameOverrideContainsWrongCallPackagePath(npv_106::ByNameOverrideContainsWrongCallPackagePath),
-
-    /// NPV-107: by-name override contains empty argument
-    ByNameOverrideContainsEmptyArgument(npv_107::ByNameOverrideContainsEmptyArgument),
-
-    /// NPV-108: by-name override contains empty path
-    ByNameOverrideContainsEmptyPath(npv_108::ByNameOverrideContainsEmptyPath),
 
     /// NPV-109: by-name shard is not a directory
     ByNameShardIsNotDirectory(npv_109::ByNameShardIsNotDirectory),
@@ -136,18 +105,8 @@ pub enum Problem {
     /// NPV-160: top-level package moved out of by-name
     TopLevelPackageMovedOutOfByName(npv_160::TopLevelPackageMovedOutOfByName),
 
-    /// NPV-161: top-level package moved out of by-name with custom arguments
-    TopLevelPackageMovedOutOfByNameWithCustomArguments(
-        npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments,
-    ),
-
     /// NPV-162: new top-level package should be in by-name
     NewTopLevelPackageShouldBeByName(npv_162::NewTopLevelPackageShouldBeByName),
-
-    /// NPV-163: new top-level package should be in by-name with a custom argument
-    NewTopLevelPackageShouldBeByNameWithCustomArgument(
-        npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument,
-    ),
 
     /// NPV-164: new top-level package must enable strictDeps
     NewTopLevelPackageMustEnableStrictDeps(npv_164::NewTopLevelPackageMustEnableStrictDeps),
@@ -173,13 +132,6 @@ impl Problem {
         match self {
             Self::ByNameUndefinedAttribute(..) => "NPV-100",
             Self::ByNameNonDerivation(..) => "NPV-101",
-            Self::ByNameInternalCallPackageUsed(..) => "NPV-102",
-            Self::ByNameCannotDetermineAttributeLocation(..) => "NPV-103",
-            Self::ByNameOverrideOfNonSyntacticCallPackage(..) => "NPV-104",
-            Self::ByNameOverrideOfNonTopLevelPackage(..) => "NPV-105",
-            Self::ByNameOverrideContainsWrongCallPackagePath(..) => "NPV-106",
-            Self::ByNameOverrideContainsEmptyArgument(..) => "NPV-107",
-            Self::ByNameOverrideContainsEmptyPath(..) => "NPV-108",
             Self::ByNameShardIsNotDirectory(..) => "NPV-109",
             Self::ByNameShardIsInvalid(..) => "NPV-110",
             Self::ByNameShardIsCaseSensitiveDuplicate(..) => "NPV-111",
@@ -200,9 +152,7 @@ impl Problem {
             Self::NixFileIsExecutableWithoutShebang(..) => "NPV-145",
             Self::NixFileHasShebangButNotExecutable(..) => "NPV-146",
             Self::TopLevelPackageMovedOutOfByName(..) => "NPV-160",
-            Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(..) => "NPV-161",
             Self::NewTopLevelPackageShouldBeByName(..) => "NPV-162",
-            Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(..) => "NPV-163",
             Self::NewTopLevelPackageMustEnableStrictDeps(..) => "NPV-164",
             Self::TopLevelPackageDisabledStrictDeps(..) => "NPV-165",
             Self::NewTopLevelPackageMustEnableStructuredAttrs(..) => "NPV-166",
@@ -222,13 +172,6 @@ impl fmt::Display for Problem {
         match self {
             Self::ByNameUndefinedAttribute(inner) => inner.fmt(f),
             Self::ByNameNonDerivation(inner) => inner.fmt(f),
-            Self::ByNameInternalCallPackageUsed(inner) => inner.fmt(f),
-            Self::ByNameCannotDetermineAttributeLocation(inner) => inner.fmt(f),
-            Self::ByNameOverrideOfNonSyntacticCallPackage(inner) => inner.fmt(f),
-            Self::ByNameOverrideOfNonTopLevelPackage(inner) => inner.fmt(f),
-            Self::ByNameOverrideContainsWrongCallPackagePath(inner) => inner.fmt(f),
-            Self::ByNameOverrideContainsEmptyArgument(inner) => inner.fmt(f),
-            Self::ByNameOverrideContainsEmptyPath(inner) => inner.fmt(f),
             Self::ByNameShardIsNotDirectory(inner) => inner.fmt(f),
             Self::ByNameShardIsInvalid(inner) => inner.fmt(f),
             Self::ByNameShardIsCaseSensitiveDuplicate(inner) => inner.fmt(f),
@@ -249,9 +192,7 @@ impl fmt::Display for Problem {
             Self::NixFileIsExecutableWithoutShebang(inner) => inner.fmt(f),
             Self::NixFileHasShebangButNotExecutable(inner) => inner.fmt(f),
             Self::TopLevelPackageMovedOutOfByName(inner) => inner.fmt(f),
-            Self::TopLevelPackageMovedOutOfByNameWithCustomArguments(inner) => inner.fmt(f),
             Self::NewTopLevelPackageShouldBeByName(inner) => inner.fmt(f),
-            Self::NewTopLevelPackageShouldBeByNameWithCustomArgument(inner) => inner.fmt(f),
             Self::NewTopLevelPackageMustEnableStrictDeps(inner) => inner.fmt(f),
             Self::TopLevelPackageDisabledStrictDeps(inner) => inner.fmt(f),
             Self::NewTopLevelPackageMustEnableStructuredAttrs(inner) => inner.fmt(f),
@@ -259,29 +200,4 @@ impl fmt::Display for Problem {
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
         }
     }
-}
-
-fn indent_definition(column: usize, definition: &str) -> String {
-    // The entire code should be indented 4 spaces
-    textwrap::indent(
-        // But first we want to strip the code's natural indentation
-        &textwrap::dedent(
-            // The definition _doesn't_ include the leading spaces, but we can
-            // recover those from the column
-            &format!("{}{definition}", " ".repeat(column - 1)),
-        ),
-        "    ",
-    )
-}
-
-/// Creates a Nix path expression that when put into Nix file `from_file`, would point to the `to_file`.
-fn create_path_expr(
-    from_file: impl AsRef<RelativePath>,
-    to_file: impl AsRef<RelativePath>,
-) -> String {
-    // This `expect` calls should never trigger because we only call this function with files.
-    // That's why we `expect` them!
-    let from = from_file.as_ref().parent().expect("a parent for this path");
-    let rel = from.relative(to_file);
-    format!("./{rel}")
 }
