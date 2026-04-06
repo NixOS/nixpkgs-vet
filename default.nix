@@ -29,7 +29,7 @@ let
   '';
 
   # Determine version from Cargo.toml
-  version = (lib.importTOML ./Cargo.toml).package.version;
+  version = (lib.importJSON ./package.json).version;
 
   treefmtEval = (import treefmt-nix).evalModule pkgs {
     # Used to find the project root
@@ -64,6 +64,7 @@ let
         rustfmt
         treefmtEval.config.build.wrapper
         defaultNixPackage
+        nodejs_24
       ];
     };
 

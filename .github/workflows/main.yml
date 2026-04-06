@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      run-release-step:
+        type: boolean
 
 # This makes sure to only run one instance of this workflow per individual PR and pushes.
 # We need this especially for the release step, because it has side effects.
@@ -19,9 +23,12 @@ concurrency:
   # Better wait until it's done
   cancel-in-progress: ${{ github.event_name != 'pull' }}
 
+permissions: {}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -33,8 +40,25 @@ jobs:
       - name: build
         run: nix-build -A ci
 
+  build-and-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' ||  inputs.run-release-step }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            max-jobs = 1
+
+      # - name: build
+      #   run: nix-build -A ci
+
       - name: release
-        if: ${{ github.event_name == 'push' }}
         run: scripts/release.sh
         env:
           GH_TOKEN: ${{ github.token }}
