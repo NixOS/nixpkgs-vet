@@ -88,5 +88,6 @@ Integration tests are declared in [`./tests`](./tests) as subdirectories imitati
 
 Pinned dependencies are [regularly updated automatically](./.github/workflows/update.yml).
 
-Releases are [automatically](./.github/workflows/main.yml) [created](./scripts/release.sh) when the `version` field in [`Cargo.toml`](./Cargo.toml)
-is updated from a push to the main branch.
+Releases are [automatically](./.github/workflows/main.yml) created when the release PR (created by [Knope](https://knope.tech/)) is merged.
+
+User-facing changes should be documented for inclusion in the changelog and release notes, either via [changesets](https://knope.tech/tutorials/releasing-basic-projects/#more-complex-changes) or [conventional commits](https://knope.tech/reference/concepts/conventional-commits/).
