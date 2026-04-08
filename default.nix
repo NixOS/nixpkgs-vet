@@ -64,6 +64,7 @@ let
         cargo-edit
         cargo-outdated
         defaultNixPackage
+        knope
         npins
         pinact
         rust-analyzer
