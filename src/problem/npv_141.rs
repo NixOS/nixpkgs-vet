@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -17,9 +18,14 @@ impl fmt::Display for InvalidPackageDirectoryName {
             package_name,
             relative_package_dir,
         } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: Invalid package directory name \"{package_name}\", must start with a letter (a-z, A-Z) or \"_\", followed by ASCII characters a-z, A-Z, 0-9, \"-\" or \"_\".",
+            format!(
+                "- {relative_package_dir}: Invalid package directory name \"{package_name}\", must start with a letter (a-z, A-Z) or \"_\", followed by ASCII characters a-z, A-Z, 0-9, \"-\" or \"_\"."
+            ),
+            Options {
+                ..Default::default()
+            },
         )
     }
 }
