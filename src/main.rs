@@ -11,6 +11,7 @@
 
 mod eval;
 mod files;
+mod gh_write;
 mod location;
 mod nix_file;
 mod problem;
@@ -166,7 +167,9 @@ mod tests {
             let expected_errors = fs::read_to_string(path.join("expected"))
                 .with_context(|| format!("No expected file for test {name}"))?;
 
-            test_nixpkgs(&name, &path, &expected_errors);
+            temp_env::with_var_unset("GITHUB_ACTIONS", || {
+                test_nixpkgs(&name, &path, &expected_errors)
+            });
         }
         Ok(())
     }
@@ -198,13 +201,15 @@ mod tests {
         fs::create_dir_all(base.join("fo/foO"))?;
         fs::write(base.join("fo/foO/package.nix"), "{ someDrv }: someDrv")?;
 
-        test_nixpkgs(
-            "case_sensitive",
-            path,
-            "- pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\". (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-111)\n\
-            This PR introduces the problems listed above. Please fix them before merging, \
-            otherwise the base branch would break.\n",
-        );
+        temp_env::with_var_unset("GITHUB_ACTIONS", || {
+            test_nixpkgs(
+                "case_sensitive",
+                path,
+                "- pkgs/by-name/fo: Duplicate case-sensitive package directories \"foO\" and \"foo\". (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-111)\n\
+                This PR introduces the problems listed above. Please fix them before merging, \
+                otherwise the base branch would break.\n",
+            )
+        });
         Ok(())
     }
 
