@@ -1,7 +1,8 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
-use indoc::writedoc;
+use indoc::formatdoc;
 use relative_path::RelativePathBuf;
 
 use crate::structure;
@@ -27,12 +28,16 @@ impl fmt::Display for TopLevelPackageMovedOutOfByName {
         let call_package_arg = call_package_path
             .as_ref()
             .map_or_else(|| "...".into(), |path| format!("./{}", path));
-        writedoc!(
+        gh_write(
             f,
-            "
+            formatdoc!("
             - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
               Please move the package back and remove the manual `callPackage`.
-            ",
+            "),
+            Options {
+                file: Some(file),
+                ..Default::default()
+            },
         )
     }
 }

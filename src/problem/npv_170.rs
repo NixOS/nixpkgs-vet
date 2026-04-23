@@ -1,8 +1,9 @@
 use std::fmt;
 
 use derive_new::new;
-use indoc::writedoc;
+use indoc::formatdoc;
 
+use crate::gh_write::{Options, gh_write};
 use crate::location::Location;
 
 #[derive(Clone, new)]
@@ -28,19 +29,27 @@ impl fmt::Display for NixFileContainsUselessEscape {
                 fixed_escape,
             ),
         };
-        writedoc!(
+        gh_write(
             f,
-            "
-            - {}: line {}, column {} contains the escape \"{}\".
-              This escape has no effect; it is equivalent to \"{}\".
-              {}
-            ",
-            location.file,
-            location.line,
-            location.column,
-            current_escape,
-            without_escape,
-            fixed_escape_text,
+            formatdoc!(
+                "
+                - {}: line {}, column {} contains the escape \"{}\".
+                  This escape has no effect; it is equivalent to \"{}\".
+                  {}
+                ",
+                location.file,
+                location.line,
+                location.column,
+                current_escape,
+                without_escape,
+                fixed_escape_text,
+            ),
+            Options {
+                file: Some(&location.file),
+                start_line: Some(location.line),
+                start_col: Some(location.column),
+                ..Default::default()
+            },
         )
     }
 }
