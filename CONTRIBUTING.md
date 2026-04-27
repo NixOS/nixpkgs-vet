@@ -2,7 +2,7 @@
 
 [@philiptaron](https://github.com/philiptaron) and
 [@wolfgangwalther](https://github.com/wolfgangwalther) are admins of this repository,
-while everybody in [@NixOS/nixpkgs-ci](https://github.com/orgs/NixOS/teams/nixpkgs-ci) has write access, as well as [@infinisil](https://github.com/infinisil) and [@willbush](https://github.com/willbush).
+while everybody in [@NixOS/nixpkgs-ci](https://github.com/orgs/NixOS/teams/nixpkgs-ci) has write access, as well as [@willbush](https://github.com/willbush).
 
 ## Development
 
