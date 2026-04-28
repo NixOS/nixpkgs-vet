@@ -23,9 +23,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31.10.4
         with:
           extra_nix_config: |
             max-jobs = 1
@@ -43,11 +43,11 @@ jobs:
   xrefcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # While this has a Nix build available, it needs to evaluate and build so much
       # that I don't think it's worth adding it to the nix-build.
-      - uses: serokell/xrefcheck-action@v1
+      - uses: serokell/xrefcheck-action@81d3967156933307f52fc52f8dc7fa5e947509c2 # v1.0.3
         with: # Invalid symlinks for testing purposes.
           xrefcheck-args: >
             --ignore tests/symlink-invalid/main/pkgs/by-name/fo/foo/foo
