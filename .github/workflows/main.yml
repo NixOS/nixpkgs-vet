@@ -30,6 +30,10 @@ jobs:
           extra_nix_config: |
             max-jobs = 1
 
+      # This can't be done in the treefmt check because it needs network access
+      - name: check action pins
+        run: nix run -f default.nix pkgs.pinact -- run -check -verify -diff
+
       - name: build
         run: nix-build -A ci
 
