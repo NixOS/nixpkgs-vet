@@ -39,6 +39,8 @@ let
     programs.nixfmt.enable = true;
     programs.rustfmt.enable = true;
     programs.shfmt.enable = true;
+    programs.zizmor.enable = true;
+
     settings.formatter.shfmt.options = [ "--space-redirects" ];
   };
 
@@ -67,6 +69,7 @@ let
         rust-analyzer
         rustfmt
         treefmtEval.config.build.wrapper
+        zizmor
       ];
     };
 
