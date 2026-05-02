@@ -35,9 +35,12 @@ let
     # Used to find the project root
     projectRootFile = "Cargo.toml";
 
-    programs.rustfmt.enable = true;
+    programs.actionlint.enable = true;
     programs.nixfmt.enable = true;
+    programs.rustfmt.enable = true;
     programs.shfmt.enable = true;
+    programs.zizmor.enable = true;
+
     settings.formatter.shfmt.options = [ "--space-redirects" ];
   };
 
@@ -56,14 +59,17 @@ let
       env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       inputsFrom = [ packages.build ];
       nativeBuildInputs = with pkgs; [
+        actionlint
         cargo-audit
         cargo-edit
         cargo-outdated
+        defaultNixPackage
         npins
+        pinact
         rust-analyzer
         rustfmt
         treefmtEval.config.build.wrapper
-        defaultNixPackage
+        zizmor
       ];
     };
 
