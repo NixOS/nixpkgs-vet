@@ -45,13 +45,10 @@ impl Status {
         // Print each error with its wiki link.
         if let Some(errors) = self.errors() {
             for error in errors {
-                let code = error.npv_code();
                 let url = error.wiki_url();
 
                 if use_color {
                     let error_str = format!("{error}");
-                    // OSC 8 hyperlink: \e]8;;URL\e\\TEXT\e]8;;\e\\
-                    let link = format!("\x1b]8;;{url}\x1b\\{code}\x1b]8;;\x1b\\");
 
                     // Most errors follow "- {path}: {message}". When we can identify
                     // that pattern, make the path bold and the message red. Otherwise
@@ -60,12 +57,12 @@ impl Status {
                         && let Some((location, message)) = rest.split_once(": ")
                         && !location.contains('\n')
                     {
-                        writeln!(f, "- {}: {} ({})", location.bold(), message.red(), link)?;
+                        writeln!(f, "- {}: {} ({})", location.bold(), message.red(), url)?;
                         continue;
                     }
 
                     // Fallback for messages that don't match the simple pattern.
-                    writeln!(f, "{} ({})", error_str.red(), link)?;
+                    writeln!(f, "{} ({})", error_str.red(), url)?;
                 } else {
                     writeln!(f, "{error} ({url})")?;
                 }
