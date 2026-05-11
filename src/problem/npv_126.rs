@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::{fmt, io};
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -21,9 +22,15 @@ impl fmt::Display for PackageContainsUnresolvableSymlink {
             subpath,
             io_error,
         } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}.",
+            format!(
+                "- {relative_package_dir}: Path {subpath} is a symlink which cannot be resolved: {io_error}."
+            ),
+            Options {
+                file: Some(&relative_package_dir.join(subpath)),
+                ..Default::default()
+            },
         )
     }
 }

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 
 use crate::structure;
@@ -13,9 +14,12 @@ pub struct ByNameShardIsNotDirectory {
 impl fmt::Display for ByNameShardIsNotDirectory {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let relative_shard_path = structure::relative_dir_for_shard(&self.shard_name);
-        write!(
+        gh_write(
             f,
-            "- {relative_shard_path}: This is a file, but it should be a directory.",
+            format!("- {relative_shard_path}: This is a file, but it should be a directory."),
+            Options {
+                ..Default::default()
+            },
         )
     }
 }

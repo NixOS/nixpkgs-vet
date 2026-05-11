@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -12,9 +13,15 @@ pub struct NixFileIsExecutableWithoutShebang {
 impl fmt::Display for NixFileIsExecutableWithoutShebang {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self { relative_path } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_path}: Nix files must not be executable unless they have a shebang (`#!`) line.",
+            format!(
+                "- {relative_path}: Nix files must not be executable unless they have a shebang (`#!`) line."
+            ),
+            Options {
+                file: Some(relative_path),
+                ..Default::default()
+            },
         )
     }
 }
