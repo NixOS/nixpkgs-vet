@@ -66,6 +66,8 @@ let
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
+            has_maintainers = value.meta.maintainers or [ ] != [ ];
+            has_no_maintainers_but_dependents = value.meta.hasNoMaintainersButDependents or false;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);

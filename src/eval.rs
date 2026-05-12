@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
@@ -6,7 +7,7 @@ use anyhow::Context;
 use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
-use crate::problem::{npv_100, npv_101, npv_120};
+use crate::problem::{npv_100, npv_101, npv_120, npv_180, npv_181, npv_182};
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::BASE_SUBPATH;
 use crate::validation::ResultIteratorExt as _;
@@ -78,6 +79,10 @@ pub enum AttributeVariant {
     AttributeSet {
         /// Whether the attribute is a derivation (`lib.isDerivation`)
         is_derivation: bool,
+        /// Whether the derivation has any maintainers
+        has_maintainers: bool,
+        /// Attribute that should correspond to whether the package has no maintainers but packages depending on it
+        has_no_maintainers_but_dependents: bool,
         /// Whether the attribute evaluates with `strictDeps = true`.
         strict_deps: bool,
         /// Whether the attribute evaluates with `__structuredAttrs = true`.
@@ -148,6 +153,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
+    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
     package_names: &[String],
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
@@ -233,11 +239,12 @@ pub fn check_values(
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
+                        idents_to_files,
                         &attribute_name,
                         non_by_name_attribute,
                     )?,
                     Attribute::ByName(by_name_attribute) => {
-                        by_name(&attribute_name, by_name_attribute)?
+                        by_name(idents_to_files, &attribute_name, by_name_attribute)?
                     }
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
@@ -250,6 +257,7 @@ pub fn check_values(
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
+    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -286,12 +294,31 @@ fn by_name(
                     structured_attrs,
                     uses_license_list,
                     is_same_scope_call_package: _,
+                    has_maintainers,
+                    has_no_maintainers_but_dependents,
                 },
             location: _,
         }) => {
             // Only derivations are allowed in `pkgs/by-name`.
-            if is_derivation {
-                Success(ratchet::Package {
+            let is_derivation_result = if is_derivation {
+                Success(())
+            } else {
+                npv_101::ByNameNonDerivation::new(attribute_name).into()
+            };
+
+            let leaf_result = leaf_result(
+                has_maintainers,
+                has_no_maintainers_but_dependents,
+                attribute_name,
+                idents_to_files,
+                &structure::relative_dir_for_package(attribute_name),
+                &structure::relative_file_for_package(attribute_name),
+            );
+
+            // Independently report problems about whether it's a derivation and its leaf status.
+            leaf_result
+                .and_(is_derivation_result)
+                .map(|()| ratchet::Package {
                     uses_by_name: Tight,
                     strict_deps: enabled_attribute_ratchet(
                         strict_deps,
@@ -306,12 +333,58 @@ fn by_name(
                         structure::relative_file_for_package(attribute_name),
                     ),
                 })
-            } else {
-                npv_101::ByNameNonDerivation::new(attribute_name).into()
-            }
         }
     };
     Ok(result)
+}
+
+fn leaf_result(
+    has_maintainers: bool,
+    has_no_maintainers_but_dependents: bool,
+    attribute_name: &str,
+    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
+    tree_to_ignore: &RelativePathBuf,
+    package_file: &RelativePathBuf,
+) -> validation::Validation<()> {
+    if has_maintainers {
+        if has_no_maintainers_but_dependents {
+            npv_181::DependentsAttrsSetWithMaintainers::new(attribute_name).into()
+        } else {
+            Success(())
+        }
+    } else {
+        let dependent_files: BTreeSet<RelativePathBuf> =
+            if let Some(referenced_by_files) = idents_to_files.get(attribute_name) {
+                referenced_by_files
+                    .clone()
+                    .into_iter()
+                    .filter(|file| !file.starts_with(tree_to_ignore))
+                    .collect()
+            } else {
+                BTreeSet::new()
+            };
+
+        if !dependent_files.is_empty() {
+            // Has potential dependents
+            if has_no_maintainers_but_dependents {
+                Success(())
+            } else {
+                npv_180::DependentsAttrsShouldBeSet::new(
+                    attribute_name,
+                    package_file,
+                    dependent_files,
+                )
+                .into()
+            }
+        } else {
+            // Has almost definitely no dependents
+            if has_no_maintainers_but_dependents {
+                npv_182::DependentsAttrsSetWithoutDependents::new(attribute_name).into()
+            } else {
+                Success(())
+            }
+        }
+    }
 }
 
 fn enabled_attribute_ratchet<R>(enabled: bool, file: RelativePathBuf) -> ratchet::RatchetState<R>
@@ -326,6 +399,7 @@ where
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
+    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -333,7 +407,7 @@ fn handle_non_by_name_attribute(
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
 
     // The ratchet state for this package.
-    let package = match non_by_name_attribute {
+    let package_result = match non_by_name_attribute {
         // This is a big ol' match on various properties of the attribute
         //
         // First, it needs to succeed evaluation. We can't know whether an attribute could be
@@ -361,6 +435,8 @@ fn handle_non_by_name_attribute(
                     structured_attrs,
                     uses_license_list,
                     is_same_scope_call_package,
+                    has_maintainers,
+                    has_no_maintainers_but_dependents,
                 },
             location: Some(location),
         }) => {
@@ -386,7 +462,7 @@ fn handle_non_by_name_attribute(
             // This is never `Tight`, because we only either:
             // - Know that the attribute _could_ be migrated to `pkgs/by-name`, which is `Loose`
             // - Or we're unsure, in which case we use `NonApplicable`
-            let uses_by_name =
+            let uses_by_name_result =
                 // At this point, we completed two different checks for whether it's a
                 // `callPackage`.
                 match (is_same_scope_call_package, &optional_syntactic_call_package) {
@@ -395,9 +471,28 @@ fn handle_non_by_name_attribute(
                         // Something like `<attr> = pythonPackages.callPackage ...`
                         | (false, Some(_))
                         // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
-                        | (true, None) => NonApplicable,
+                        | (true, None) => Success(NonApplicable),
                     // Something like `<attr> = pkgs.callPackage ...`
                     (true, Some(syntactic_call_package)) => {
+                        let leaf_result = if let Some(ref rel_path) = syntactic_call_package.relative_path {
+                            let file = if rel_path.to_logical_path(nixpkgs_path).is_dir() {
+                                &rel_path.join("default.nix")
+                            } else {
+                                rel_path
+                            };
+                            leaf_result(
+                                has_maintainers,
+                                has_no_maintainers_but_dependents,
+                                attribute_name,
+                                idents_to_files,
+                                file,
+                                file,
+                            )
+                        } else {
+                            Success(())
+                        };
+
+                        leaf_result.map(|_|
                         // It's only possible to migrate such definitions if..
                         match syntactic_call_package.relative_path {
                             Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
@@ -417,9 +512,9 @@ fn handle_non_by_name_attribute(
                                 NonApplicable
                             }
                             _ => Loose((syntactic_call_package.clone(), location.file.clone())),
+                            })
                         }
-                    }
-                };
+                    };
 
             // For evaluated boolean ratchets, point at the package file when we can resolve one.
             // Otherwise fall back to the file that defines the top-level attribute.
@@ -443,21 +538,21 @@ fn handle_non_by_name_attribute(
                 (true, file) => Loose(file),
             };
 
-            ratchet::Package {
+            uses_by_name_result.map(|uses_by_name| ratchet::Package {
                 uses_by_name,
                 strict_deps,
                 structured_attrs,
                 license_expression,
-            }
+            })
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
         // being able to make any good calls about the ratchet state.
-        _ => ratchet::Package {
+        _ => Success(ratchet::Package {
             uses_by_name: NonApplicable,
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
             license_expression: NonApplicable,
-        },
+        }),
     };
-    Ok(Success(package))
+    Ok(package_result)
 }
