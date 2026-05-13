@@ -1,0 +1,5 @@
+- pkgs/by-name/fo/foo/package.nix: line 10, column 14 has the following patch URL: "https://github.com/AndyLavr/amd-ucodegen/compare/0d34b54e396ef300d0364817e763d2c7d1ffff02...dobo90:amd-ucodegen:7a3c51e821df96910ecb05b22f3e4866b4fb85b2.patch".
+  This is a problem because the number of characters in the included commit hashes can change at any time, causing the fixed-output derivation to fail.
+  To fix this, change the URL to "https://github.com/AndyLavr/amd-ucodegen/compare/0d34b54e396ef300d0364817e763d2c7d1ffff02...dobo90:amd-ucodegen:7a3c51e821df96910ecb05b22f3e4866b4fb85b2.patch?full_index=1", and update the hash to its new value.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
