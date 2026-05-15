@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use relative_path::RelativePathBuf;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -9,11 +10,11 @@ use indoc::writedoc;
 #[derive(Clone, Debug, new)]
 pub struct DependentsAttrsShouldBeSet {
     #[new(into)]
-    package: String,
+    package_path: Vec<String>,
     #[new(into)]
     package_file: RelativePathBuf,
     #[new(into)]
-    referenced_by_files: BTreeSet<RelativePathBuf>,
+    referenced_by_files: BTreeMap<String, BTreeSet<RelativePathBuf>>,
 }
 
 impl fmt::Display for DependentsAttrsShouldBeSet {
@@ -25,10 +26,14 @@ impl fmt::Display for DependentsAttrsShouldBeSet {
               - There are no maintainers, and
               - The package might be depended on by potentially {} files, including: {}
             ",
-            self.package,
+            self.package_path.join("."),
             self.package_file,
-            self.referenced_by_files.len(),
-            self.referenced_by_files.iter().take(5).join(", "),
+            self.referenced_by_files.values().flatten().count(),
+            self.referenced_by_files
+                .values()
+                .flatten()
+                .take(5)
+                .join(", "),
         )
     }
 }

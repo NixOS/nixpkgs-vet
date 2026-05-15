@@ -6,7 +6,7 @@ use indoc::writedoc;
 #[derive(Clone, Debug, new)]
 pub struct DependentsAttrsSetWithoutDependents {
     #[new(into)]
-    package: String,
+    package_path: Vec<String>,
 }
 
 impl fmt::Display for DependentsAttrsSetWithoutDependents {
@@ -17,7 +17,7 @@ impl fmt::Display for DependentsAttrsSetWithoutDependents {
             - {}: Has `meta.hasNoMaintainersButDependents = true` set, but there are no
             dependents. Please unset the attribute
             ",
-            self.package,
+            self.package_path.join("."),
         )
     }
 }

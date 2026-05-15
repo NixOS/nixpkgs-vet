@@ -6,6 +6,40 @@
 let
   attrs = builtins.fromJSON (builtins.readFile attrsPath);
 
+  # Copied from lib
+  attrByPath =
+    attrPath: default: set:
+    let
+      lenAttrPath = builtins.length attrPath;
+      attrByPath' =
+        n: s:
+        (
+          if n == lenAttrPath then
+            s
+          else
+            (
+              let
+                attr = builtins.elemAt attrPath n;
+              in
+              if s ? ${attr} then attrByPath' (n + 1) s.${attr} else default
+            )
+        );
+    in
+    attrByPath' 0 set;
+  sublist =
+    start: count: list:
+    let
+      len = builtins.length list;
+    in
+    builtins.genList (n: builtins.elemAt list (n + start)) (
+      if start >= len then
+        0
+      else if start + count > len then
+        len - start
+      else
+        count
+    );
+
   # We need to check whether attributes are defined via callPackage of the same scope or not.
   overlay = final: prev: {
 
@@ -34,8 +68,10 @@ let
   };
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
-  attrInfo = name: value: {
-    location = builtins.unsafeGetAttrPos name pkgs;
+  attrInfo = path: value: {
+    location = builtins.unsafeGetAttrPos (builtins.elemAt path (builtins.length path - 1)) (
+      attrByPath (sublist 0 (builtins.length path - 1) path) (throw "No such attr") pkgs
+    );
     attribute_variant =
       if !builtins.isAttrs value then
         { NonAttributeSet = null; }
@@ -76,38 +112,48 @@ let
   };
 
   # Information on all attributes that are in `pkgs/by-name`.
-  byNameAttrs = builtins.listToAttrs (
-    map (name: {
-      inherit name;
-      value.ByName =
+  byNameAttrs = map (name: [
+    [ name ]
+    {
+      ByName =
         if !pkgs ? ${name} then
           { Missing = null; }
         else
           # Evaluation failures are not allowed, so don't try to catch them.
-          { Existing = attrInfo name pkgs.${name}; };
-    }) attrs
-  );
+          { Existing = attrInfo [ name ] pkgs.${name}; };
+    }
+  ]) attrs;
+
+  ciEvalAttrpaths = nixpkgsPath + "/ci/eval/attrpaths.nix";
+
+  allAttrs = (import ciEvalAttrpaths { }).paths;
+  nonByNameAttrsList =
+    if builtins.pathExists ciEvalAttrpaths then
+
+      builtins.filter (
+        path: !(builtins.length path == 1 && builtins.elem (builtins.elemAt path 0) attrs)
+      ) allAttrs
+    else
+      map (a: [ a ]) (builtins.attrNames (builtins.removeAttrs pkgs attrs));
 
   # Information on all attributes that exist but are not in `pkgs/by-name`.
   # We need this to enforce `pkgs/by-name` for new packages.
-  nonByNameAttrs = builtins.mapAttrs (
-    name: value:
+  nonByNameAttrs = builtins.map (
+    path:
     let
+      value = attrByPath path (throw "No ${toString path}") pkgs;
       # Packages outside `pkgs/by-name` often fail evaluation, so we need to handle that.
-      output = attrInfo name value;
+      output = attrInfo path value;
       result = builtins.tryEval (builtins.deepSeq output null);
     in
-    {
-      NonByName = if result.success then { EvalSuccess = output; } else { EvalFailure = null; };
-    }
-  ) (builtins.removeAttrs pkgs attrs);
-
-  # All attributes
-  attributes = byNameAttrs // nonByNameAttrs;
+    [
+      path
+      {
+        NonByName = if result.success then { EvalSuccess = output; } else { EvalFailure = null; };
+      }
+    ]
+  ) nonByNameAttrsList;
 in
-# We output them in the form [ [ <name> <value> ] ]` such that the Rust side doesn't need to sort
+# We output them in the form [ [ <attrpath> <value> ] ]` such that the Rust side doesn't need to sort
 # them again to get deterministic behavior. This is good for testing.
-map (name: [
-  name
-  attributes.${name}
-]) (builtins.attrNames attributes)
+byNameAttrs ++ nonByNameAttrs

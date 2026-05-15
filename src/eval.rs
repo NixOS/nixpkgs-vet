@@ -7,6 +7,7 @@ use anyhow::Context;
 use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
+use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{npv_100, npv_101, npv_120, npv_180, npv_181, npv_182};
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::BASE_SUBPATH;
@@ -153,7 +154,7 @@ pub fn check_values(
     nix_file_store: &mut NixFileStore,
     idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
     package_names: &[String],
-) -> validation::Result<BTreeMap<String, ratchet::Package>> {
+) -> validation::Result<BTreeMap<Vec<String>, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
         .tempdir()
@@ -221,7 +222,7 @@ pub fn check_values(
     }
 
     // Parse the resulting JSON value
-    let attributes: Vec<(String, Attribute)> = serde_json::from_slice(&result.stdout)
+    let attributes: Vec<(Vec<String>, Attribute)> = serde_json::from_slice(&result.stdout)
         .with_context(|| {
             format!(
                 "Failed to deserialise {}",
@@ -232,20 +233,21 @@ pub fn check_values(
     let check_result = validation::sequence(
         attributes
             .into_iter()
-            .map(|(attribute_name, attribute_value)| {
+            .map(|(attribute_path, attribute_value)| {
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
                         idents_to_files,
-                        &attribute_name,
+                        &attribute_path,
                         non_by_name_attribute,
                     )?,
                     Attribute::ByName(by_name_attribute) => {
-                        by_name(idents_to_files, &attribute_name, by_name_attribute)?
+                        assert!(attribute_path.len() == 1);
+                        by_name(idents_to_files, &attribute_path[0], by_name_attribute)?
                     }
                 };
-                Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
+                Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_path.clone(), value)))
             })
             .collect_vec()?,
     );
@@ -306,7 +308,7 @@ fn by_name(
             let leaf_result = leaf_result(
                 has_maintainers,
                 has_no_maintainers_but_dependents,
-                attribute_name,
+                &vec![attribute_name.to_string()],
                 idents_to_files,
                 &structure::relative_dir_for_package(attribute_name),
                 &structure::relative_file_for_package(attribute_name),
@@ -334,20 +336,22 @@ fn by_name(
 fn leaf_result(
     has_maintainers: bool,
     has_no_maintainers_but_dependents: bool,
-    attribute_name: &str,
+    attribute_path: &Vec<String>,
     idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
     tree_to_ignore: &RelativePathBuf,
     package_file: &RelativePathBuf,
 ) -> validation::Validation<()> {
     if has_maintainers {
         if has_no_maintainers_but_dependents {
-            npv_181::DependentsAttrsSetWithMaintainers::new(attribute_name).into()
+            npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.clone()).into()
         } else {
             Success(())
         }
     } else {
-        let dependent_files: BTreeSet<RelativePathBuf> =
-            if let Some(referenced_by_files) = idents_to_files.get(attribute_name) {
+        let mut dependent_files: BTreeMap<String, BTreeSet<RelativePathBuf>> = BTreeMap::new();
+
+        for attr in attribute_path {
+            let files = if let Some(referenced_by_files) = idents_to_files.get(attr) {
                 referenced_by_files
                     .clone()
                     .into_iter()
@@ -356,14 +360,17 @@ fn leaf_result(
             } else {
                 BTreeSet::new()
             };
+            dependent_files.insert(attr.clone(), files);
+        }
 
-        if !dependent_files.is_empty() {
+        // All attributes need a reference
+        if dependent_files.values().all(|files| !files.is_empty()) {
             // Has potential dependents
             if has_no_maintainers_but_dependents {
                 Success(())
             } else {
                 npv_180::DependentsAttrsShouldBeSet::new(
-                    attribute_name,
+                    attribute_path.clone(),
                     package_file,
                     dependent_files,
                 )
@@ -372,7 +379,7 @@ fn leaf_result(
         } else {
             // Has almost definitely no dependents
             if has_no_maintainers_but_dependents {
-                npv_182::DependentsAttrsSetWithoutDependents::new(attribute_name).into()
+                npv_182::DependentsAttrsSetWithoutDependents::new(attribute_path.clone()).into()
             } else {
                 Success(())
             }
@@ -393,7 +400,7 @@ fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
-    attribute_name: &str,
+    attribute_path: &Vec<String>,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
@@ -437,7 +444,10 @@ fn handle_non_by_name_attribute(
 
             // The relative location of the Nix file, for error messages
             let location = location.relative(nixpkgs_path).with_context(|| {
-                format!("Failed to resolve the file where attribute {attribute_name} is defined")
+                format!(
+                    "Failed to resolve the file where attribute {} is defined",
+                    attribute_path.join("."),
+                )
             })?;
 
             // Figure out whether it's an attribute definition of the form
@@ -447,7 +457,7 @@ fn handle_non_by_name_attribute(
                 .with_context(|| {
                     format!(
                         "Failed to get the definition info for attribute {}",
-                        attribute_name
+                        attribute_path.join("."),
                     )
                 })?;
 
@@ -458,33 +468,20 @@ fn handle_non_by_name_attribute(
                 // At this point, we completed two different checks for whether it's a
                 // `callPackage`.
                 match (is_same_scope_call_package, &optional_syntactic_call_package) {
-                        // Something like `<attr> = { }`
+                        // Something like `<attr> = somethingThatEvaluatesToAPackage`
+                        // TODO: We still need to run package checks on this one
                         (false, None)
                         // Something like `<attr> = pythonPackages.callPackage ...`
+                        // TODO: We still need to run package checks on this one
+                        // TODO: Also need to run leaf checks on this one
                         | (false, Some(_))
                         // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
+                        // TODO: We still need to run package checks on this one
                         | (true, None) => Success(NonApplicable),
                     // Something like `<attr> = pkgs.callPackage ...`
+                    // TODO: We still need to run package checks on this one
+                    // TODO: Also need to run leaf checks on this one
                     (true, Some(syntactic_call_package)) => {
-                        let leaf_result = if let Some(ref rel_path) = syntactic_call_package.relative_path {
-                            let file = if rel_path.to_logical_path(nixpkgs_path).is_dir() {
-                                &rel_path.join("default.nix")
-                            } else {
-                                rel_path
-                            };
-                            leaf_result(
-                                has_maintainers,
-                                has_no_maintainers_but_dependents,
-                                attribute_name,
-                                idents_to_files,
-                                file,
-                                file,
-                            )
-                        } else {
-                            Success(())
-                        };
-
-                        leaf_result.map(|_|
                         // It's only possible to migrate such definitions if..
                         match syntactic_call_package.relative_path {
                             Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
@@ -501,12 +498,34 @@ fn handle_non_by_name_attribute(
                                 //
                                 // See also "package variants" in RFC 140:
                                 // https://github.com/NixOS/rfcs/blob/master/rfcs/0140-simple-package-paths.md#package-variants
-                                NonApplicable
+                                Success(NonApplicable)
                             }
-                            _ => Loose((syntactic_call_package.clone(), location.file.clone())),
-                            })
+                            _ => Success(Loose((syntactic_call_package.clone(), location.file.clone()))),
                         }
-                    };
+                    }
+                };
+
+            let leaf_result = if let Some(CallPackageArgumentInfo {
+                relative_path: Some(rel_path),
+                ..
+            }) = optional_syntactic_call_package.as_ref()
+            {
+                let file = if rel_path.to_logical_path(nixpkgs_path).is_dir() {
+                    &rel_path.join("default.nix")
+                } else {
+                    rel_path
+                };
+                leaf_result(
+                    has_maintainers,
+                    has_no_maintainers_but_dependents,
+                    attribute_path,
+                    idents_to_files,
+                    file,
+                    file,
+                )
+            } else {
+                Success(())
+            };
 
             // For evaluated boolean ratchets, point at the package file when we can resolve one.
             // Otherwise fall back to the file that defines the top-level attribute.
@@ -525,11 +544,13 @@ fn handle_non_by_name_attribute(
                 (false, file) => Loose(file),
             };
 
-            uses_by_name_result.map(|uses_by_name| ratchet::Package {
-                uses_by_name,
-                strict_deps,
-                structured_attrs,
-            })
+            leaf_result
+                .and_(uses_by_name_result)
+                .map(|uses_by_name| ratchet::Package {
+                    uses_by_name,
+                    strict_deps,
+                    structured_attrs,
+                })
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
         // being able to make any good calls about the ratchet state.
