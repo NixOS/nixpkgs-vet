@@ -7,20 +7,21 @@ use relative_path::RelativePathBuf;
 #[derive(Clone, Debug, new)]
 pub struct TopLevelPackageSwitchedToLicenseList {
     #[new(into)]
-    package_name: String,
+    package_path: Vec<String>,
     #[new(into)]
     file: RelativePathBuf,
 }
 
 impl fmt::Display for TopLevelPackageSwitchedToLicenseList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { package_name, file } = self;
+        let Self { package_path, file } = self;
         writedoc!(
             f,
             "
-            - Attribute `{package_name}` previously did not use a list for `meta.license`, but now does.
+            - Attribute `{}` previously did not use a list for `meta.license`, but now does.
               Please use a single license, or combine licenses with `lib.licenses.OR` or `lib.licenses.AND` in {file}.
             ",
+            package_path.join("."),
         )
     }
 }
