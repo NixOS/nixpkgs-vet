@@ -1,4 +1,3 @@
-//use crate::structure::PACKAGE_NAME_REGEX;
 use rnix::ast::HasEntry;
 use std::collections::HashSet;
 
@@ -14,9 +13,9 @@ trait CanReferencePackages {
 
 impl CanReferencePackages for str {
     fn pprefs(&self, result: &mut HashSet<String>) {
-        //if PACKAGE_NAME_REGEX.is_match(self) {
+        // Even though many strings/identifiers usually aren't used for packages, we don't want to
+        // miss any, so don't limit it
         result.insert(self.to_string());
-        //}
     }
 }
 

@@ -107,6 +107,7 @@ let
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
+            meta_position = value.meta.position or null;
             is_same_scope_call_package = value._callPackage or false;
           };
         };
