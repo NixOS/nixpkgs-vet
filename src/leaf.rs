@@ -1,36 +1,31 @@
 use rnix::ast::HasEntry;
-use std::collections::HashSet;
+use rowan::ast::AstNode;
 
-pub fn pprefs(expr: rnix::ast::Expr) -> HashSet<String> {
-    let mut idents = HashSet::new();
+pub fn pprefs(expr: &rnix::ast::Expr) -> Vec<(String, usize)> {
+    let mut idents = vec![];
     expr.pprefs(&mut idents);
     idents
 }
 
 trait CanReferencePackages {
-    fn pprefs(&self, result: &mut HashSet<String>);
-}
-
-impl CanReferencePackages for str {
-    fn pprefs(&self, result: &mut HashSet<String>) {
-        // Even though many strings/identifiers usually aren't used for packages, we don't want to
-        // miss any, so don't limit it
-        result.insert(self.to_string());
-    }
+    fn pprefs(&self, result: &mut Vec<(String, usize)>);
 }
 
 impl CanReferencePackages for rnix::ast::Ident {
-    fn pprefs(&self, result: &mut HashSet<String>) {
-        self.ident_token().unwrap().text().pprefs(result);
+    fn pprefs(&self, result: &mut Vec<(String, usize)>) {
+        let position = self.ident_token().unwrap().text_range().start();
+        let text = self.ident_token().unwrap().text().to_string();
+        result.push((text, usize::from(position)));
     }
 }
 
 impl CanReferencePackages for rnix::ast::Str {
-    fn pprefs(&self, result: &mut HashSet<String>) {
+    fn pprefs(&self, result: &mut Vec<(String, usize)>) {
         for p in self.normalized_parts() {
             match p {
                 rnix::ast::InterpolPart::Literal(s) => {
-                    s.pprefs(result);
+                    let position = self.syntax().text_range().start();
+                    result.push((s, usize::from(position)));
                 }
                 rnix::ast::InterpolPart::Interpolation(x) => {
                     x.expr().unwrap().pprefs(result);
@@ -41,7 +36,7 @@ impl CanReferencePackages for rnix::ast::Str {
 }
 
 impl CanReferencePackages for rnix::ast::Attr {
-    fn pprefs(&self, result: &mut HashSet<String>) {
+    fn pprefs(&self, result: &mut Vec<(String, usize)>) {
         use rnix::ast::Attr::*;
         match self {
             Ident(z) => z.pprefs(result),
@@ -52,7 +47,7 @@ impl CanReferencePackages for rnix::ast::Attr {
 }
 
 impl CanReferencePackages for rnix::ast::Expr {
-    fn pprefs(&self, result: &mut HashSet<String>) {
+    fn pprefs(&self, result: &mut Vec<(String, usize)>) {
         use rnix::ast::Expr::*;
         match self {
             Apply(x) => {
@@ -61,6 +56,7 @@ impl CanReferencePackages for rnix::ast::Expr {
             }
             Assert(x) => {
                 x.condition().unwrap().pprefs(result);
+                x.body().unwrap().pprefs(result);
             }
             Error(x) => {
                 panic!("What is this Error: {:?}", x)
@@ -147,7 +143,7 @@ impl CanReferencePackages for rnix::ast::Expr {
     }
 }
 
-fn pprefs_from_entries<E: HasEntry>(e: &E, skip_first: bool, result: &mut HashSet<String>) {
+fn pprefs_from_entries<E: HasEntry>(e: &E, _skip_first: bool, result: &mut Vec<(String, usize)>) {
     for e in e.entries() {
         use rnix::ast::Entry::*;
         match e {
@@ -174,5 +170,26 @@ fn pprefs_from_entries<E: HasEntry>(e: &E, skip_first: bool, result: &mut HashSe
                 y.value().unwrap().pprefs(result);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indoc::indoc;
+    #[test]
+    fn basic() -> anyhow::Result<()> {
+        let contents = indoc! {r#"
+            # TODO: Create an expression that tests all code paths
+            null
+        "#};
+
+        let expr = rnix::Root::parse(&contents)
+            .ok()?
+            .expr()
+            .ok_or(anyhow::format_err!("No expr"))?;
+
+        assert_eq!(pprefs(&expr), vec![("null".to_string(), 55)]);
+        Ok(())
     }
 }

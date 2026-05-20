@@ -22,8 +22,10 @@ use crate::validation::Validation::{Failure, Success};
 use crate::validation::sequence_;
 use crate::{ratchet, structure, validation};
 
+pub type IdentIndex = BTreeMap<String, BTreeMap<RelativePathBuf, BTreeSet<usize>>>;
+
 pub struct FileCheckResult {
-    pub idents_to_files: BTreeMap<String, BTreeSet<RelativePathBuf>>,
+    pub idents_to_files: IdentIndex,
     pub file_ratchets: Validation<BTreeMap<RelativePathBuf, ratchet::File>>,
 }
 
@@ -32,14 +34,16 @@ pub fn check_files(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
 ) -> anyhow::Result<FileCheckResult> {
-    let mut idents_to_files: BTreeMap<String, BTreeSet<RelativePathBuf>> = BTreeMap::new();
+    let mut idents_to_files: IdentIndex = BTreeMap::new();
     let file_ratchets =
         process_nix_files(nixpkgs_path, nix_file_store, |relative_path, nix_file| {
-            for ident in leaf::pprefs(nix_file.syntax_root.expr().unwrap()) {
+            for (ident, pos) in leaf::pprefs(&nix_file.syntax_root.expr().unwrap()) {
                 idents_to_files
                     .entry(ident)
                     .or_default()
-                    .insert(relative_path.to_relative_path_buf());
+                    .entry(relative_path.to_relative_path_buf())
+                    .or_default()
+                    .insert(nix_file.line_index.line(pos));
             }
             let result = sequence_([
                 check_executable_iff_shebang(relative_path, &nix_file.path)?,

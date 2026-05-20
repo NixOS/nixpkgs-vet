@@ -1,3 +1,4 @@
+use crate::files::IdentIndex;
 use itertools::Itertools;
 use relative_path::PathExt;
 use std::collections::BTreeMap;
@@ -160,7 +161,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
+    idents_to_files: &IdentIndex,
     package_names: &[String],
 ) -> validation::Result<BTreeMap<Vec<String>, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
@@ -268,7 +269,7 @@ pub fn check_values(
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
-    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
+    idents_to_files: &IdentIndex,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -306,10 +307,10 @@ fn by_name(
                     is_same_scope_call_package: _,
                     has_maintainers,
                     has_no_maintainers_but_dependents,
-                    meta_position,
+                    meta_position: _,
                     pname,
                     name,
-                    is_generated,
+                    is_generated: _,
                 },
             location: _,
         }) => {
@@ -325,7 +326,8 @@ fn by_name(
                 has_no_maintainers_but_dependents,
                 &vec![attribute_name.to_string()],
                 idents_to_files,
-                &structure::relative_dir_for_package(attribute_name),
+                &Some(structure::relative_dir_for_package(attribute_name)),
+                &BTreeMap::new(),
                 &structure::relative_file_for_package(attribute_name),
                 &pname,
                 &name,
@@ -354,8 +356,9 @@ fn leaf_result(
     has_maintainers: bool,
     has_no_maintainers_but_dependents: bool,
     attribute_path: &Vec<String>,
-    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
-    tree_to_ignore: &RelativePathBuf,
+    idents_to_files: &IdentIndex,
+    tree_to_ignore: &Option<RelativePathBuf>,
+    file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
     package_file: &RelativePathBuf,
     pname: &Option<String>,
     name: &Option<String>,
@@ -374,7 +377,13 @@ fn leaf_result(
                     referenced_by_files
                         .clone()
                         .into_iter()
-                        .filter(|file| !file.starts_with(tree_to_ignore))
+                        .filter(|(file, lines)| {
+                            !tree_to_ignore.as_ref().is_some_and(|t| file.starts_with(t))
+                                && !file_ranges_to_ignore.get(file).is_some_and(|(from, to)| {
+                                    lines.iter().all(|line| from <= line && line < to)
+                                })
+                        })
+                        .map(|(file, lines)| file)
                         .collect()
                 } else {
                     BTreeSet::new()
@@ -420,7 +429,7 @@ where
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
+    idents_to_files: &IdentIndex,
     attribute_path: &Vec<String>,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -549,14 +558,29 @@ fn handle_non_by_name_attribute(
                 && !is_generated
             {
                 // `meta.position` is "${file}:${line}"
+                let only_line: usize = meta_pos.split(':').last().unwrap().parse()?;
                 let only_file = meta_pos.split(':').dropping_back(1).join(":");
-                let rel_path = PathBuf::from(only_file).relative_to(nixpkgs_path)?;
+                let abs_path = PathBuf::from(only_file);
+                let rel_path = abs_path.relative_to(nixpkgs_path)?;
+                let file = nix_file_store.get(&abs_path)?;
+                // TODO: Populate ignored_ranges by using the meta.position line, then going
+                // through syntax nodes until ${attribute_path[-1]} = is found, in which case its
+                // value range should be used, otherwise the entire file is ignored
+                // should be
+                let (ignored_tree, ignored_ranges) = if let Some(value_range) =
+                    file.attribute_range(attribute_path.last().unwrap(), only_line)?
+                {
+                    (None, BTreeMap::from([(rel_path.clone(), (value_range))]))
+                } else {
+                    (Some(rel_path.clone()), BTreeMap::new())
+                };
                 leaf_result(
                     has_maintainers,
                     has_no_maintainers_but_dependents,
                     attribute_path,
                     idents_to_files,
-                    &rel_path,
+                    &ignored_tree,
+                    &ignored_ranges,
                     &rel_path,
                     &pname,
                     &name,
