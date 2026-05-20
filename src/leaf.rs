@@ -160,14 +160,17 @@ fn pprefs_from_entries<E: HasEntry>(e: &E, skip_first: bool, result: &mut HashSe
                 }
             }
             AttrpathValue(y) => {
-                for z in y
-                    .attrpath()
-                    .unwrap()
-                    .attrs()
-                    .skip(if skip_first { 1 } else { 0 })
-                {
-                    z.pprefs(result);
-                }
+                // This code would make `a.b.c = d` a dependency on identifiers a, b and c
+                // While this is possible, it's very unlikely, and causes many false positives like
+                // in all-packages.nix and similar files
+                //for z in y
+                //    .attrpath()
+                //    .unwrap()
+                //    .attrs()
+                //    .skip(if skip_first { 1 } else { 0 })
+                //{
+                //    z.pprefs(result);
+                //}
                 y.value().unwrap().pprefs(result);
             }
         }

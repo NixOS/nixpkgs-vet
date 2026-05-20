@@ -14,7 +14,11 @@ pub struct DependentsAttrsShouldBeSet {
     #[new(into)]
     package_file: RelativePathBuf,
     #[new(into)]
-    referenced_by_files: BTreeMap<String, BTreeSet<RelativePathBuf>>,
+    pname: Option<String>,
+    #[new(into)]
+    name: Option<String>,
+    #[new(into)]
+    referenced_by_files: BTreeSet<RelativePathBuf>,
 }
 
 impl fmt::Display for DependentsAttrsShouldBeSet {
@@ -22,18 +26,25 @@ impl fmt::Display for DependentsAttrsShouldBeSet {
         writedoc!(
             f,
             "
-            - {} (defined by {}): `meta.hasNoMaintainersButDependents` should be set, because:
-              - There are no maintainers, and
-              - The package might be depended on by potentially {} files, including: {}
+            - {} (defined by {}, {}: {}, {} pot. dependents): {}
             ",
+            // "
+            // - pkgs.{} (defined by {}, {}: {}): `meta.hasNoMaintainersButDependents` should be set, because:
+            //   - There are no maintainers, and
+            //   - The package might be depended on by potentially {} files, including: {}
+            // ",
             self.package_path.join("."),
             self.package_file,
-            self.referenced_by_files.values().flatten().count(),
-            self.referenced_by_files
-                .values()
-                .flatten()
-                .take(5)
-                .join(", "),
+            if self.pname.is_some() {
+                "pname"
+            } else {
+                "name"
+            },
+            self.pname
+                .clone()
+                .unwrap_or_else(|| self.name.clone().unwrap()),
+            self.referenced_by_files.len(),
+            self.referenced_by_files.iter().take(5).join(", "),
         )
     }
 }

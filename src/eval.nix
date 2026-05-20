@@ -108,6 +108,9 @@ let
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
             meta_position = value.meta.position or null;
+            is_generated = value.meta.isGenerated or false;
+            pname = value.pname or null;
+            name = value.name or null;
             is_same_scope_call_package = value._callPackage or false;
           };
         };
