@@ -85,7 +85,7 @@ fn check_path(
                         &subpath.join(entry.file_name().to_string_lossy().to_string()),
                     )
                 })
-                .collect_vec()
+                .collect_vec_res()
                 .with_context(|| format!("Error while recursing into {}", subpath))?,
         )
     } else if path.is_file() {

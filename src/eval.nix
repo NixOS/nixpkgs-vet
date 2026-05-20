@@ -106,6 +106,7 @@ let
             has_no_maintainers_but_dependents = value.meta.hasNoMaintainersButDependents or false;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
+            meta_position = value.meta.position or null;
             is_same_scope_call_package = value._callPackage or false;
           };
         };
