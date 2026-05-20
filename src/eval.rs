@@ -95,6 +95,9 @@ pub enum AttributeVariant {
         /// Whether the attribute was defined via `callPackage` of the same scope
         is_same_scope_call_package: bool,
         meta_position: Option<String>,
+        is_generated: bool,
+        pname: Option<String>,
+        name: Option<String>,
     },
 }
 
@@ -304,6 +307,9 @@ fn by_name(
                     has_maintainers,
                     has_no_maintainers_but_dependents,
                     meta_position,
+                    pname,
+                    name,
+                    is_generated,
                 },
             location: _,
         }) => {
@@ -321,6 +327,8 @@ fn by_name(
                 idents_to_files,
                 &structure::relative_dir_for_package(attribute_name),
                 &structure::relative_file_for_package(attribute_name),
+                &pname,
+                &name,
             );
 
             // Independently report problems about whether it's a derivation and its leaf status.
@@ -349,6 +357,8 @@ fn leaf_result(
     idents_to_files: &BTreeMap<String, BTreeSet<RelativePathBuf>>,
     tree_to_ignore: &RelativePathBuf,
     package_file: &RelativePathBuf,
+    pname: &Option<String>,
+    name: &Option<String>,
 ) -> validation::Validation<()> {
     if has_maintainers {
         if has_no_maintainers_but_dependents {
@@ -357,23 +367,23 @@ fn leaf_result(
             Success(())
         }
     } else {
-        let mut dependent_files: BTreeMap<String, BTreeSet<RelativePathBuf>> = BTreeMap::new();
-
-        for attr in attribute_path {
-            let files = if let Some(referenced_by_files) = idents_to_files.get(attr) {
-                referenced_by_files
-                    .clone()
-                    .into_iter()
-                    .filter(|file| !file.starts_with(tree_to_ignore))
-                    .collect()
-            } else {
-                BTreeSet::new()
-            };
-            dependent_files.insert(attr.clone(), files);
-        }
+        let dependent_files: Vec<BTreeSet<RelativePathBuf>> = attribute_path
+            .iter()
+            .map(|attr| {
+                if let Some(referenced_by_files) = idents_to_files.get(attr) {
+                    referenced_by_files
+                        .clone()
+                        .into_iter()
+                        .filter(|file| !file.starts_with(tree_to_ignore))
+                        .collect()
+                } else {
+                    BTreeSet::new()
+                }
+            })
+            .collect();
 
         // All attributes need a reference
-        if dependent_files.values().all(|files| !files.is_empty()) {
+        if dependent_files.iter().all(|files| !files.is_empty()) {
             // Has potential dependents
             if has_no_maintainers_but_dependents {
                 Success(())
@@ -381,7 +391,9 @@ fn leaf_result(
                 npv_180::DependentsAttrsShouldBeSet::new(
                     attribute_path.clone(),
                     package_file,
-                    dependent_files,
+                    pname.clone(),
+                    name.clone(),
+                    dependent_files.last().unwrap().clone(),
                 )
                 .into()
             }
@@ -446,6 +458,9 @@ fn handle_non_by_name_attribute(
                     has_maintainers,
                     has_no_maintainers_but_dependents,
                     meta_position,
+                    pname,
+                    name,
+                    is_generated,
                 },
             location: Some(location),
         }) => {
@@ -529,23 +544,22 @@ fn handle_non_by_name_attribute(
             //    } else {
             //        rel_path.clone()
             //    })
-            let maybe_package_file = if let Some(meta_pos) = meta_position {
+
+            let leaf_result = if let Some(ref meta_pos) = meta_position
+                && !is_generated
+            {
                 // `meta.position` is "${file}:${line}"
                 let only_file = meta_pos.split(':').dropping_back(1).join(":");
                 let rel_path = PathBuf::from(only_file).relative_to(nixpkgs_path)?;
-                Some(rel_path)
-            } else {
-                None
-            };
-
-            let leaf_result = if let Some(package_file) = maybe_package_file {
                 leaf_result(
                     has_maintainers,
                     has_no_maintainers_but_dependents,
                     attribute_path,
                     idents_to_files,
-                    &package_file,
-                    &package_file,
+                    &rel_path,
+                    &rel_path,
+                    &pname,
+                    &name,
                 )
             } else {
                 Success(())
