@@ -1,6 +1,5 @@
 use itertools::Itertools;
 use relative_path::RelativePathBuf;
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 
