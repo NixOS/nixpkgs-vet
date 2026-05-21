@@ -132,13 +132,16 @@ let
 
   allAttrs = (import ciEvalAttrpaths { }).paths;
   nonByNameAttrsList =
-    if builtins.pathExists ciEvalAttrpaths then
+    builtins.filter (p: !(builtins.length p > 0 && builtins.elemAt p 0 == "tests"))
+      (
+        if builtins.pathExists ciEvalAttrpaths then
 
-      builtins.filter (
-        path: !(builtins.length path == 1 && builtins.elem (builtins.elemAt path 0) attrs)
-      ) allAttrs
-    else
-      map (a: [ a ]) (builtins.attrNames (builtins.removeAttrs pkgs attrs));
+          builtins.filter (
+            path: !(builtins.length path == 1 && builtins.elem (builtins.elemAt path 0) attrs)
+          ) allAttrs
+        else
+          map (a: [ a ]) (builtins.attrNames (builtins.removeAttrs pkgs attrs))
+      );
 
   # Information on all attributes that exist but are not in `pkgs/by-name`.
   # We need this to enforce `pkgs/by-name` for new packages.
