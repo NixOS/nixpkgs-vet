@@ -382,7 +382,9 @@ impl NixFile {
         attribute: &str,
         starting_line: usize,
     ) -> anyhow::Result<Option<(usize, usize)>> {
-        let index = self.line_index.fromlinecolumn(starting_line, 1);
+        // Because we're prefering the left, start one line further down so that we can catch
+        // attributes on the line itself
+        let index = self.line_index.fromlinecolumn(starting_line + 1, 1);
 
         let token_at_offset = self
             .syntax_root
@@ -678,21 +680,24 @@ mod tests {
                 nested.hello = {
                     nested = null;
                 };
+                itself = {
+                };
             }
         "#};
 
-        let contents =
-            read_to_string("/home/tweagysil/src/nixpkgs/pkgs/top-level/perl-packages.nix")?;
+        // let contents =
+        //     read_to_string("/home/tweagysil/src/nixpkgs/pkgs/top-level/perl-packages.nix")?;
 
         std::fs::write(&file, contents)?;
 
         let nix_file = NixFile::new(&file)?;
 
         let cases = [
-            // ("doesNotExist", 1, None),
-            // ("hello", 3, Some((2, 4))),
-            // ("hello", 6, Some((5, 7))),
-            ("Importer", 17353, Some((17345, 17359))),
+            ("doesNotExist", 1, None),
+            ("hello", 3, Some((2, 4))),
+            ("hello", 6, Some((5, 7))),
+            ("itself", 8, Some((8, 9))),
+            // ("Importer", 17353, Some((17345, 17359))),
         ];
         for (attribute, starting_line, expected) in cases {
             let actual = nix_file.attribute_range(attribute, starting_line)?;
