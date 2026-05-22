@@ -14,8 +14,7 @@ impl fmt::Display for DependentsAttrsSetWithoutDependents {
         writedoc!(
             f,
             "
-            - {}: Has `meta.hasNoMaintainersButDependents = true` set, but there are no
-            dependents. Please unset the attribute
+            - {}: Has `meta.hasNoMaintainersButDependents = true` set, but there are no dependents. Please unset the attribute
             ",
             self.package_path.join("."),
         )
