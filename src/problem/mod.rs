@@ -45,6 +45,7 @@ pub mod npv_171;
 pub mod npv_180;
 pub mod npv_181;
 pub mod npv_182;
+pub mod npv_183;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
@@ -153,6 +154,9 @@ pub enum Problem {
 
     /// NPV-182: meta.hasNoMaintainersButDependents should not be set when there are no dependents
     DependentsAttrsSetWithoutDependents(npv_182::DependentsAttrsSetWithoutDependents),
+
+    /// NPV-183: meta.hasNoMaintainersButDependents should not be set when it's not needed
+    DependentsAttrsSetWithoutNeed(npv_183::DependentsAttrsSetWithoutNeed),
 }
 
 impl Problem {
@@ -193,6 +197,7 @@ impl Problem {
             Self::DependentsAttrsShouldBeSet(..) => "NPV-180",
             Self::DependentsAttrsSetWithMaintainers(..) => "NPV-181",
             Self::DependentsAttrsSetWithoutDependents(..) => "NPV-182",
+            Self::DependentsAttrsSetWithoutNeed(..) => "NPV-183",
         }
     }
 
@@ -239,6 +244,7 @@ impl fmt::Display for Problem {
             Self::DependentsAttrsShouldBeSet(inner) => inner.fmt(f),
             Self::DependentsAttrsSetWithMaintainers(inner) => inner.fmt(f),
             Self::DependentsAttrsSetWithoutDependents(inner) => inner.fmt(f),
+            Self::DependentsAttrsSetWithoutNeed(inner) => inner.fmt(f),
         }
     }
 }
