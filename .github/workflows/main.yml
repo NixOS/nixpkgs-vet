@@ -24,9 +24,6 @@ permissions: {}
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -44,11 +41,87 @@ jobs:
       - name: build
         run: nix-build -A ci
 
-      - name: release
-        if: ${{ github.event_name == 'push' }}
-        run: scripts/release.sh
+  prepare-release:
+    if: "${{
+        github.event_name == 'push' &&
+        !contains(github.event.head_commit.message, 'chore: prepare release')
+      }}" # Skip merges from releases
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        if: vars.NIXPKGS_VET_CI_CLIENT_ID
+        id: app-token
+        with:
+          client-id: ${{ vars.NIXPKGS_VET_CI_CLIENT_ID }}
+          private-key: ${{ secrets.NIXPKGS_VET_CI_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      - uses: cachix/install-nix-action@ab739621df7a23f52766f9ccc97f38da6b7af14f # v31.10.5
+
+      - name: Get GitHub App User ID
+        id: get-user-id
+        if: vars.NIXPKGS_VET_CI_CLIENT_ID
+        run: echo "user-id=$(gh api "/users/$TOKEN_USERNAME" --jq .id)" >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ github.token }}
+          TOKEN_USERNAME: ${{ steps.app-token.outputs.app-slug }}[bot]
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        run: |
+          git config --global user.name "$TOKEN_USERNAME"
+          git config --global user.email "$TOKEN_USER_ID+$TOKEN_USERNAME@users.noreply.github.com"
+        env:
+          TOKEN_USERNAME: ${{ steps.app-token.outputs.app-slug || 'github-actions' }}[bot]
+          TOKEN_USER_ID: ${{ steps.get-user-id.outputs.user-id || '41898282' }}
+
+      - name: run knope
+        run: nix run -f default.nix pkgs.knope -- prepare-release --verbose
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+
+  release:
+    if: "${{
+        github.event_name == 'push' &&
+        contains(github.event.head_commit.message, 'chore: prepare release')
+      }}" # Only run when a release PR is merged
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        if: vars.NIXPKGS_VET_CI_CLIENT_ID
+        id: app-token
+        with:
+          client-id: ${{ vars.NIXPKGS_VET_CI_CLIENT_ID }}
+          private-key: ${{ secrets.NIXPKGS_VET_CI_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      - uses: cachix/install-nix-action@ab739621df7a23f52766f9ccc97f38da6b7af14f # v31.10.5
+
+      - name: run knope
+        run: nix run -f default.nix pkgs.knope -- release --verbose
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
 
   # Make sure that all links in Markdown documents are valid
   xrefcheck:
