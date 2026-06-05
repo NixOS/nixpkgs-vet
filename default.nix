@@ -140,17 +140,6 @@ let
               echo "</details>"
             '';
           };
-          githubActions = pkgs.writeShellApplication {
-            name = "update-github-actions";
-            runtimeInputs = with pkgs; [
-              dependabot-cli.withDockerImages
-              docker
-              jq
-              github-cli
-              coreutils
-            ];
-            text = builtins.readFile ./scripts/update-github-actions.sh;
-          };
         };
       in
       pkgs.writeShellApplication {
