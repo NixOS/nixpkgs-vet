@@ -394,8 +394,16 @@ fn leaf_result(
                 })
                 .collect();
 
-            // All attributes need a reference
-            if dependent_files.iter().all(|files| !files.is_empty()) {
+            // Ideally we would check that all attributes in the path are referenced and not just the
+            // last one, but this leads to an annoying problem, because e.g. if `beamPackages = beam29Packages` and
+            // there's a `beamPackages.foo` that has no maintainers, and we can find references to
+            // `beamPackages`, `foo` but not `beam29Packages`, what should
+            // `foo.meta.hasNoMaintainersButDependents` be? Any way we set it is unreconcilable for
+            // either `beamPackages` or `beam29Packages`.
+
+            // Only check the last attribute path for references
+            // TODO: Simplify the code above
+            if !dependent_files.last().unwrap().is_empty() {
                 // Has potential dependents
                 if has_no_maintainers_but_dependents {
                     Success(())
