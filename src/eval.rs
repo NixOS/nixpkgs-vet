@@ -323,7 +323,8 @@ fn by_name(
                 has_no_maintainers_but_dependents,
                 &vec![attribute_name.to_string()],
                 idents_to_files,
-                &Some(structure::relative_dir_for_package(attribute_name)),
+                // TODO: Test that relative_dir_for_package wouldn't work
+                &Some(structure::relative_file_for_package(attribute_name)),
                 &BTreeMap::new(),
                 &structure::relative_file_for_package(attribute_name),
                 &pname,
