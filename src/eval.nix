@@ -63,7 +63,7 @@ let
     # Don't let the user's home directory influence this result.
     config = { };
     overlays = [ overlay ];
-    # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
+    # TODO: Check for all supported systems to ensure that packages don't fail evaluation on other systems
     system = "x86_64-linux";
   };
 
