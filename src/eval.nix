@@ -102,7 +102,8 @@ let
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
-            missing_maintainers = value.meta.missingMaintainers or null;
+            missing_maintainers =
+              if value.meta.requiresMaintainers or false then value.meta.maintainers == [ ] else null;
             has_no_maintainers_but_dependents = value.meta.hasNoMaintainersButDependents or false;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
