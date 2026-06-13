@@ -42,10 +42,10 @@ jobs:
         run: nix-build -A ci
 
   prepare-release:
-    if: "${{
-        github.event_name == 'push' &&
-        !contains(github.event.head_commit.message, 'chore: prepare release')
-      }}" # Skip merges from releases
+    # Skip merges from releases
+    if: >-
+      github.event_name == 'push' &&
+      !contains(github.event.head_commit.message, 'chore: prepare release')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -86,16 +86,30 @@ jobs:
           TOKEN_USERNAME: ${{ steps.app-token.outputs.app-slug || 'github-actions' }}[bot]
           TOKEN_USER_ID: ${{ steps.get-user-id.outputs.user-id || '41898282' }}
 
-      - name: run knope
+      - name: store pre-bump version
+        id: pre-bump
+        run: echo "version=$(nix run -f default.nix pkgs.knope -- get-version)" >> "$GITHUB_OUTPUT"
+
+      - name: prepare release
         run: nix run -f default.nix pkgs.knope -- prepare-release --verbose
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
 
+      - name: store post-bump version
+        id: post-bump
+        run: echo "version=$(nix run -f default.nix pkgs.knope -- get-version)" >> "$GITHUB_OUTPUT"
+
+      - name: create release PR
+        if: "${{ steps.pre-bump.outputs.version != steps.post-bump.outputs.version }}"
+        run: nix run -f default.nix pkgs.knope -- push-draft-release --verbose
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+
   release:
-    if: "${{
-        github.event_name == 'push' &&
-        contains(github.event.head_commit.message, 'chore: prepare release')
-      }}" # Only run when a release PR is merged
+    # Only run when a release PR is merged
+    if: >-
+      github.event_name == 'push' &&
+      contains(github.event.head_commit.message, 'chore: prepare release')
     needs: build
     runs-on: ubuntu-latest
     permissions:
