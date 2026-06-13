@@ -9,3 +9,20 @@ updates:
       actions:
         patterns:
           - "*"
+
+  - package-ecosystem: "nix"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    versioning-strategy: "increase"
+    groups:
+      cargo:
+        patterns:
+          - "*"
