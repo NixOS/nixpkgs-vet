@@ -35,6 +35,10 @@ command = "git switch -c release"
 type = "PrepareRelease"
 allow_empty = true
 
+# push-draft-release workflow
+[[workflows]]
+name = "push-draft-release"
+
 [[workflows.steps]]
 type = "Command"
 command = "git commit -m \"chore: prepare release $version\""
