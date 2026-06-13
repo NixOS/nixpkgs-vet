@@ -86,7 +86,7 @@ Integration tests are declared in [`./tests`](./tests) as subdirectories imitati
 
 ## Automation
 
-Pinned dependencies are [regularly updated automatically](./.github/workflows/update.yml).
+Pinned dependencies are regularly updated automatically by [dependabot](./.github/dependabot.yml).
 
 Releases are [automatically](./.github/workflows/main.yml) created when the release PR (created by [Knope](https://knope.tech/)) is merged.
 

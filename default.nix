@@ -1,10 +1,8 @@
-let
-  sources = import ./npins;
-in
 {
+  self ? import ./flake-compat.nix,
   system ? builtins.currentSystem,
-  nixpkgs ? sources.nixpkgs,
-  treefmt-nix ? sources.treefmt-nix,
+  nixpkgs ? self.inputs.nixpkgs,
+  treefmt-nix ? self.inputs.treefmt-nix,
 }:
 let
   pkgs = import nixpkgs {
@@ -65,7 +63,6 @@ let
         cargo-outdated
         defaultNixPackage
         knope
-        npins
         pinact
         rust-analyzer
         rustfmt
@@ -81,80 +78,6 @@ let
         fileset = lib.fileset.gitTracked ./.;
       }
     );
-
-    # Run regularly by CI and turned into a PR
-    autoPrUpdate =
-      let
-        updateScripts = {
-          npins = pkgs.writeShellApplication {
-            name = "update-npins";
-            runtimeInputs = [
-              defaultNixPackage
-              pkgs.npins
-              pkgs.openssh
-            ];
-            text = ''
-              echo "<details><summary>npins changes</summary>"
-              # Needed because GitHub's rendering of the first body line breaks down otherwise
-              echo ""
-              echo '```'
-              npins --directory "$1/npins" update 2>&1
-              echo  '```'
-              echo "</details>"
-            '';
-          };
-          # These steps have to be in the same script because order matters.
-          # `carge upgrade` should happen before `cargo update` and then check
-          # `cargo outdated` and `cargo audit` after that.
-          cargo = pkgs.writeShellApplication {
-            name = "cargo";
-            runtimeInputs = with pkgs; [
-              cargo
-              cargo-audit
-              cargo-edit # provides `cargo upgrade`
-              cargo-outdated
-              openssh
-            ];
-            text = ''
-              echo "<details><summary>cargo changes</summary>"
-              echo ""
-              echo "### cargo upgrade"
-              printf "\n\`\`\`\n"
-              cargo upgrade --manifest-path "$1/Cargo.toml" 2>&1
-              printf "\n\`\`\`\n"
-
-              echo "### cargo update"
-              printf "\n\`\`\`\n"
-              cargo update --manifest-path "$1/Cargo.toml" 2>&1
-              printf "\n\`\`\`\n"
-
-              echo "### cargo outdated"
-              printf "\n\`\`\`\n"
-              cargo outdated --manifest-path "$1/Cargo.toml" 2>&1
-              printf "\n\`\`\`\n"
-
-              echo "### cargo audit"
-              printf "\n\`\`\`\n"
-              cargo audit --file "$1/Cargo.lock" 2>&1
-              printf "\n\`\`\`\n"
-              echo "</details>"
-            '';
-          };
-        };
-      in
-      pkgs.writeShellApplication {
-        name = "auto-pr-update";
-        text = ''
-          set -eo pipefail
-          # Prevent impurities
-          unset PATH
-
-          ${lib.concatMapStringsSep "\n" (script: ''
-            echo >&2 "Running ${script}"
-            ${lib.getExe script} "$1"
-          '') (lib.attrValues updateScripts)}
-        '';
-      };
 
     # Tests the tool on the pinned Nixpkgs tree with stable Nix. This is a good sanity check.
     nixpkgsCheck = pkgs.callPackage ./nixpkgs-check.nix {
