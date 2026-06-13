@@ -8,7 +8,9 @@ repo = "nixpkgs-vet"
 
 [release_notes]
 change_templates = [
+    "### $summary (#$pr_number)\n\n$details\n\nBy @$pr_author_login",
     "### $summary ($commit_hash)\n\n$details\n\nBy $commit_author_name",
+    "* **$summary** by @$pr_author_login (#$pr_number)",
     "* **$summary** by $commit_author_name ($commit_hash)",
     "### $summary\n\n$details",
     "* **$summary**",
