@@ -1,10 +1,8 @@
-let
-  sources = import ./npins;
-in
 {
+  self ? import ./flake-compat.nix,
   system ? builtins.currentSystem,
-  nixpkgs ? sources.nixpkgs,
-  treefmt-nix ? sources.treefmt-nix,
+  nixpkgs ? self.inputs.nixpkgs,
+  treefmt-nix ? self.inputs.treefmt-nix,
 }:
 let
   pkgs = import nixpkgs {
@@ -65,7 +63,6 @@ let
         cargo-outdated
         defaultNixPackage
         knope
-        npins
         pinact
         rust-analyzer
         rustfmt
@@ -86,19 +83,18 @@ let
     autoPrUpdate =
       let
         updateScripts = {
-          npins = pkgs.writeShellApplication {
-            name = "update-npins";
+          flake = pkgs.writeShellApplication {
+            name = "update-flake";
             runtimeInputs = [
               defaultNixPackage
-              pkgs.npins
               pkgs.openssh
             ];
             text = ''
-              echo "<details><summary>npins changes</summary>"
+              echo "<details><summary>flake changes</summary>"
               # Needed because GitHub's rendering of the first body line breaks down otherwise
               echo ""
               echo '```'
-              npins --directory "$1/npins" update 2>&1
+              nix flake update
               echo  '```'
               echo "</details>"
             '';
