@@ -57,11 +57,30 @@ let
       if !builtins.isAttrs value then
         { NonAttributeSet = null; }
       else
+        let
+          # Disallows people getting around actually setting `strictDeps`
+          # and `__structuredAttrs` by doing something like:
+          # {
+          #   passthru.strictDeps = true;
+          # }
+          # or
+          # package = package-final // {
+          #   __structuredAttrs = true;
+          # };
+          cleanPackage = value.overrideAttrs (
+            _: prev: {
+              passthru = removeAttrs (prev.passthru or { }) [
+                "__structuredAttrs"
+                "strictDeps"
+              ];
+            }
+          );
+        in
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
-            strict_deps = value.strictDeps or false;
-            structured_attrs = value.__structuredAttrs or false;
+            strict_deps = cleanPackage.strictDeps or false;
+            structured_attrs = cleanPackage.__structuredAttrs or false;
             definition_variant =
               if !value ? _callPackageVariant then
                 { ManualDefinition.is_semantic_call_package = false; }
