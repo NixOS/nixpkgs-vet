@@ -41,11 +41,13 @@ let
     # By using `mapAttrs`, `builtins.unsafeGetAttrPos` just returns `null`,
     # which then doesn't trigger this check
     // lib.mapAttrs (name: value: value) {
-      someDrv = {
-        type = "derivation";
-        strictDeps = true;
-        __structuredAttrs = true;
-      };
+      someDrv = (
+        lib.makeExtensibleWithCustomName "overrideAttrs" (finalAttrs: {
+          type = "derivation";
+          strictDeps = true;
+          __structuredAttrs = true;
+        })
+      );
     };
 
   baseDirectory = root + "/pkgs/by-name";
