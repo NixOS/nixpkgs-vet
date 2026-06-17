@@ -58,6 +58,10 @@ let
         { NonAttributeSet = null; }
       else
         let
+          # Not all attrs (or even all derivations) have an `overrideAttrs`,
+          # only those constructed by something based on `stdenv.mkDerivation`
+          overrideValue = value.overrideAttrs or (_: value);
+
           # Disallows people getting around actually setting `strictDeps`
           # and `__structuredAttrs` by doing something like:
           # {
@@ -67,20 +71,14 @@ let
           # package = package-final // {
           #   __structuredAttrs = true;
           # };
-          cleanPackage =
-            if value ? overrideAttrs then
-              value.overrideAttrs (
-                _: prev: {
-                  passthru = removeAttrs (prev.passthru or { }) [
-                    "__structuredAttrs"
-                    "strictDeps"
-                  ];
-                }
-              )
-            else if pkgs.lib.isDerivation value then
-              throw "${name} derivation is missing overrideAttrs"
-            else
-              value;
+          cleanPackage = overrideValue (
+            _: prev: {
+              passthru = removeAttrs (prev.passthru or { }) [
+                "__structuredAttrs"
+                "strictDeps"
+              ];
+            }
+          );
         in
         {
           AttributeSet = {
