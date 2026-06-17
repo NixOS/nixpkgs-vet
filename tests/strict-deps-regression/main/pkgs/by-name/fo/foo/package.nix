@@ -1,1 +1,1 @@
-{ someDrv }: someDrv // { strictDeps = false; }
+{ someDrv }: someDrv.overrideAttrs (_: _: { strictDeps = false; })

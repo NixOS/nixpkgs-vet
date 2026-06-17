@@ -1,1 +1,5 @@
-{ someDrv }: removeAttrs someDrv [ "__structuredAttrs" ]
+{ mkFakeDrv }:
+mkFakeDrv (finalAttrs: {
+  strictDeps = true;
+  # No __structuredAttrs
+})
