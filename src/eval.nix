@@ -67,14 +67,20 @@ let
           # package = package-final // {
           #   __structuredAttrs = true;
           # };
-          cleanPackage = value.overrideAttrs (
-            _: prev: {
-              passthru = removeAttrs (prev.passthru or { }) [
-                "__structuredAttrs"
-                "strictDeps"
-              ];
-            }
-          );
+          cleanPackage =
+            if value ? overrideAttrs then
+              value.overrideAttrs (
+                _: prev: {
+                  passthru = removeAttrs (prev.passthru or { }) [
+                    "__structuredAttrs"
+                    "strictDeps"
+                  ];
+                }
+              )
+            else if pkgs.lib.isDerivation value then
+              throw "${name} derivation is missing overrideAttrs"
+            else
+              value;
         in
         {
           AttributeSet = {
