@@ -57,11 +57,34 @@ let
       if !builtins.isAttrs value then
         { NonAttributeSet = null; }
       else
+        let
+          # Not all attrs (or even all derivations) have an `overrideAttrs`,
+          # only those constructed by something based on `stdenv.mkDerivation`
+          overrideValue = value.overrideAttrs or (_: value);
+
+          # Disallows people getting around actually setting `strictDeps`
+          # and `__structuredAttrs` by doing something like:
+          # {
+          #   passthru.strictDeps = true;
+          # }
+          # or
+          # package = package-final // {
+          #   __structuredAttrs = true;
+          # };
+          cleanPackage = overrideValue (
+            _: prev: {
+              passthru = removeAttrs (prev.passthru or { }) [
+                "__structuredAttrs"
+                "strictDeps"
+              ];
+            }
+          );
+        in
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
-            strict_deps = value.strictDeps or false;
-            structured_attrs = value.__structuredAttrs or false;
+            strict_deps = cleanPackage.strictDeps or false;
+            structured_attrs = cleanPackage.__structuredAttrs or false;
             definition_variant =
               if !value ? _callPackageVariant then
                 { ManualDefinition.is_semantic_call_package = false; }

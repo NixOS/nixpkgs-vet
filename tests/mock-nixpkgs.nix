@@ -33,6 +33,15 @@ let
       newScope = extra: lib.callPackageWith (self // extra);
       callPackage = self.newScope { };
       callPackages = lib.callPackagesWith self;
+      mkFakeDrv =
+        args:
+        lib.makeExtensibleWithCustomName "overrideAttrs" (
+          finalAttrs:
+          {
+            type = "derivation";
+          }
+          // args finalAttrs
+        );
     }
     # This mapAttrs is a very hacky workaround necessary because for all attributes defined in Nixpkgs,
     # the files that define them are verified to be within Nixpkgs.
@@ -41,11 +50,10 @@ let
     # By using `mapAttrs`, `builtins.unsafeGetAttrPos` just returns `null`,
     # which then doesn't trigger this check
     // lib.mapAttrs (name: value: value) {
-      someDrv = {
-        type = "derivation";
+      someDrv = self.mkFakeDrv (finalAttrs: {
         strictDeps = true;
         __structuredAttrs = true;
-      };
+      });
     };
 
   baseDirectory = root + "/pkgs/by-name";
