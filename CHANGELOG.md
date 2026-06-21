@@ -1,3 +1,15 @@
+## 0.3.3 (2026-06-19)
+
+### Features
+
+#### Ignore ineffective package attrs in `strictDeps` & `__structuredAttrs` checks (#265)
+
+Previously, setting e.g. `passthru.__structuredAttrs` would satisfy our checks, even though this is not effective to actually enable `__structuredAttrs` in the derivation.
+
+Detection of these features now more closely aligns with the actual derivation's use of them.
+
+By @RossSmyth
+
 ## 0.3.2 (2026-06-05)
 
 Fixed release of v0.3.1.
