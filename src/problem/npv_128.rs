@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -22,9 +23,16 @@ impl fmt::Display for NixFileContainsHomeRelativePath {
             line,
             text,
         } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: File {subpath} at line {line} contains the home-relative path expression \"{text}\", which is not allowed in nixpkgs.",
+            format!(
+                "- {relative_package_dir}: File {subpath} at line {line} contains the home-relative path expression \"{text}\", which is not allowed in nixpkgs."
+            ),
+            Options {
+                file: Some(&relative_package_dir.join(subpath)),
+                start_line: Some(*line),
+                ..Default::default()
+            },
         )
     }
 }

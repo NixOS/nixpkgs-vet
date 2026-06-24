@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::{fmt, io};
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -26,9 +27,16 @@ impl fmt::Display for NixFileContainsUnresolvablePath {
             text,
             io_error,
         } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}.",
+            format!(
+                "- {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which cannot be resolved: {io_error}."
+            ),
+            Options {
+                file: Some(&relative_package_dir.join(subpath)),
+                start_line: Some(*line),
+                ..Default::default()
+            },
         )
     }
 }

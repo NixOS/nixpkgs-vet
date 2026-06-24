@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 
 use crate::structure;
@@ -14,9 +15,14 @@ impl fmt::Display for ByNameShardIsInvalid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let shard_name = &self.shard_name;
         let relative_shard_path = structure::relative_dir_for_shard(shard_name);
-        write!(
+        gh_write(
             f,
-            "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters, starting with a-z or \"_\", consisting of a-z, 0-9, \"-\" or \"_\".",
+            format!(
+                "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters, starting with a-z or \"_\", consisting of a-z, 0-9, \"-\" or \"_\"."
+            ),
+            Options {
+                ..Default::default()
+            },
         )
     }
 }

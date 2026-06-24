@@ -1,9 +1,10 @@
 use std::fmt;
 
 use derive_new::new;
-use indoc::writedoc;
+use indoc::formatdoc;
 use relative_path::RelativePathBuf;
 
+use crate::gh_write::{Options, gh_write};
 use crate::structure::PACKAGE_NIX_FILENAME;
 
 #[derive(Clone, new)]
@@ -25,9 +26,9 @@ impl fmt::Display for NixFileContainsPathOutsideDirectory {
             line,
             text,
         } = self;
-        writedoc!(
+        gh_write(
             f,
-            "
+            formatdoc!("
             - {relative_package_dir}: File {subpath} at line {line} contains the path expression \"{text}\" which may point outside the directory of that package.
               This is undesirable because it creates dependencies between internal paths, making it harder to reorganise Nixpkgs in the future.
               Alternatives include:
@@ -35,7 +36,12 @@ impl fmt::Display for NixFileContainsPathOutsideDirectory {
               - If the path being referenced could be considered a stable interface with multiple uses, consider exposing it via a `pkgs` attribute, then taking it as a attribute argument in {PACKAGE_NIX_FILENAME}.
               - If the path being referenced is internal and has multiple uses, consider passing the file as an explicit `callPackage` argument in `pkgs/top-level/all-packages.nix`.
               - If the path being referenced is internal and will need to be modified independently of the original, consider copying it into the {relative_package_dir} directory.
-            "
+            "),
+            Options {
+                file: Some(&relative_package_dir.join(subpath)),
+                start_line: Some(*line),
+                ..Default::default()
+            },
         )
     }
 }

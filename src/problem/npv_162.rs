@@ -1,9 +1,10 @@
 use std::fmt;
 
 use derive_new::new;
-use indoc::writedoc;
+use indoc::formatdoc;
 use relative_path::RelativePathBuf;
 
+use crate::gh_write::{Options, gh_write};
 use crate::structure;
 
 #[derive(Clone, new)]
@@ -27,14 +28,18 @@ impl fmt::Display for NewTopLevelPackageShouldBeByName {
         let call_package_arg = call_package_path
             .as_ref()
             .map_or_else(|| "...".into(), |path| format!("./{}", path));
-        writedoc!(
+        gh_write(
             f,
-            "
+            formatdoc!("
             - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
               Please define it in {relative_package_file} instead.
               See `pkgs/by-name/README.md` for more details.
               Since the second `callPackage` argument is `{{ }}`, no manual `callPackage` in {file} is needed anymore.
-            ",
+            "),
+            Options {
+                file: Some(file),
+                ..Default::default()
+            },
         )
     }
 }

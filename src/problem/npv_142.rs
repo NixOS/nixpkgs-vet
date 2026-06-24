@@ -3,6 +3,7 @@ use std::fmt;
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
+use crate::gh_write::{Options, gh_write};
 use crate::structure;
 
 #[derive(Clone, new)]
@@ -20,9 +21,14 @@ impl fmt::Display for PackageInWrongShard {
             relative_package_dir,
         } = self;
         let correct_relative_package_dir = structure::relative_dir_for_package(package_name);
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead.",
+            format!(
+                "- {relative_package_dir}: Incorrect directory location, should be {correct_relative_package_dir} instead."
+            ),
+            Options {
+                ..Default::default()
+            },
         )
     }
 }

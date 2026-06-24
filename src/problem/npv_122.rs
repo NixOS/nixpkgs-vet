@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -22,9 +23,16 @@ impl fmt::Display for NixFileContainsSearchPath {
             line,
             text,
         } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package.",
+            format!(
+                "- {relative_package_dir}: File {subpath} at line {line} contains the nix search path expression \"{text}\" which may point outside the directory of that package."
+            ),
+            Options {
+                file: Some(&relative_package_dir.join(subpath)),
+                start_line: Some(*line),
+                ..Default::default()
+            },
         )
     }
 }

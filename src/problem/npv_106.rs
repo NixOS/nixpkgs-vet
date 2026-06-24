@@ -1,9 +1,10 @@
 use std::fmt;
 
 use derive_new::new;
-use indoc::writedoc;
+use indoc::formatdoc;
 use relative_path::RelativePathBuf;
 
+use crate::gh_write::{Options, gh_write};
 use crate::location::Location;
 use crate::structure;
 
@@ -25,14 +26,14 @@ impl fmt::Display for ByNameOverrideContainsWrongCallPackagePath {
             location,
             actual_path,
         } = self;
-        let Location { file, line, .. } = location;
+        let Location { file, line, column } = location;
         let expected_package_path = structure::relative_file_for_package(package_name);
         let expected_path_expr = create_path_expr(file, expected_package_path);
         let relative_package_dir = structure::relative_dir_for_package(package_name);
         let actual_path_expr = create_path_expr(file, actual_path);
-        writedoc!(
+        gh_write(
             f,
-            "
+            formatdoc!("
             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
                 {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
@@ -40,7 +41,13 @@ impl fmt::Display for ByNameOverrideContainsWrongCallPackagePath {
               However, in this PR, the first `callPackage` argument is the wrong path. See the definition in {file}:{line}:
 
                 {package_name} = callPackage {actual_path_expr} {{ /* ... */ }};
-            ",
+            "),
+            Options {
+                file: Some(file),
+                start_line: Some(*line),
+                start_col: Some(*column),
+                ..Default::default()
+            }
         )
     }
 }

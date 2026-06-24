@@ -1,8 +1,9 @@
 use std::fmt;
 
 use derive_new::new;
-use indoc::writedoc;
+use indoc::formatdoc;
 
+use crate::gh_write::{Options, gh_write};
 use crate::location::Location;
 use crate::structure;
 
@@ -30,9 +31,9 @@ impl fmt::Display for ByNameOverrideContainsEmptyPath {
         let expected_path_expr = create_path_expr(file, expected_package_path);
         let indented_definition = indent_definition(*column, definition);
 
-        writedoc!(
+        gh_write(
             f,
-            "
+            formatdoc!("
             - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
                 {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
@@ -40,7 +41,13 @@ impl fmt::Display for ByNameOverrideContainsEmptyPath {
               However, in this PR, the first `callPackage` argument is not a path. See the definition in {file}:{line}:
 
             {indented_definition}
-            ",
+            "),
+            Options {
+                file: Some(file),
+                start_line: Some(*line),
+                start_col: Some(*column),
+                ..Default::default()
+            }
         )
     }
 }

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::gh_write::{Options, gh_write};
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
@@ -17,9 +18,15 @@ impl fmt::Display for PackageContainsSymlinkPointingOutside {
             relative_package_dir,
             subpath,
         } = self;
-        write!(
+        gh_write(
             f,
-            "- {relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package.",
+            format!(
+                "- {relative_package_dir}: Path {subpath} is a symlink pointing to a path outside the directory of that package."
+            ),
+            Options {
+                file: Some(&relative_package_dir.join(subpath)),
+                ..Default::default()
+            },
         )
     }
 }

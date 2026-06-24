@@ -3,6 +3,7 @@ use std::fmt;
 
 use derive_new::new;
 
+use crate::gh_write::{Options, gh_write};
 use crate::structure;
 
 #[derive(Clone, new)]
@@ -18,9 +19,14 @@ impl fmt::Display for ByNameShardIsCaseSensitiveDuplicate {
         let relative_shard_path = structure::relative_dir_for_shard(&self.shard_name);
         let first = self.first.to_string_lossy();
         let second = self.second.to_string_lossy();
-        write!(
+        gh_write(
             f,
-            "- {relative_shard_path}: Duplicate case-sensitive package directories \"{first}\" and \"{second}\"."
+            format!(
+                "- {relative_shard_path}: Duplicate case-sensitive package directories \"{first}\" and \"{second}\"."
+            ),
+            Options {
+                ..Default::default()
+            },
         )
     }
 }

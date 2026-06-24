@@ -1,12 +1,12 @@
 use std::fmt;
 
 use derive_new::new;
-use indoc::writedoc;
-
-use crate::location::Location;
-use crate::structure;
+use indoc::formatdoc;
 
 use super::{create_path_expr, indent_definition};
+use crate::gh_write::{Options, gh_write};
+use crate::location::Location;
+use crate::structure;
 
 #[derive(Clone, new)]
 pub struct ByNameOverrideOfNonSyntacticCallPackage {
@@ -30,17 +30,25 @@ impl fmt::Display for ByNameOverrideOfNonSyntacticCallPackage {
         let expected_path_expr = create_path_expr(file, expected_package_path);
         let indented_definition = indent_definition(*column, definition);
 
-        writedoc!(
+        gh_write(
             f,
-            "
-            - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
+            formatdoc!(
+                "
+                - Because {relative_package_dir} exists, the attribute `pkgs.{package_name}` must be defined like
 
-                {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
+                    {package_name} = callPackage {expected_path_expr} {{ /* ... */ }};
 
-              However, in this PR, it isn't defined that way. See the definition in {file}:{line}
+                  However, in this PR, it isn't defined that way. See the definition in {file}:{line}
 
-            {indented_definition}
-            ",
+                {indented_definition}
+                ",
+            ),
+            Options {
+                file: Some(file),
+                start_line: Some(*line),
+                start_col: Some(*column),
+                ..Default::default()
+            }
         )
     }
 }
