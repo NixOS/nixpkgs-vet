@@ -2,15 +2,18 @@ use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 use rnix::ast;
 use rnix::ast::AstToken;
+use rnix::ast::HasEntry;
 use rowan::ast::AstNode;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use url::Url;
 
 use crate::location;
 use crate::nix_file::{NixFile, NixFileStore};
+use crate::problem::npv_171;
 use crate::problem::{Problem, npv_145, npv_146, npv_170};
 use crate::validation::ResultIteratorExt;
 use crate::validation::Validation::{Failure, Success};
@@ -26,6 +29,7 @@ pub fn check_files(
         let result = sequence_([
             check_executable_iff_shebang(relative_path, &nix_file.path)?,
             check_invalid_escapes(relative_path, nix_file)?,
+            check_flaky_github_urls(relative_path, nix_file)?,
         ]);
         Ok(result.map(|()| ratchet::File {}))
     })
@@ -146,6 +150,82 @@ fn check_invalid_escapes(
                         },
                         _ => break,
                     }
+                }
+            }
+        }
+    }
+
+    if problems.is_empty() {
+        Ok(Success(()))
+    } else {
+        Ok(Failure(problems))
+    }
+}
+
+fn check_flaky_github_urls(
+    relative_path: &RelativePath,
+    nix_file: &NixFile,
+) -> validation::Result<()> {
+    let mut problems: Vec<Problem> = Vec::new();
+
+    for apply in nix_file
+        .syntax_root
+        .syntax()
+        .descendants()
+        .filter_map(ast::Apply::cast)
+    {
+        let Some(lambda) = apply.lambda() else {
+            continue;
+        };
+        if !lambda.to_string().starts_with("fetchpatch") {
+            continue;
+        }
+        let Some(argument) = apply.argument() else {
+            continue;
+        };
+        let ast::Expr::AttrSet(attrs) = argument else {
+            continue;
+        };
+
+        if let Some(value) = attrs.attrpath_values().find(|entry| {
+            entry
+                .attrpath()
+                .map_or(String::new(), |attrpath| attrpath.to_string())
+                == "url"
+        }) && let Some(str_parts) = value
+            .syntax()
+            .descendants()
+            .filter_map(|node| Some(ast::Str::cast(node)?.parts()))
+            .next()
+        {
+            for part in str_parts {
+                let ast::InterpolPart::Literal(lit) = part else {
+                    continue;
+                };
+                let base: usize = lit.syntax().text_range().start().into();
+                let Ok(mut url) = Url::parse(lit.syntax().text()) else {
+                    continue;
+                };
+
+                if url.domain().is_some_and(|s| s == "github.com")
+                    && (url.path().contains(".patch") || url.path().contains(".diff"))
+                    && !url.query_pairs().any(|(k, _v)| k == "full_index")
+                {
+                    problems.push(
+                        npv_171::MutableGitHubFetchpatch::new(
+                            location::Location::new(
+                                relative_path,
+                                nix_file.line_index.line(base),
+                                nix_file.line_index.column(base),
+                            ),
+                            url.to_string(),
+                            url.query_pairs_mut()
+                                .append_pair("full_index", "1")
+                                .finish()
+                                .to_string(),
+                        )
+                        .into(),
+                    );
                 }
             }
         }

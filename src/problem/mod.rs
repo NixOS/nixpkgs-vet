@@ -44,6 +44,7 @@ pub mod npv_166;
 pub mod npv_167;
 
 pub mod npv_170;
+pub mod npv_171;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
@@ -165,6 +166,9 @@ pub enum Problem {
 
     /// NPV-170: nix files should not contain useless escapes
     NixFileContainsUselessEscape(npv_170::NixFileContainsUselessEscape),
+
+    /// NPV-171: no flaky fetchpatch URLs
+    MutableGitHubFetchpatch(npv_171::MutableGitHubFetchpatch),
 }
 
 impl Problem {
@@ -208,6 +212,7 @@ impl Problem {
             Self::NewTopLevelPackageMustEnableStructuredAttrs(..) => "NPV-166",
             Self::TopLevelPackageDisabledStructuredAttrs(..) => "NPV-167",
             Self::NixFileContainsUselessEscape(..) => "NPV-170",
+            Self::MutableGitHubFetchpatch(..) => "NPV-171",
         }
     }
 
@@ -257,6 +262,7 @@ impl fmt::Display for Problem {
             Self::NewTopLevelPackageMustEnableStructuredAttrs(inner) => inner.fmt(f),
             Self::TopLevelPackageDisabledStructuredAttrs(inner) => inner.fmt(f),
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
+            Self::MutableGitHubFetchpatch(inner) => inner.fmt(f),
         }
     }
 }
