@@ -10,9 +10,7 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{
-    Problem, npv_160, npv_161, npv_162, npv_163, npv_164, npv_165, npv_166, npv_167,
-};
+use crate::problem::{Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -41,9 +39,6 @@ impl Nixpkgs {
 
 /// The ratchet value for a top-level package
 pub struct Package {
-    /// The ratchet value for the check for non-auto-called empty arguments
-    pub manual_definition: RatchetState<ManualDefinition>,
-
     /// The ratchet value for the check for new packages using pkgs/by-name
     pub uses_by_name: RatchetState<UsesByName>,
 
@@ -58,11 +53,6 @@ impl Package {
     /// Validates the ratchet checks for a top-level package
     pub fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         validation::sequence_([
-            RatchetState::<ManualDefinition>::compare(
-                name,
-                optional_from.map(|x| &x.manual_definition),
-                &to.manual_definition,
-            ),
             RatchetState::<UsesByName>::compare(
                 name,
                 optional_from.map(|x| &x.uses_by_name),
@@ -146,32 +136,6 @@ impl<Context: ToProblem> RatchetState<Context> {
     }
 }
 
-/// The ratchet to check whether a top-level attribute has/needs a manual definition, e.g. in
-/// `pkgs/top-level/all-packages.nix`.
-///
-/// This ratchet is only tight for attributes that:
-///
-/// - Are not defined in `pkgs/by-name`, and rely on a manual definition.
-///
-/// - Are defined in `pkgs/by-name` without any manual definition (no custom argument overrides).
-///
-/// - Are defined with `pkgs/by-name` with a manual definition that can't be removed
-///   because it provides custom argument overrides.
-///
-/// In comparison, this ratchet is loose for attributes that:
-///
-/// - Are defined in `pkgs/by-name` with a manual definition that doesn't have any
-///   custom argument overrides.
-pub enum ManualDefinition {}
-
-impl ToProblem for ManualDefinition {
-    type ToContext = Problem;
-
-    fn to_problem(_name: &str, _optional_from: Option<()>, to: &Self::ToContext) -> Problem {
-        (*to).clone()
-    }
-}
-
 /// The ratchet value of an attribute for the check that new packages use `pkgs/by-name`.
 ///
 /// This checks that all new package defined using `callPackage` must be defined via
@@ -184,30 +148,11 @@ impl ToProblem for UsesByName {
 
     fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
         let is_new = optional_from.is_none();
-        let is_empty = to.empty_arg;
-        match (is_new, is_empty) {
-            (false, true) => {
-                npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
-            // This can happen if users mistakenly assume that `pkgs/by-name` can't be used
-            // for custom arguments.
-            (false, false) => npv_161::TopLevelPackageMovedOutOfByNameWithCustomArguments::new(
-                name,
-                to.relative_path.clone(),
-                file,
-            )
-            .into(),
-            (true, true) => {
-                npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone(), file)
-                    .into()
-            }
-            (true, false) => npv_163::NewTopLevelPackageShouldBeByNameWithCustomArgument::new(
-                name,
-                to.relative_path.clone(),
-                file,
-            )
-            .into(),
+        if is_new {
+            npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone()).into()
+        } else {
+            npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
+                .into()
         }
     }
 }

@@ -79,7 +79,8 @@ The following checks are performed when calling the binary:
 ### Nix evaluation checks
 
 Evaluate Nixpkgs with `system` set to `x86_64-linux` and check that:
-- For each package directory, the `pkgs.${name}` attribute must be defined as `callPackage pkgs/by-name/${shard}/${name}/package.nix args` for some `args`.
+- For each package directory, the `pkgs.${name}` attribute must be defined,
+  which the `pkgs/by-name` overlay does automatically.
 - For each package directory, `pkgs.lib.isDerivation pkgs.${name}` must be `true`.
 
 ### Ratchet checks
@@ -92,8 +93,6 @@ Ratchets should be removed eventually once the pattern is not used anymore.
 
 The current ratchets are:
 
-- New manual definitions of `pkgs.${name}` (e.g. in `pkgs/top-level/all-packages.nix`) with `args = { }`
-  (see [nix evaluation checks](#nix-evaluation-checks)) must not be introduced.
 - New top-level packages defined using `pkgs.callPackage` must be defined with a package directory.
   - Once a top-level package uses `pkgs/by-name`, it also can't be moved back out of it.
 - New top-level packages must evaluate with `strictDeps = true`.
