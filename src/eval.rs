@@ -357,32 +357,24 @@ fn handle_non_by_name_attribute(
                 },
             location: Some(location),
         }) => {
-            // We need the location of the manual definition, because otherwise we can't figure out
-            // whether it's a syntactic `callPackage`.
-            let parsed_definition = {
-                // Parse the Nix file in the location
-                let nix_file = nix_file_store.get(&location.file)?;
+            // Parse the Nix file in the location
+            let nix_file = nix_file_store.get(&location.file)?;
 
-                // The relative location of the Nix file, for error messages
-                let location = location.relative(nixpkgs_path).with_context(|| {
+            // The relative location of the Nix file, for error messages
+            let location = location.relative(nixpkgs_path).with_context(|| {
+                format!("Failed to resolve the file where attribute {attribute_name} is defined")
+            })?;
+
+            // Figure out whether it's an attribute definition of the form
+            // `= callPackage <arg1> <arg2>`, returning the arguments if so.
+            let (optional_syntactic_call_package, _definition) = nix_file
+                .call_package_argument_info_at(location.line, location.column, nixpkgs_path)
+                .with_context(|| {
                     format!(
-                        "Failed to resolve the file where attribute {attribute_name} is defined"
+                        "Failed to get the definition info for attribute {}",
+                        attribute_name
                     )
                 })?;
-
-                // Figure out whether it's an attribute definition of the form
-                // `= callPackage <arg1> <arg2>`, returning the arguments if so.
-                let (optional_syntactic_call_package, _definition) = nix_file
-                    .call_package_argument_info_at(location.line, location.column, nixpkgs_path)
-                    .with_context(|| {
-                        format!(
-                            "Failed to get the definition info for attribute {}",
-                            attribute_name
-                        )
-                    })?;
-                (location, optional_syntactic_call_package)
-            };
-            let (location, optional_syntactic_call_package) = parsed_definition;
 
             // This is never `Tight`, because we only either:
             // - Know that the attribute _could_ be migrated to `pkgs/by-name`, which is `Loose`
