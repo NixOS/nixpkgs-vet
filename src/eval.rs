@@ -251,10 +251,9 @@ fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
-    // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exists.  This match
-    // decides whether the attribute `foo` is defined accordingly and whether a legacy manual
-    // definition could be removed.
-    let manual_definition_result = match by_name_attribute {
+    // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exist. This match
+    // decides whether the attribute `foo` is defined accordingly.
+    let result = match by_name_attribute {
         // The attribute is missing.
         ByNameAttribute::Missing => {
             // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
@@ -306,12 +305,7 @@ fn by_name(
             }
         }
     };
-    Ok(
-        // Packages being checked in this function are _always_ already defined in `pkgs/by-name`,
-        // so instead of repeating ourselves all the time to define `uses_by_name`, just set it
-        // once at the end with a map.
-        manual_definition_result,
-    )
+    Ok(result)
 }
 
 fn enabled_attribute_ratchet<R>(enabled: bool, file: RelativePathBuf) -> ratchet::RatchetState<R>
