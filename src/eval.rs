@@ -289,7 +289,6 @@ fn by_name(
             // Only derivations are allowed in `pkgs/by-name`.
             if is_derivation {
                 Success(ratchet::Package {
-                    manual_definition: Tight,
                     uses_by_name: Tight,
                     strict_deps: enabled_attribute_ratchet(
                         strict_deps,
@@ -432,10 +431,6 @@ fn handle_non_by_name_attribute(
             };
 
             ratchet::Package {
-                // Packages being checked in this function _always_ need a manual definition,
-                // because they're not using `pkgs/by-name` which would allow avoiding it. So the
-                // ratchet stays `Tight` regardless of the other checks in this function.
-                manual_definition: Tight,
                 uses_by_name,
                 strict_deps,
                 structured_attrs,
@@ -444,7 +439,6 @@ fn handle_non_by_name_attribute(
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
         // being able to make any good calls about the ratchet state.
         _ => ratchet::Package {
-            manual_definition: Tight,
             uses_by_name: NonApplicable,
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,

@@ -39,9 +39,6 @@ impl Nixpkgs {
 
 /// The ratchet value for a top-level package
 pub struct Package {
-    /// The ratchet value for the check for non-auto-called empty arguments
-    pub manual_definition: RatchetState<ManualDefinition>,
-
     /// The ratchet value for the check for new packages using pkgs/by-name
     pub uses_by_name: RatchetState<UsesByName>,
 
@@ -56,11 +53,6 @@ impl Package {
     /// Validates the ratchet checks for a top-level package
     pub fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         validation::sequence_([
-            RatchetState::<ManualDefinition>::compare(
-                name,
-                optional_from.map(|x| &x.manual_definition),
-                &to.manual_definition,
-            ),
             RatchetState::<UsesByName>::compare(
                 name,
                 optional_from.map(|x| &x.uses_by_name),
@@ -141,22 +133,6 @@ impl<Context: ToProblem> RatchetState<Context> {
             // - Anything involving NotApplicable, where we can't really make any good calls
             _ => Success(()),
         }
-    }
-}
-
-/// The ratchet to check whether a top-level attribute has/needs a manual definition, e.g. in
-/// `pkgs/top-level/all-packages.nix`.
-///
-/// This ratchet is only tight for attributes that:
-///
-/// - Are not defined in `pkgs/by-name`, and rely on a manual definition.
-pub enum ManualDefinition {}
-
-impl ToProblem for ManualDefinition {
-    type ToContext = Problem;
-
-    fn to_problem(_name: &str, _optional_from: Option<()>, to: &Self::ToContext) -> Problem {
-        (*to).clone()
     }
 }
 
