@@ -1,3 +1,17 @@
+## 0.3.4 (2026-07-01)
+
+### Features
+
+#### Remove support for by-name overrides (#189)
+
+A substantial portion of the codebase was dedicated to handling overrides in
+all-packages.nix of packages defined in pkgs/by-name.
+
+These are now disallowed by NixOS/nixpkgs#483820, so this functionality is no
+longer needed.
+
+By @mdaniels5757
+
 ## 0.3.3 (2026-06-19)
 
 ### Features
