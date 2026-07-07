@@ -6,7 +6,7 @@ use relative_path::RelativePathBuf;
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct NewTopLevelPackageShouldBeByName {
     #[new(into)]
     package_name: String,

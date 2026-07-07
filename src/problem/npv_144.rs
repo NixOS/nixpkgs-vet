@@ -4,7 +4,7 @@ use derive_new::new;
 
 use crate::structure::{self, PACKAGE_NIX_FILENAME};
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct PackageNixIsNotFile {
     #[new(into)]
     package_name: String,

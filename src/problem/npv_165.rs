@@ -4,7 +4,7 @@ use derive_new::new;
 use indoc::writedoc;
 use relative_path::RelativePathBuf;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct TopLevelPackageDisabledStrictDeps {
     #[new(into)]
     package_name: String,
