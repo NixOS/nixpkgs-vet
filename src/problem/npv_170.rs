@@ -5,7 +5,7 @@ use indoc::writedoc;
 
 use crate::location::Location;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct NixFileContainsUselessEscape {
     location: Location,
     current_escape: String,

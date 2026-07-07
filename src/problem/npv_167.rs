@@ -4,7 +4,7 @@ use derive_new::new;
 use indoc::writedoc;
 use relative_path::RelativePathBuf;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct TopLevelPackageDisabledStructuredAttrs {
     #[new(into)]
     package_name: String,
@@ -18,7 +18,7 @@ impl fmt::Display for TopLevelPackageDisabledStructuredAttrs {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` previously evaluated with `__structuredAttrs = true`, but now evaluates with `__structuredAttrs = false`.
+            - Attribute `{package_name}` previously evaluated with `__structuredAttrs = true`, but now evaluates with `__structuredAttrs = false`.
               Please re-enable `__structuredAttrs = true;` in {file}.
             ",
         )

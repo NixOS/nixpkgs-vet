@@ -4,7 +4,7 @@ use derive_new::new;
 use indoc::writedoc;
 use relative_path::RelativePathBuf;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct TopLevelPackageDisabledStrictDeps {
     #[new(into)]
     package_name: String,
@@ -18,7 +18,7 @@ impl fmt::Display for TopLevelPackageDisabledStrictDeps {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` previously evaluated with `strictDeps = true`, but now evaluates with `strictDeps = false`.
+            - Attribute `{package_name}` previously evaluated with `strictDeps = true`, but now evaluates with `strictDeps = false`.
               Please re-enable `strictDeps = true;` in {file}.
             ",
         )

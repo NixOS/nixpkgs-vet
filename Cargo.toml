@@ -21,5 +21,6 @@ derive-new = "0.7.0"
 derive_more = { version = "2.1.1", features = ["display"] }
 
 [dev-dependencies]
+fixtures = "2.5.0"
 pretty_assertions = "1.4.1"
 temp-env = "0.3.6"

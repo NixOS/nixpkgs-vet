@@ -3,7 +3,7 @@ use std::fmt;
 use derive_new::new;
 use relative_path::RelativePathBuf;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct NixFileIsExecutableWithoutShebang {
     #[new(into)]
     relative_path: RelativePathBuf,

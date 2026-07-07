@@ -6,7 +6,7 @@ use relative_path::RelativePathBuf;
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct NewTopLevelPackageShouldBeByName {
     #[new(into)]
     package_name: String,
@@ -27,7 +27,7 @@ impl fmt::Display for NewTopLevelPackageShouldBeByName {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` is a new top-level package using `pkgs.callPackage {call_package_arg} {{ /* ... */ }}`.
+            - Attribute `{package_name}` is a new top-level package using `callPackage {call_package_arg} {{ /* ... */ }}`.
               Please define it in {relative_package_file} instead.
               See `pkgs/by-name/README.md` for more details.
             ",

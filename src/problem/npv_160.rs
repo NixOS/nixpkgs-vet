@@ -6,7 +6,7 @@ use relative_path::RelativePathBuf;
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct TopLevelPackageMovedOutOfByName {
     #[new(into)]
     package_name: String,
@@ -30,7 +30,7 @@ impl fmt::Display for TopLevelPackageMovedOutOfByName {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
+            - Attribute `{package_name}` was previously defined in {relative_package_file}, but is now manually defined as `callPackage {call_package_arg} {{ /* ... */ }}` in {file}.
               Please move the package back and remove the manual `callPackage`.
             ",
         )

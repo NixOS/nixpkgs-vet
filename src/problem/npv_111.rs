@@ -5,7 +5,7 @@ use derive_new::new;
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct ByNameShardIsCaseSensitiveDuplicate {
     #[new(into)]
     shard_name: String,

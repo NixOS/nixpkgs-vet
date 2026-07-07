@@ -4,7 +4,7 @@ use derive_new::new;
 
 use crate::structure;
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct ByNameUndefinedAttribute {
     #[new(into)]
     attribute_name: String,
@@ -16,7 +16,7 @@ impl fmt::Display for ByNameUndefinedAttribute {
         let relative_package_file = structure::relative_file_for_package(attribute_name);
         write!(
             f,
-            "- pkgs.{attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
+            "- {attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
         )
     }
 }

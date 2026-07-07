@@ -37,7 +37,7 @@ pub mod npv_170;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
-#[derive(Clone, EnumFrom)]
+#[derive(Clone, Debug, EnumFrom)]
 pub enum Problem {
     /// NPV-100: attribute is not defined but it should be defined automatically
     ByNameUndefinedAttribute(npv_100::ByNameUndefinedAttribute),
