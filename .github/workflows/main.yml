@@ -150,5 +150,5 @@ jobs:
       - uses: serokell/xrefcheck-action@81d3967156933307f52fc52f8dc7fa5e947509c2 # v1.0.3
         with: # Invalid symlinks for testing purposes.
           xrefcheck-args: >
-            --ignore tests/symlink-invalid/main/pkgs/by-name/fo/foo/foo
-            --ignore tests/multiple-failures/main/pkgs/by-name/A/fo@/foo
+            --ignore tests/top-level/symlink-invalid/main/pkgs/by-name/fo/foo/foo
+            --ignore tests/top-level/multiple-failures/main/pkgs/by-name/A/fo@/foo
