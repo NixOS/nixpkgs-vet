@@ -18,7 +18,7 @@ impl fmt::Display for NewTopLevelPackageMustEnableStrictDeps {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` is a new package with `strictDeps` unset or set to `false`.
+            - Attribute `{package_name}` is a new package with `strictDeps` unset or set to `false`.
               Please enable `strictDeps = true;` in {file}.
             ",
         )

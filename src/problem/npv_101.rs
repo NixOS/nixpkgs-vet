@@ -16,7 +16,7 @@ impl fmt::Display for ByNameNonDerivation {
         let relative_package_file = structure::relative_file_for_package(attribute_name);
         write!(
             f,
-            "- pkgs.{attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
+            "- {attribute_name}: This attribute defined by {relative_package_file} is not a derivation",
         )
     }
 }

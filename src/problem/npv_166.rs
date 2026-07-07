@@ -18,7 +18,7 @@ impl fmt::Display for NewTopLevelPackageMustEnableStructuredAttrs {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` is a new package with `__structuredAttrs` unset or set to `false`.
+            - Attribute `{package_name}` is a new package with `__structuredAttrs` unset or set to `false`.
               Please enable `__structuredAttrs = true;` in {file}.
             ",
         )

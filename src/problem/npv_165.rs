@@ -18,7 +18,7 @@ impl fmt::Display for TopLevelPackageDisabledStrictDeps {
         writedoc!(
             f,
             "
-            - Attribute `pkgs.{package_name}` previously evaluated with `strictDeps = true`, but now evaluates with `strictDeps = false`.
+            - Attribute `{package_name}` previously evaluated with `strictDeps = true`, but now evaluates with `strictDeps = false`.
               Please re-enable `strictDeps = true;` in {file}.
             ",
         )
