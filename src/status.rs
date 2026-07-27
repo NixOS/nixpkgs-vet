@@ -71,7 +71,7 @@ impl Status {
 
         // Then, print out the message for this status.
         let message = match self {
-            Self::Error(error) => format!("{} {:#}", &maybe_yellow("I/O error: "), error).into(),
+            Self::Error(error) => format!("{} {:#}", maybe_yellow("I/O error: "), error).into(),
             Self::ValidatedSuccessfully => maybe_green("Validated successfully"),
             Self::BranchHealed => {
                 maybe_green("The base branch is broken, but this PR fixes it. Nice job!")
