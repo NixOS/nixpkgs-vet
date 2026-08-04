@@ -17,7 +17,7 @@ concurrency:
   # We don't want to cancel in progress workflows for pushes to the main branch,
   # because it could be in the process of doing a release.
   # Better wait until it's done
-  cancel-in-progress: ${{ github.event_name != 'pull' }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions: {}
 
