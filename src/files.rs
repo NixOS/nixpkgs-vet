@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::location;
 use crate::nix_file::{NixFile, NixFileStore};
-use crate::problem::{Problem, npv_145, npv_146, npv_170};
+use crate::problem::{Problem, npv_145, npv_146, npv_170, npv_171};
 use crate::validation::ResultIteratorExt;
 use crate::validation::Validation::{Failure, Success};
 use crate::validation::sequence_;
@@ -26,6 +26,7 @@ pub fn check_files(
         let result = sequence_([
             check_executable_iff_shebang(relative_path, &nix_file.path)?,
             check_invalid_escapes(relative_path, nix_file)?,
+            check_optional_list_parameters(relative_path, nix_file)?,
         ]);
         Ok(result.map(|()| ratchet::File {}))
     })
@@ -155,6 +156,109 @@ fn check_invalid_escapes(
         Ok(Success(()))
     } else {
         Ok(Failure(problems))
+    }
+}
+
+/// Check that `optional` is not called with a list literal.
+///
+/// `optional condition [ value ]` produces either `[]` or `[[ value ]]`.
+/// The latter is almost always unintended, and in derivation attributes
+/// can interact particularly poorly with `__structuredAttrs`.
+fn check_optional_list_parameters(
+    relative_path: &RelativePath,
+    nix_file: &NixFile,
+) -> validation::Result<()> {
+    let mut problems: Vec<Problem> = Vec::new();
+
+    for apply in nix_file
+        .syntax_root
+        .syntax()
+        .descendants()
+        .filter_map(ast::Apply::cast)
+    {
+        let Some(ast::Expr::List(_)) = apply.argument() else {
+            continue;
+        };
+        let Some(ast::Expr::Apply(optional_apply)) = apply.lambda() else {
+            continue;
+        };
+        let Some(function) = optional_apply.lambda() else {
+            continue;
+        };
+        let Some(optional_function) = OptionalFunction::from_expr(&function) else {
+            continue;
+        };
+
+        let index: usize = function.syntax().text_range().start().into();
+        problems.push(
+            npv_171::NixFileContainsOptionalList::new(
+                location::Location::new(
+                    relative_path,
+                    nix_file.line_index.line(index),
+                    nix_file.line_index.column(index),
+                ),
+                optional_function.singular(),
+                optional_function.plural(),
+            )
+            .into(),
+        );
+    }
+
+    if problems.is_empty() {
+        Ok(Success(()))
+    } else {
+        Ok(Failure(problems))
+    }
+}
+
+/// The syntactic forms of `optional` covered by the upstream check.
+enum OptionalFunction {
+    Bare,
+    Lib,
+    LibLists,
+}
+
+impl OptionalFunction {
+    fn from_expr(expr: &ast::Expr) -> Option<Self> {
+        match expr {
+            ast::Expr::Ident(ident) if ident.syntax().text() == "optional" => Some(Self::Bare),
+            ast::Expr::Select(select) if select.default_expr().is_none() => {
+                let ast::Expr::Ident(root) = select.expr()? else {
+                    return None;
+                };
+                if root.syntax().text() != "lib" {
+                    return None;
+                }
+
+                let attrpath = select.attrpath()?;
+                let attrs: Vec<_> = attrpath.attrs().map(|attr| attr.syntax().text()).collect();
+
+                match attrs.as_slice() {
+                    [optional] if *optional == "optional" => Some(Self::Lib),
+                    [lists, optional] if *lists == "lists" && *optional == "optional" => {
+                        Some(Self::LibLists)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    const fn singular(&self) -> &'static str {
+        match self {
+            Self::Bare => "optional",
+            Self::Lib => "lib.optional",
+            Self::LibLists => "lib.lists.optional",
+        }
+    }
+
+    const fn plural(&self) -> &'static str {
+        match self {
+            Self::Bare => "optionals",
+            Self::Lib => "lib.optionals",
+            Self::LibLists => "lib.lists.optionals",
+        }
     }
 }
 
