@@ -13,7 +13,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 anyhow = "1.0"
 colored = "3.1.1"
 itertools = "0.15.0"
-rowan = "0.16.1"
+rowan = "0.17.0"
 indoc = "2.0.7"
 relative-path = "2.0.1"
 derive-enum-from-into = "0.2.1"
