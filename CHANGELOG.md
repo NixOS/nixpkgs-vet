@@ -1,3 +1,9 @@
+## 0.3.5 (2026-09-23)
+
+### Features
+
+* **prohibit `lib.optional cond [ ]`** by @mdaniels5757 (#301)
+
 ## 0.3.4 (2026-07-01)
 
 ### Features
