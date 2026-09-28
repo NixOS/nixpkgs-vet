@@ -191,7 +191,7 @@ pub fn check_values(
         // Add the work directory to the NIX_PATH so that it can be accessed in restrict-eval mode.
         .arg("-I")
         .arg(&work_dir_path)
-        .args(["--arg", "attrsPath"])
+        .args(["--arg", "packageNamesFilePath"])
         .arg(&package_names_path)
         // Same for the nixpkgs to test, adding it to the NIX_PATH so it can be accessed in
         // restrict-eval mode.
