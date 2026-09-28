@@ -73,11 +73,14 @@ fn main() -> ExitCode {
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
 fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
     let by_name_subpath = RelativePathBuf::from("pkgs/by-name");
+    let attr_path = vec![];
 
     let by_name_subpath_clone = by_name_subpath.clone();
+    let attr_path_clone = attr_path.clone();
     // Very easy to parallelise this, since both operations are totally independent of each other.
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, &by_name_subpath));
-    let main_result = match check_nixpkgs(main_nixpkgs, &by_name_subpath_clone) {
+    let base_thread =
+        thread::spawn(move || check_nixpkgs(&base_nixpkgs, &by_name_subpath, attr_path));
+    let main_result = match check_nixpkgs(main_nixpkgs, &by_name_subpath_clone, attr_path_clone) {
         Ok(result) => result,
         Err(error) => {
             return error.into();
@@ -114,6 +117,7 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
 fn check_nixpkgs(
     nixpkgs_path: &Path,
     by_name_subpath: &RelativePath,
+    attr_path: Vec<String>,
 ) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
@@ -136,6 +140,7 @@ fn check_nixpkgs(
                 eval::check_values(
                     &nixpkgs_path,
                     by_name_subpath,
+                    attr_path,
                     &mut nix_file_store,
                     package_names.as_slice(),
                 )

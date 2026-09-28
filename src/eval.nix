@@ -2,7 +2,11 @@
 #
 # Returns a value containing information on all Nixpkgs attributes which is decoded on the Rust
 # side. See ./eval.rs for the meaning of the returned values.
-{ packageNamesFilePath, nixpkgsPath }:
+{
+  packageNamesFilePath,
+  nixpkgsPath,
+  attrPath,
+}:
 let
   attrs = builtins.fromJSON (builtins.readFile packageNamesFilePath);
 
@@ -25,13 +29,36 @@ let
       # don't return the value directly and treat it as if it wasn't a `callPackage`.
       value;
 
-  pkgs = import nixpkgsPath {
-    # Don't let the user's home directory influence this result.
-    config = { };
-    overlays = [ overlay ];
-    # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
-    system = "x86_64-linux";
-  };
+  # copied from nixpkgs
+  attrByPath =
+    attrPath: default: set:
+    let
+      lenAttrPath = builtins.length attrPath;
+      attrByPath' =
+        n: s:
+        (
+          if n == lenAttrPath then
+            s
+          else
+            (
+              let
+                attr = builtins.elemAt attrPath n;
+              in
+              if s ? ${attr} then attrByPath' (n + 1) s.${attr} else default
+            )
+        );
+    in
+    attrByPath' 0 set;
+
+  pkgs = attrByPath attrPath { } (
+    import nixpkgsPath {
+      # Don't let the user's home directory influence this result.
+      config = { };
+      overlays = [ overlay ];
+      # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
+      system = "x86_64-linux";
+    }
+  );
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
   attrInfo = name: value: {

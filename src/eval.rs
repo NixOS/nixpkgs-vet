@@ -145,11 +145,13 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     by_name_subpath: &RelativePath,
+    attr_path: Vec<String>,
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
 ) -> validation::Result<BTreeMap<String, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
+        // .disable_cleanup(true)
         .tempdir()
         .with_context(|| "Failed to create a working directory")?;
 
@@ -193,6 +195,15 @@ pub fn check_values(
         .arg(&work_dir_path)
         .args(["--arg", "packageNamesFilePath"])
         .arg(&package_names_path)
+        .args(["--arg", "attrPath"])
+        .arg({
+            let mut a = String::from("[");
+            for name in attr_path {
+                a = a + "\"" + &name + "\"";
+            }
+            a += "]";
+            a
+        })
         // Same for the nixpkgs to test, adding it to the NIX_PATH so it can be accessed in
         // restrict-eval mode.
         .args(["--arg", "nixpkgsPath"])
@@ -204,6 +215,16 @@ pub fn check_values(
     mutate_nix_instatiate_arguments_based_on_cfg(&work_dir_path, &mut command)?;
 
     command.arg(eval_nix_path);
+
+    // for debugging the command
+    // println!(
+    //     "{} {}",
+    //     command.get_program().to_string_lossy(),
+    //     command.get_args().fold("".to_string(), |x, y| format!(
+    //         "{x} '{}'",
+    //         y.to_string_lossy()
+    //     ))
+    // );
 
     let result = command
         .output()
