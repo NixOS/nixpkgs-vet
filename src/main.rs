@@ -22,6 +22,7 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
+use relative_path::{RelativePath, RelativePathBuf};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -71,9 +72,12 @@ fn main() -> ExitCode {
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
 fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
+    let by_name_subpath = RelativePathBuf::from("pkgs/by-name");
+
+    let by_name_subpath_clone = by_name_subpath.clone();
     // Very easy to parallelise this, since both operations are totally independent of each other.
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs));
-    let main_result = match check_nixpkgs(main_nixpkgs) {
+    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, &by_name_subpath));
+    let main_result = match check_nixpkgs(main_nixpkgs, &by_name_subpath_clone) {
         Ok(result) => result,
         Err(error) => {
             return error.into();
@@ -102,12 +106,15 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
     }
 }
 
-/// Checks whether the pkgs/by-name structure in Nixpkgs is valid.
+/// Checks whether the by-name structure at the given path in Nixpkgs is valid.
 ///
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
+fn check_nixpkgs(
+    nixpkgs_path: &Path,
+    by_name_subpath: &RelativePath,
+) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
             "Nixpkgs path {} could not be resolved",
@@ -118,15 +125,20 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
     let mut nix_file_store = NixFileStore::default();
 
     let package_result = {
-        if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
-            // No pkgs/by-name directory, always valid
+        if !nixpkgs_path.join(by_name_subpath.as_str()).exists() {
+            // No directory at the given location (e.g. pkgs/by-name), always valid
             Success(BTreeMap::new())
         } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
+            let structure = check_structure(&nixpkgs_path, &mut nix_file_store, by_name_subpath)?;
 
             // Only if we could successfully parse the structure, we do the evaluation checks
             structure.result_map(|package_names| {
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
+                eval::check_values(
+                    &nixpkgs_path,
+                    by_name_subpath,
+                    &mut nix_file_store,
+                    package_names.as_slice(),
+                )
             })?
         }
     };
@@ -150,7 +162,7 @@ mod tests {
     use pretty_assertions::StrComparison;
     use tempfile::{TempDir, tempdir_in};
 
-    use super::{process, structure::BASE_SUBPATH};
+    use super::process;
 
     // Manually repeat this for each subdir under tests/ in order to disambiguate
     #[fixtures::fixtures(["tests/top-level/*"])]
@@ -188,7 +200,7 @@ mod tests {
             return Ok(());
         }
 
-        let base = path.join("main").join(BASE_SUBPATH);
+        let base = path.join("main/pkgs/by-name");
 
         fs::create_dir_all(base.join("fo/foo"))?;
         fs::write(base.join("fo/foo/package.nix"), "{ someDrv }: someDrv")?;

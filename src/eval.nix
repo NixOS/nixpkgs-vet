@@ -1,4 +1,4 @@
-# Takes a path to nixpkgs and a path to the json-encoded list of `pkgs/by-name` attributes.
+# Takes a path to nixpkgs and a path to the json-encoded list of attributes in the by-name subpath.
 #
 # Returns a value containing information on all Nixpkgs attributes which is decoded on the Rust
 # side. See ./eval.rs for the meaning of the returned values.
@@ -73,7 +73,7 @@ let
         };
   };
 
-  # Information on all attributes that are in `pkgs/by-name`.
+  # Information on all attributes that are in the by-name subpath.
   byNameAttrs = builtins.listToAttrs (
     map (name: {
       inherit name;
@@ -86,12 +86,12 @@ let
     }) attrs
   );
 
-  # Information on all attributes that exist but are not in `pkgs/by-name`.
-  # We need this to enforce `pkgs/by-name` for new packages.
+  # Information on all attributes that exist but are not in the by-name subpath.
+  # We need this to enforce the by-name subpath for new packages.
   nonByNameAttrs = builtins.mapAttrs (
     name: value:
     let
-      # Packages outside `pkgs/by-name` often fail evaluation, so we need to handle that.
+      # Packages outside the by-name subpath often fail evaluation, so we need to handle that.
       output = attrInfo name value;
       result = builtins.tryEval (builtins.deepSeq output null);
     in

@@ -39,7 +39,7 @@ impl Nixpkgs {
 
 /// The ratchet value for a top-level package
 pub struct Package {
-    /// The ratchet value for the check for new packages using pkgs/by-name
+    /// The ratchet value for the check for new packages using the by-name structure
     pub uses_by_name: RatchetState<UsesByName>,
 
     /// The ratchet value for the check for enabling `strictDeps`.
@@ -136,23 +136,38 @@ impl<Context: ToProblem> RatchetState<Context> {
     }
 }
 
-/// The ratchet value of an attribute for the check that new packages use `pkgs/by-name`.
+/// The ratchet value of an attribute for the check that new packages use the by-name subpath given by ToContext.
 ///
-/// This checks that all new package defined using `callPackage` must be defined via
-/// `pkgs/by-name`. It also checks that once a package uses `pkgs/by-name`, it can't switch back
+/// This checks that all new package defined using `callPackage` must be defined via the by-name
+/// subpath. It also checks that once a package uses by-name subpath, it can't switch back
 /// to `pkgs/top-level/all-packages.nix`.
 pub enum UsesByName {}
 
 impl ToProblem for UsesByName {
-    type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
+    /// callPackage argument info, attribute location relative to the nixpkgs root, by-name subpath
+    type ToContext = (CallPackageArgumentInfo, RelativePathBuf, RelativePathBuf);
 
-    fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
+    fn to_problem(
+        name: &str,
+        optional_from: Option<()>,
+        (to, file, by_name_subpath): &Self::ToContext,
+    ) -> Problem {
         let is_new = optional_from.is_none();
         if is_new {
-            npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone()).into()
+            npv_162::NewTopLevelPackageShouldBeByName::new(
+                by_name_subpath,
+                name,
+                to.relative_path.clone(),
+            )
+            .into()
         } else {
-            npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
-                .into()
+            npv_160::TopLevelPackageMovedOutOfByName::new(
+                by_name_subpath,
+                name,
+                to.relative_path.clone(),
+                file,
+            )
+            .into()
         }
     }
 }

@@ -1,19 +1,25 @@
 use std::fmt;
 
 use derive_new::new;
+use relative_path::RelativePathBuf;
 
 use crate::structure;
 
 #[derive(Clone, Debug, new)]
 pub struct ByNameShardIsInvalid {
     #[new(into)]
+    by_name_subpath: RelativePathBuf,
+    #[new(into)]
     shard_name: String,
 }
 
 impl fmt::Display for ByNameShardIsInvalid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let shard_name = &self.shard_name;
-        let relative_shard_path = structure::relative_dir_for_shard(shard_name);
+        let Self {
+            by_name_subpath,
+            shard_name,
+        } = self;
+        let relative_shard_path = structure::relative_dir_for_shard(by_name_subpath, shard_name);
         write!(
             f,
             "- {relative_shard_path}: Invalid directory name \"{shard_name}\", must be at most 2 ASCII characters, starting with a-z or \"_\", consisting of a-z, 0-9, \"-\" or \"_\".",
