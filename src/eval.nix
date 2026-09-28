@@ -2,9 +2,9 @@
 #
 # Returns a value containing information on all Nixpkgs attributes which is decoded on the Rust
 # side. See ./eval.rs for the meaning of the returned values.
-{ attrsPath, nixpkgsPath }:
+{ packageNamesFilePath, nixpkgsPath }:
 let
-  attrs = builtins.fromJSON (builtins.readFile attrsPath);
+  attrs = builtins.fromJSON (builtins.readFile packageNamesFilePath);
 
   # We need to check whether attributes are defined via callPackage of the same scope or not.
   overlay = final: prev: {
