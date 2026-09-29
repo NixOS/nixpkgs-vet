@@ -8,6 +8,8 @@
   attrPath,
 }:
 let
+  lib = (import nixpkgsPath { }).lib;
+
   attrs = builtins.fromJSON (builtins.readFile packageNamesFilePath);
 
   # We need to check whether attributes are defined via callPackage of the same scope or not.
@@ -92,7 +94,7 @@ let
         in
         {
           AttributeSet = {
-            is_derivation = pkgs.lib.isDerivation value;
+            is_derivation = lib.isDerivation value;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
