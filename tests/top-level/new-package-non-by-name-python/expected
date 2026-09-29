@@ -1,0 +1,17 @@
+- Attribute `new1` is a new top-level package using `callPackage ... { /* ... */ }`.
+  Please define it in pkgs/sets/python3Packages/by-name/ne/new1/package.nix instead.
+  See `pkgs/sets/python3Packages/by-name/README.md` for more details.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-162)
+- Attribute `new2` is a new top-level package using `callPackage ./without-config.nix { /* ... */ }`.
+  Please define it in pkgs/sets/python3Packages/by-name/ne/new2/package.nix instead.
+  See `pkgs/sets/python3Packages/by-name/README.md` for more details.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-162)
+- Attribute `new3` is a new top-level package using `callPackage ... { /* ... */ }`.
+  Please define it in pkgs/sets/python3Packages/by-name/ne/new3/package.nix instead.
+  See `pkgs/sets/python3Packages/by-name/README.md` for more details.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-162)
+- Attribute `new4` is a new top-level package using `callPackage ./with-config.nix { /* ... */ }`.
+  Please define it in pkgs/sets/python3Packages/by-name/ne/new4/package.nix instead.
+  See `pkgs/sets/python3Packages/by-name/README.md` for more details.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-162)
+This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.
