@@ -51,7 +51,7 @@ pub struct Package {
 
 impl Package {
     /// Validates the ratchet checks for a top-level package
-    pub fn compare(path: &Vec<String>, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+    pub fn compare(path: &[String], optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         validation::sequence_([
             RatchetState::<UsesByName>::compare(
                 path,
@@ -109,13 +109,13 @@ pub trait ToProblem {
     type ToContext;
 
     /// How to convert an attribute-specific error context into a Problem.
-    fn to_problem(path: &Vec<String>, optional_from: Option<()>, to: &Self::ToContext) -> Problem;
+    fn to_problem(path: &[String], optional_from: Option<()>, to: &Self::ToContext) -> Problem;
 }
 
 impl<Context: ToProblem> RatchetState<Context> {
     /// Compare the previous ratchet state of an attribute to the new state.
     /// The previous state may be `None` in case the attribute is new.
-    fn compare(path: &Vec<String>, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+    fn compare(path: &[String], optional_from: Option<&Self>, to: &Self) -> Validation<()> {
         match (optional_from, to) {
             // Loosening a ratchet is not allowed.
             (Some(RatchetState::Tight), RatchetState::Loose(loose_context)) => {
@@ -147,7 +147,7 @@ impl ToProblem for UsesByName {
     type ToContext = (CallPackageArgumentInfo, RelativePathBuf);
 
     fn to_problem(
-        path: &Vec<String>,
+        path: &[String],
         optional_from: Option<()>,
         (to, file): &Self::ToContext,
     ) -> Problem {
@@ -164,8 +164,8 @@ impl ToProblem for UsesByName {
 }
 
 pub trait EnabledAttributeProblem {
-    fn introduced_problem(name: &Vec<String>, file: RelativePathBuf) -> Problem;
-    fn regressed_problem(name: &Vec<String>, file: RelativePathBuf) -> Problem;
+    fn introduced_problem(name: &[String], file: RelativePathBuf) -> Problem;
+    fn regressed_problem(name: &[String], file: RelativePathBuf) -> Problem;
 }
 
 /// The ratchet value of an evaluated boolean attribute that must be enabled for new packages and
@@ -175,11 +175,7 @@ pub struct EnabledAttribute<ProblemKind>(PhantomData<ProblemKind>);
 impl<ProblemKind: EnabledAttributeProblem> ToProblem for EnabledAttribute<ProblemKind> {
     type ToContext = RelativePathBuf;
 
-    fn to_problem(
-        path: &Vec<String>,
-        optional_from: Option<()>,
-        file: &Self::ToContext,
-    ) -> Problem {
+    fn to_problem(path: &[String], optional_from: Option<()>, file: &Self::ToContext) -> Problem {
         if optional_from.is_some() {
             ProblemKind::regressed_problem(path, file.clone())
         } else {
@@ -197,12 +193,12 @@ pub type StrictDeps = EnabledAttribute<StrictDepsProblem>;
 pub enum StrictDepsProblem {}
 
 impl EnabledAttributeProblem for StrictDepsProblem {
-    fn introduced_problem(path: &Vec<String>, file: RelativePathBuf) -> Problem {
-        npv_164::NewTopLevelPackageMustEnableStrictDeps::new(path.clone(), file).into()
+    fn introduced_problem(path: &[String], file: RelativePathBuf) -> Problem {
+        npv_164::NewTopLevelPackageMustEnableStrictDeps::new(path, file).into()
     }
 
-    fn regressed_problem(path: &Vec<String>, file: RelativePathBuf) -> Problem {
-        npv_165::TopLevelPackageDisabledStrictDeps::new(path.clone(), file).into()
+    fn regressed_problem(path: &[String], file: RelativePathBuf) -> Problem {
+        npv_165::TopLevelPackageDisabledStrictDeps::new(path, file).into()
     }
 }
 
@@ -216,11 +212,11 @@ pub type StructuredAttrs = EnabledAttribute<StructuredAttrsProblem>;
 pub enum StructuredAttrsProblem {}
 
 impl EnabledAttributeProblem for StructuredAttrsProblem {
-    fn introduced_problem(path: &Vec<String>, file: RelativePathBuf) -> Problem {
-        npv_166::NewTopLevelPackageMustEnableStructuredAttrs::new(path.clone(), file).into()
+    fn introduced_problem(path: &[String], file: RelativePathBuf) -> Problem {
+        npv_166::NewTopLevelPackageMustEnableStructuredAttrs::new(path, file).into()
     }
 
-    fn regressed_problem(path: &Vec<String>, file: RelativePathBuf) -> Problem {
-        npv_167::TopLevelPackageDisabledStructuredAttrs::new(path.clone(), file).into()
+    fn regressed_problem(path: &[String], file: RelativePathBuf) -> Problem {
+        npv_167::TopLevelPackageDisabledStructuredAttrs::new(path, file).into()
     }
 }
