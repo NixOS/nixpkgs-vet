@@ -78,9 +78,27 @@ impl NixFile {
 
 /// Information about `callPackage` arguments.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CallPackageArgumentInfo {
-    /// The relative path of the first argument, or `None` if it's not a path.
-    pub relative_path: Option<RelativePathBuf>,
+pub enum CallPackageArgumentInfo {
+    RelativePath(RelativePathBuf),
+    NoPath,
+}
+
+impl Into<CallPackageArgumentInfo> for Option<RelativePathBuf> {
+    fn into(self) -> CallPackageArgumentInfo {
+        match self {
+            Some(path) => CallPackageArgumentInfo::RelativePath(path),
+            None => CallPackageArgumentInfo::NoPath,
+        }
+    }
+}
+
+impl From<CallPackageArgumentInfo> for Option<RelativePathBuf> {
+    fn from(other: CallPackageArgumentInfo) -> Option<RelativePathBuf> {
+        match other {
+            CallPackageArgumentInfo::NoPath => None,
+            CallPackageArgumentInfo::RelativePath(path) => Some(path),
+        }
+    }
 }
 
 impl NixFile {
@@ -369,9 +387,7 @@ impl NixFile {
         };
 
         if token.text() == "callPackage" {
-            Ok(Some(CallPackageArgumentInfo {
-                relative_path: path,
-            }))
+            Ok(Some(path.into()))
         } else {
             Ok(None)
         }
@@ -640,22 +656,17 @@ mod tests {
             (5, None),
             (
                 6,
-                Some(CallPackageArgumentInfo {
-                    relative_path: Some(RelativePathBuf::from("file.nix")),
-                }),
+                Some(CallPackageArgumentInfo::RelativePath(
+                    RelativePathBuf::from("file.nix"),
+                )),
             ),
             (
                 7,
-                Some(CallPackageArgumentInfo {
-                    relative_path: Some(RelativePathBuf::from("file.nix")),
-                }),
+                Some(CallPackageArgumentInfo::RelativePath(
+                    RelativePathBuf::from("file.nix"),
+                )),
             ),
-            (
-                8,
-                Some(CallPackageArgumentInfo {
-                    relative_path: None,
-                }),
-            ),
+            (8, Some(CallPackageArgumentInfo::NoPath)),
         ];
 
         for (line, expected_result) in cases {
