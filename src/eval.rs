@@ -321,7 +321,7 @@ fn by_name(
             let leaf_result = leaf_result(
                 missing_maintainers,
                 has_no_maintainers_but_dependents,
-                &vec![attribute_name.to_string()],
+                &[attribute_name.to_string()],
                 idents_to_files,
                 // TODO: Test that relative_dir_for_package wouldn't work
                 &Some(structure::relative_file_for_package(attribute_name)),
@@ -353,7 +353,7 @@ fn by_name(
 fn leaf_result(
     missing_maintainers: Option<bool>,
     has_no_maintainers_but_dependents: bool,
-    attribute_path: &Vec<String>,
+    attribute_path: &[String],
     idents_to_files: &IdentIndex,
     tree_to_ignore: &Option<RelativePathBuf>,
     file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
@@ -366,7 +366,7 @@ fn leaf_result(
         // has_no_maintainers_but_dependents should not be set
         None => {
             if has_no_maintainers_but_dependents {
-                npv_183::DependentsAttrsSetWithoutNeed::new(attribute_path.clone()).into()
+                npv_183::DependentsAttrsSetWithoutNeed::new(attribute_path.to_owned()).into()
             } else {
                 Success(())
             }
@@ -411,7 +411,7 @@ fn leaf_result(
                     Success(())
                 } else {
                     npv_180::DependentsAttrsShouldBeSet::new(
-                        attribute_path.clone(),
+                        attribute_path.to_owned(),
                         package_file,
                         pname.clone(),
                         name.clone(),
@@ -422,7 +422,8 @@ fn leaf_result(
             } else {
                 // Has almost definitely no dependents
                 if has_no_maintainers_but_dependents {
-                    npv_182::DependentsAttrsSetWithoutDependents::new(attribute_path.clone()).into()
+                    npv_182::DependentsAttrsSetWithoutDependents::new(attribute_path.to_owned())
+                        .into()
                 } else {
                     Success(())
                 }
@@ -432,7 +433,7 @@ fn leaf_result(
         // has_no_maintainers_but_dependents should not be set
         Some(false) => {
             if has_no_maintainers_but_dependents {
-                npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.clone()).into()
+                npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.to_owned()).into()
             } else {
                 Success(())
             }
@@ -453,7 +454,7 @@ fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     idents_to_files: &IdentIndex,
-    attribute_path: &Vec<String>,
+    attribute_path: &[String],
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
