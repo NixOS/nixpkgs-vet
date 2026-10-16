@@ -1,4 +1,5 @@
 use crate::files::IdentIndex;
+use crate::nix_file::CallPackageArgumentInfo;
 use itertools::Itertools;
 use relative_path::PathExt;
 use std::collections::BTreeMap;
@@ -540,8 +541,8 @@ fn handle_non_by_name_attribute(
                     // TODO: Also need to run leaf checks on this one
                     (true, Some(syntactic_call_package)) => {
                         // It's only possible to migrate such definitions if..
-                        match syntactic_call_package.relative_path {
-                            Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
+                        match syntactic_call_package {
+                            CallPackageArgumentInfo::RelativePath(rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
                                 // ..the path is not already within `pkgs/by-name` like
                                 //
                                 //   foo-variant = callPackage ../by-name/fo/foo/package.nix {
@@ -612,10 +613,10 @@ fn handle_non_by_name_attribute(
 
             // For evaluated boolean ratchets, point at the package file when we can resolve one.
             // Otherwise fall back to the file that defines the top-level attribute.
-            let evaluated_attribute_file = optional_syntactic_call_package
-                .as_ref()
-                .and_then(|call_package| call_package.relative_path.clone())
-                .unwrap_or_else(|| location.file.clone());
+            let evaluated_attribute_file = match optional_syntactic_call_package {
+                Some(CallPackageArgumentInfo::RelativePath(path)) => path,
+                None | Some(CallPackageArgumentInfo::NoPath) => location.file.clone(),
+            };
 
             let strict_deps = match (strict_deps, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
