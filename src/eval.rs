@@ -579,7 +579,7 @@ fn handle_non_by_name_attribute(
 
             let leaf_result = if let Some(ref meta_pos) = meta_position {
                 // `meta.position` is "${file}:${line}"
-                let only_line: usize = meta_pos.split(':').last().unwrap().parse()?;
+                let only_line: usize = meta_pos.split(':').next_back().unwrap().parse()?;
                 let only_file = meta_pos.split(':').dropping_back(1).join(":");
                 let abs_path = PathBuf::from(only_file);
                 let rel_path = abs_path.relative_to(nixpkgs_path)?;
