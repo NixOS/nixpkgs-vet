@@ -362,11 +362,13 @@ fn leaf_result(
     pname: &Option<String>,
     name: &Option<String>,
 ) -> validation::Validation<()> {
-    match missing_maintainers {
+    match dbg!(missing_maintainers) {
         // The package is not meant to have maintainers
         // has_no_maintainers_but_dependents should not be set
         None => {
             if has_no_maintainers_but_dependents {
+                // FIXME should this be NPV-181 instead? See: tests::test_top_level_dir::hasNoMaintainersButDependents_no_maintainers
+                // The expected output shows 181 but currently we emit -183
                 npv_183::DependentsAttrsSetWithoutNeed::new(attribute_path.to_owned()).into()
             } else {
                 Success(())
