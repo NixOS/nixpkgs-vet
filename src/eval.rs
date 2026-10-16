@@ -379,15 +379,16 @@ fn leaf_result(
                 .map(|attr| {
                     if let Some(referenced_by_files) = idents_to_files.get(attr) {
                         referenced_by_files
-                            .clone()
-                            .into_iter()
+                            .iter()
                             .filter(|(file, lines)| {
                                 !tree_to_ignore.as_ref().is_some_and(|t| file.starts_with(t))
-                                    && !file_ranges_to_ignore.get(file).is_some_and(|(from, to)| {
-                                        lines.iter().all(|line| from <= line && line < to)
-                                    })
+                                    && !file_ranges_to_ignore.get(*file).is_some_and(
+                                        |(from, to)| {
+                                            lines.iter().all(|line| from <= line && line < to)
+                                        },
+                                    )
                             })
-                            .map(|(file, _lines)| file)
+                            .map(|(file, _lines)| file.clone())
                             .collect()
                     } else {
                         BTreeSet::new()
