@@ -1,0 +1,2 @@
+- pkgs/sets/python3Packages/by-name/aa/FOO: Incorrect directory location, should be pkgs/sets/python3Packages/by-name/fo/FOO instead. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-142)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

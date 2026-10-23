@@ -1,0 +1,1 @@
+{ someDrv }: someDrv // { nixPath = <nixpkgs>; }
