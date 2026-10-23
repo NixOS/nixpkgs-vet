@@ -125,13 +125,15 @@ fn check_nix_file(
 
     Ok(validation::sequence_(
         nix_file.syntax_root.syntax().descendants().map(|node| {
-            let line = nix_file.line_index.line(node.text_range().start().into());
-            let text = node.text().to_string();
-
             // We're only interested in Path expressions
             let Some(path) = rnix::ast::Path::cast(node) else {
                 return Success(());
             };
+
+            let line = nix_file
+                .line_index
+                .line(path.syntax().text_range().start().into());
+            let text = path.syntax().text().to_string();
 
             match nix_file.static_resolve_path(&path, absolute_package_dir) {
                 ResolvedPath::Interpolated => npv_121::NixFileContainsPathInterpolation::new(
