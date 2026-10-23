@@ -7,20 +7,21 @@ use relative_path::RelativePathBuf;
 #[derive(Clone, Debug, new)]
 pub struct NewTopLevelPackageMustEnableStructuredAttrs {
     #[new(into)]
-    package_name: String,
+    package_path: Vec<String>,
     #[new(into)]
     file: RelativePathBuf,
 }
 
 impl fmt::Display for NewTopLevelPackageMustEnableStructuredAttrs {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { package_name, file } = self;
+        let Self { package_path, file } = self;
         writedoc!(
             f,
             "
-            - Attribute `{package_name}` is a new package with `__structuredAttrs` unset or set to `false`.
+            - Attribute `{}` is a new package with `__structuredAttrs` unset or set to `false`.
               Please enable `__structuredAttrs = true;` in {file}.
             ",
+            package_path.join("."),
         )
     }
 }
