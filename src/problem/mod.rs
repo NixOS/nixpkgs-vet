@@ -36,6 +36,11 @@ pub mod npv_167;
 pub mod npv_170;
 pub mod npv_171;
 
+pub mod npv_180;
+pub mod npv_181;
+pub mod npv_182;
+pub mod npv_183;
+
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
 #[derive(Clone, Debug, EnumFrom)]
@@ -128,6 +133,18 @@ pub enum Problem {
 
     /// NPV-171: nix files should not pass list literals to `optional`
     NixFileContainsOptionalList(npv_171::NixFileContainsOptionalList),
+
+    /// NPV-180: meta.hasNoMaintainersButDependents should be set
+    DependentsAttrsShouldBeSet(npv_180::DependentsAttrsShouldBeSet),
+
+    /// NPV-181: meta.hasNoMaintainersButDependents should not be set when there are maintainers
+    DependentsAttrsSetWithMaintainers(npv_181::DependentsAttrsSetWithMaintainers),
+
+    /// NPV-182: meta.hasNoMaintainersButDependents should not be set when there are no dependents
+    DependentsAttrsSetWithoutDependents(npv_182::DependentsAttrsSetWithoutDependents),
+
+    /// NPV-183: meta.hasNoMaintainersButDependents should not be set when it's not needed
+    DependentsAttrsSetWithoutNeed(npv_183::DependentsAttrsSetWithoutNeed),
 }
 
 impl Problem {
@@ -163,6 +180,10 @@ impl Problem {
             Self::TopLevelPackageDisabledStructuredAttrs(..) => "NPV-167",
             Self::NixFileContainsUselessEscape(..) => "NPV-170",
             Self::NixFileContainsOptionalList(..) => "NPV-171",
+            Self::DependentsAttrsShouldBeSet(..) => "NPV-180",
+            Self::DependentsAttrsSetWithMaintainers(..) => "NPV-181",
+            Self::DependentsAttrsSetWithoutDependents(..) => "NPV-182",
+            Self::DependentsAttrsSetWithoutNeed(..) => "NPV-183",
         }
     }
 
@@ -204,6 +225,10 @@ impl fmt::Display for Problem {
             Self::TopLevelPackageDisabledStructuredAttrs(inner) => inner.fmt(f),
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
             Self::NixFileContainsOptionalList(inner) => inner.fmt(f),
+            Self::DependentsAttrsShouldBeSet(inner) => inner.fmt(f),
+            Self::DependentsAttrsSetWithMaintainers(inner) => inner.fmt(f),
+            Self::DependentsAttrsSetWithoutDependents(inner) => inner.fmt(f),
+            Self::DependentsAttrsSetWithoutNeed(inner) => inner.fmt(f),
         }
     }
 }

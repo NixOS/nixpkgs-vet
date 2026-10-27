@@ -1,0 +1,5 @@
+- foo (defined by pkgs/by-name/fo/foo/package.nix): `meta.hasNoMaintainersButDependents` should be set, because:
+  - There are no maintainers, and
+  - The package might be depended on by potentially 1 files, including: sneaky-dependent.nix
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-180)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
