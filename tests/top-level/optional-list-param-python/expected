@@ -1,0 +1,28 @@
+- default.nix: line 12, column 6 conditionally includes a list with `lib.lists.optional`.
+  Use `lib.lists.optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 13, column 6 conditionally includes a list with `lib.lists.optional`.
+  Use `lib.lists.optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 16, column 6 conditionally includes a list with `lib.lists.optional`.
+  Use `lib.lists.optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 17, column 6 conditionally includes a list with `lib.optional`.
+  Use `lib.optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 18, column 6 conditionally includes a list with `lib.optional`.
+  Use `lib.optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 21, column 6 conditionally includes a list with `lib.optional`.
+  Use `lib.optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 22, column 6 conditionally includes a list with `optional`.
+  Use `optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 23, column 6 conditionally includes a list with `optional`.
+  Use `optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+- default.nix: line 26, column 6 conditionally includes a list with `optional`.
+  Use `optionals` when conditionally including a list.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-171)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

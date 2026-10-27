@@ -56,29 +56,41 @@ let
       });
     };
 
-  baseDirectory = root + "/pkgs/by-name";
-
   # Generates { <name> = <file>; } entries mapping package names to their `package.nix` files in `pkgs/by-name`.
   # Could be more efficient, but this is only for testing.
   autoCalledPackageFiles =
+    by_name_subpath:
     let
-      entries = builtins.readDir baseDirectory;
-
-      namesForShard =
-        shard:
-        if entries.${shard} != "directory" then
-          # Only README.md is allowed to be a file, but it's not this code's job to check for that
-          { }
-        else
-          builtins.mapAttrs (name: _: baseDirectory + "/${shard}/${name}/package.nix") (
-            builtins.readDir (baseDirectory + "/${shard}")
-          );
+      baseDirectory = root + by_name_subpath;
     in
-    builtins.foldl' (acc: el: acc // el) { } (map namesForShard (builtins.attrNames entries));
+    if builtins.pathExists baseDirectory then
+      let
+        entries = builtins.readDir baseDirectory;
+
+        namesForShard =
+          shard:
+          if entries.${shard} != "directory" then
+            # Only README.md is allowed to be a file, but it's not this code's job to check for that
+            { }
+          else
+            builtins.mapAttrs (name: _: baseDirectory + "/${shard}/${name}/package.nix") (
+              builtins.readDir (baseDirectory + "/${shard}")
+            );
+      in
+      builtins.foldl' (acc: el: acc // el) { } (map namesForShard (builtins.attrNames entries))
+    else
+      { };
 
   # Turns autoCalledPackageFiles into an overlay that `callPackage`'s all of them
   autoCalledPackages =
-    self: super: builtins.mapAttrs (name: file: self.callPackage file { }) autoCalledPackageFiles;
+    self: super:
+    builtins.mapAttrs (name: file: self.callPackage file { }) (autoCalledPackageFiles "/pkgs/by-name");
+
+  autoCalledPythonPackages = self: super: {
+    python3Packages = builtins.mapAttrs (name: file: self.callPackage file { }) (
+      autoCalledPackageFiles "/pkgs/sets/python3Packages/by-name"
+    );
+  };
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
   optionalAllPackagesOverlay =
@@ -98,6 +110,7 @@ let
   # All the overlays in the right order, including the user-supplied ones
   allOverlays = [
     autoCalledPackages
+    autoCalledPythonPackages
   ]
   ++ optionalAllPackagesOverlay
   ++ optionalAliasesOverlay
