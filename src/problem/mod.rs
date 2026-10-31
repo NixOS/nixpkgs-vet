@@ -32,6 +32,8 @@ pub mod npv_164;
 pub mod npv_165;
 pub mod npv_166;
 pub mod npv_167;
+pub mod npv_168;
+pub mod npv_169;
 
 pub mod npv_170;
 pub mod npv_171;
@@ -123,6 +125,12 @@ pub enum Problem {
     /// NPV-167: top-level package disabled __structuredAttrs
     TopLevelPackageDisabledStructuredAttrs(npv_167::TopLevelPackageDisabledStructuredAttrs),
 
+    /// NPV-168: new top-level package uses a list for meta.license
+    NewTopLevelPackageUsesLicenseList(npv_168::NewTopLevelPackageUsesLicenseList),
+
+    /// NPV-169: top-level package switched to a list for meta.license
+    TopLevelPackageSwitchedToLicenseList(npv_169::TopLevelPackageSwitchedToLicenseList),
+
     /// NPV-170: nix files should not contain useless escapes
     NixFileContainsUselessEscape(npv_170::NixFileContainsUselessEscape),
 
@@ -161,6 +169,8 @@ impl Problem {
             Self::TopLevelPackageDisabledStrictDeps(..) => "NPV-165",
             Self::NewTopLevelPackageMustEnableStructuredAttrs(..) => "NPV-166",
             Self::TopLevelPackageDisabledStructuredAttrs(..) => "NPV-167",
+            Self::NewTopLevelPackageUsesLicenseList(..) => "NPV-168",
+            Self::TopLevelPackageSwitchedToLicenseList(..) => "NPV-169",
             Self::NixFileContainsUselessEscape(..) => "NPV-170",
             Self::NixFileContainsOptionalList(..) => "NPV-171",
         }
@@ -202,6 +212,8 @@ impl fmt::Display for Problem {
             Self::TopLevelPackageDisabledStrictDeps(inner) => inner.fmt(f),
             Self::NewTopLevelPackageMustEnableStructuredAttrs(inner) => inner.fmt(f),
             Self::TopLevelPackageDisabledStructuredAttrs(inner) => inner.fmt(f),
+            Self::NewTopLevelPackageUsesLicenseList(inner) => inner.fmt(f),
+            Self::TopLevelPackageSwitchedToLicenseList(inner) => inner.fmt(f),
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
             Self::NixFileContainsOptionalList(inner) => inner.fmt(f),
         }

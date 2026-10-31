@@ -1,0 +1,4 @@
+- Attribute `foo` is a new package with a list for `meta.license`.
+  Please use a single license, or combine licenses with `lib.licenses.OR` or `lib.licenses.AND` in pkgs/by-name/fo/foo/package.nix.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-168)
+This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.
