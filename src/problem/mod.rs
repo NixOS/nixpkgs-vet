@@ -41,6 +41,7 @@ pub mod npv_169;
 
 pub mod npv_170;
 pub mod npv_171;
+pub mod npv_172;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
@@ -140,6 +141,9 @@ pub enum Problem {
 
     /// NPV-171: nix files should not pass list literals to `optional`
     NixFileContainsOptionalList(npv_171::NixFileContainsOptionalList),
+
+    /// NPV-172: nix files should use `lib.getExe` instead of spelling out executable paths
+    NixFileContainsExecutablePath(npv_172::NixFileContainsExecutablePath),
 }
 
 impl Problem {
@@ -177,6 +181,7 @@ impl Problem {
             Self::TopLevelPackageSwitchedToLicenseList(..) => "NPV-169",
             Self::NixFileContainsUselessEscape(..) => "NPV-170",
             Self::NixFileContainsOptionalList(..) => "NPV-171",
+            Self::NixFileContainsExecutablePath(..) => "NPV-172",
         }
     }
 
@@ -220,6 +225,7 @@ impl fmt::Display for Problem {
             Self::TopLevelPackageSwitchedToLicenseList(inner) => inner.fmt(f),
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
             Self::NixFileContainsOptionalList(inner) => inner.fmt(f),
+            Self::NixFileContainsExecutablePath(inner) => inner.fmt(f),
         }
     }
 }

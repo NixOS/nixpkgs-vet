@@ -11,6 +11,7 @@ use std::path::Path;
 
 use crate::location;
 use crate::nix_file::{NixFile, NixFileStore};
+use crate::problem::npv_172::{ExecutableReference, ExecutableReferenceFix};
 use crate::problem::{Problem, npv_145, npv_146, npv_170, npv_171};
 use crate::validation::ResultIteratorExt;
 use crate::validation::Validation::{Failure, Success};
@@ -28,7 +29,9 @@ pub fn check_files(
             check_invalid_escapes(relative_path, nix_file)?,
             check_optional_list_parameters(relative_path, nix_file)?,
         ]);
-        Ok(result.map(|()| ratchet::File {}))
+        Ok(result.map(|()| ratchet::File {
+            executable_references: collect_executable_references(relative_path, nix_file),
+        }))
     })
 }
 
@@ -113,12 +116,7 @@ fn check_invalid_escapes(
         .descendants()
         .filter_map(ast::Str::cast)
     {
-        let is_multiline = str_node
-            .syntax()
-            .children_with_tokens()
-            .filter_map(rnix::SyntaxElement::into_token)
-            .next()
-            .is_some_and(|t| t.text() == "''");
+        let is_multiline = is_indented_string(&str_node);
 
         for part in str_node.parts() {
             let ast::InterpolPart::Literal(lit) = part else {
@@ -157,6 +155,205 @@ fn check_invalid_escapes(
     } else {
         Ok(Failure(problems))
     }
+}
+
+/// Whether a string literal is of the `''...''` kind.
+fn is_indented_string(str_node: &ast::Str) -> bool {
+    str_node
+        .syntax()
+        .children_with_tokens()
+        .filter_map(rnix::SyntaxElement::into_token)
+        .next()
+        .is_some_and(|t| t.text() == "''")
+}
+
+/// Collect the strings that spell out an executable path by hand, for the ratchet check in
+/// `ratchet::File`.
+///
+/// Indented strings are skipped: they are usually scripts, and the path-to-string coercion may be
+/// relied on. Strings in attribute name position are skipped because the fix does not apply there.
+fn collect_executable_references(
+    relative_path: &RelativePath,
+    nix_file: &NixFile,
+) -> BTreeMap<String, Vec<ExecutableReference>> {
+    let mut references: BTreeMap<String, Vec<ExecutableReference>> = BTreeMap::new();
+
+    for str_node in nix_file
+        .syntax_root
+        .syntax()
+        .descendants()
+        .filter_map(ast::Str::cast)
+    {
+        if is_indented_string(&str_node) {
+            continue;
+        }
+        if str_node
+            .syntax()
+            .parent()
+            .is_some_and(|parent| ast::Attrpath::can_cast(parent.kind()))
+        {
+            continue;
+        }
+        let Some(fix) = executable_reference_fix(&str_node) else {
+            continue;
+        };
+
+        let text = collapse_whitespace(&str_node.syntax().text().to_string());
+        let key = text.replace(' ', "");
+        let index: usize = str_node.syntax().text_range().start().into();
+        references
+            .entry(key)
+            .or_default()
+            .push(ExecutableReference {
+                location: location::Location::new(
+                    relative_path,
+                    nix_file.line_index.line(index),
+                    nix_file.line_index.column(index),
+                ),
+                text,
+                fix,
+            });
+    }
+
+    references
+}
+
+/// Classify a `"`-string as one of the executable path shapes, or `None` when it is not one or
+/// when the rewrite might not be safe.
+fn executable_reference_fix(str_node: &ast::Str) -> Option<ExecutableReferenceFix> {
+    use ast::InterpolPart::{Interpolation, Literal};
+
+    match str_node.normalized_parts().as_slice() {
+        [Interpolation(call)] => Some(ExecutableReferenceFix::Unwrap {
+            call: get_exe_call(&call.expr()?)?,
+        }),
+        [Interpolation(package), Literal(literal)] => {
+            let program = literal.strip_prefix("/bin/")?;
+            if !is_program_name(program) {
+                return None;
+            }
+            Some(ExecutableReferenceFix::GetExePrime {
+                package: package_expression(&package.expr()?)?,
+                program: program.to_owned(),
+            })
+        }
+        [
+            Interpolation(package),
+            Literal(literal),
+            Interpolation(main_program),
+        ] if literal.as_str() == "/bin/" => {
+            let package = package_expression(&package.expr()?)?;
+            if main_program_package(&main_program.expr()?)? != package {
+                return None;
+            }
+            Some(ExecutableReferenceFix::GetExe { package })
+        }
+        _ => None,
+    }
+}
+
+/// Only plain program names are rewritten; anything else may be shell syntax or a nested path.
+fn is_program_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-'))
+}
+
+/// The source text of `X` in `"${X}/bin/..."` when `X` plausibly is a derivation whose `bin`
+/// output is wanted. `getBin X` is accepted because `lib.getExe'` is defined through `getBin`.
+fn package_expression(expr: &ast::Expr) -> Option<String> {
+    if let ast::Expr::Apply(apply) = expr {
+        let function = attribute_path(&apply.lambda()?)?;
+        if function != ["getBin"] && function != ["lib", "getBin"] {
+            return None;
+        }
+        let argument = apply.argument()?;
+        if matches!(argument, ast::Expr::Apply(_)) {
+            return None;
+        }
+        return package_expression(&argument);
+    }
+
+    let path = attribute_path(expr)?;
+    if looks_like_output_or_path(path.last()?) {
+        return None;
+    }
+    Some(path.join("."))
+}
+
+/// Explicit outputs must not be rewritten, since `getBin` may pick a different output.
+/// Names ending in `path`, `dir` or `home` are usually strings, which `lib.getExe'` rejects.
+fn looks_like_output_or_path(name: &str) -> bool {
+    const OUTPUT_NAMES: [&str; 11] = [
+        "out", "bin", "dev", "lib", "man", "doc", "info", "devdoc", "debug", "static", "outPath",
+    ];
+    let lower = name.to_ascii_lowercase();
+    OUTPUT_NAMES.contains(&name)
+        || ["path", "dir", "home"]
+            .iter()
+            .any(|suffix| lower.ends_with(suffix))
+}
+
+/// `X` as source text when `expr` is `X.meta.mainProgram`.
+fn main_program_package(expr: &ast::Expr) -> Option<String> {
+    let path = attribute_path(expr)?;
+    let (package, selector) = path.split_at(path.len().checked_sub(2)?);
+    if package.is_empty() || selector != ["meta", "mainProgram"] {
+        return None;
+    }
+    Some(package.join("."))
+}
+
+/// `a.b.c` as `["a", "b", "c"]` for an identifier or a select chain of identifiers without a
+/// default. Dynamic or quoted attributes give `None`.
+fn attribute_path(expr: &ast::Expr) -> Option<Vec<String>> {
+    match expr {
+        ast::Expr::Ident(ident) => Some(vec![ident.ident_token()?.text().to_owned()]),
+        ast::Expr::Select(select) if select.default_expr().is_none() => {
+            let mut path = attribute_path(&select.expr()?)?;
+            for attr in select.attrpath()?.attrs() {
+                let ast::Attr::Ident(ident) = attr else {
+                    return None;
+                };
+                path.push(ident.ident_token()?.text().to_owned());
+            }
+            Some(path)
+        }
+        _ => None,
+    }
+}
+
+/// The collapsed source text of `expr` when it is a saturated call to `getExe` or `getExe'`,
+/// optionally through `lib` or `lib.meta`.
+fn get_exe_call(expr: &ast::Expr) -> Option<String> {
+    let mut head = expr.clone();
+    let mut arguments = 0;
+    while let ast::Expr::Apply(apply) = head {
+        head = apply.lambda()?;
+        arguments += 1;
+    }
+
+    let path = attribute_path(&head)?;
+    let path: Vec<&str> = path.iter().map(String::as_str).collect();
+    let function = match path.as_slice() {
+        [function] | ["lib", function] | ["lib", "meta", function] => *function,
+        _ => return None,
+    };
+    let expected_arguments = match function {
+        "getExe" => 1,
+        "getExe'" => 2,
+        _ => return None,
+    };
+    if arguments != expected_arguments {
+        return None;
+    }
+
+    Some(collapse_whitespace(&expr.syntax().text().to_string()))
+}
+
+fn collapse_whitespace(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Check that `optional` is not called with a list literal.
