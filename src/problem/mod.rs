@@ -1,3 +1,7 @@
+// derive-new 0.7.0 expands `#[derive(new)]` to `Self { field: field, .. }` using the
+// field spans from our source, which newer clippy reports as redundant_field_names.
+#![allow(clippy::redundant_field_names)]
+
 use std::fmt;
 
 use derive_enum_from_into::EnumFrom;
