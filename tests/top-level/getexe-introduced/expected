@@ -1,0 +1,28 @@
+- pkgs/literal/default.nix: line 8, column 17 introduces the executable path "${bash}/bin/bash".
+  Use `lib.getExe' bash "bash"` instead, or `lib.getExe bash` if "bash" is its `meta.mainProgram`.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/literal/default.nix: line 9, column 7 introduces the executable path "${lib.getBin pkgs.coreutils}/bin/env".
+  Use `lib.getExe' pkgs.coreutils "env"` instead, or `lib.getExe pkgs.coreutils` if "env" is its `meta.mainProgram`.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/literal/default.nix: line 10, column 7 introduces the executable path "${getBin pkgs.coreutils}/bin/env".
+  Use `lib.getExe' pkgs.coreutils "env"` instead, or `lib.getExe pkgs.coreutils` if "env" is its `meta.mainProgram`.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/main-program/default.nix: line 3, column 10 introduces the executable path "${pkgs.hello}/bin/${pkgs.hello.meta.mainProgram}".
+  Use `lib.getExe pkgs.hello` instead.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/main-program/default.nix: line 4, column 15 introduces the executable path "${lib.getBin pkgs.hello}/bin/${pkgs.hello.meta.mainProgram}".
+  Use `lib.getExe pkgs.hello` instead.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/wrapped/default.nix: line 3, column 7 wraps `lib.getExe pkgs.hello` in a string.
+  `lib.getExe pkgs.hello` already is a string, so use it directly without the surrounding "${ }".
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/wrapped/default.nix: line 4, column 7 wraps `lib.getExe' pkgs.hello "hello"` in a string.
+  `lib.getExe' pkgs.hello "hello"` already is a string, so use it directly without the surrounding "${ }".
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/wrapped/default.nix: line 5, column 9 wraps `getExe pkgs.hello` in a string.
+  `getExe pkgs.hello` already is a string, so use it directly without the surrounding "${ }".
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/wrapped/default.nix: line 6, column 7 wraps `lib.meta.getExe pkgs.hello` in a string.
+  `lib.meta.getExe pkgs.hello` already is a string, so use it directly without the surrounding "${ }".
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.

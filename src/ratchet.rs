@@ -9,9 +9,13 @@ use std::collections::BTreeMap;
 
 use relative_path::RelativePathBuf;
 
+use crate::location::Location;
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167};
-use crate::validation::{self, Validation, Validation::Success};
+use crate::problem::{Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_172};
+use crate::validation::{
+    self, Validation,
+    Validation::{Failure, Success},
+};
 
 /// The ratchet value for the entirety of Nixpkgs.
 #[derive(Default)]
@@ -72,16 +76,48 @@ impl Package {
     }
 }
 
-pub struct File {}
+/// The ratchet value for a single Nix file
+pub struct File {
+    /// Strings that spell out an executable path by hand instead of using `lib.getExe`, keyed by
+    /// their source text with all whitespace removed. Instances are in file order.
+    ///
+    /// Keying by text rather than by position grandfathers an instance across unrelated edits and
+    /// reformatting, while an edit to the instance itself counts as introducing a new one.
+    pub executable_references: BTreeMap<String, Vec<npv_172::ExecutableReference>>,
+}
 
 impl File {
-    /// Validates the ratchet checks for a top-level package
+    /// Validates the ratchet checks for a Nix file
+    ///
+    /// Per key, the file may not contain more instances than the base version of the same file.
+    /// The instances beyond the allowed count are reported, in file order.
     pub fn compare(
         _name: &RelativePath,
-        _optional_from: Option<&Self>,
-        _to: &Self,
+        optional_from: Option<&Self>,
+        to: &Self,
     ) -> Validation<()> {
-        Success(())
+        let mut problems: Vec<(&Location, Problem)> = Vec::new();
+        for (key, instances) in &to.executable_references {
+            let allowed = optional_from
+                .and_then(|from| from.executable_references.get(key))
+                .map_or(0, Vec::len);
+            for instance in instances.iter().skip(allowed) {
+                problems.push((
+                    &instance.location,
+                    npv_172::NixFileContainsExecutablePath::new(
+                        instance.clone(),
+                        allowed,
+                        instances.len(),
+                    )
+                    .into(),
+                ));
+            }
+        }
+        if problems.is_empty() {
+            return Success(());
+        }
+        problems.sort_by_key(|(location, _)| (location.line, location.column));
+        Failure(problems.into_iter().map(|(_, problem)| problem).collect())
     }
 }
 
