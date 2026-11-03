@@ -11,7 +11,7 @@ use crate::problem::{npv_121, npv_122, npv_123, npv_124, npv_125, npv_126, npv_1
 use crate::structure::read_dir_sorted;
 use crate::validation::{self, ResultIteratorExt, Validation::Success};
 
-/// Check that every package directory in pkgs/by-name doesn't link to outside that directory.
+/// Check that every package directory in the by-name structure doesn't link to outside that directory.
 /// Both symlinks and Nix path expressions are checked.
 pub fn check_references(
     nix_file_store: &mut NixFileStore,

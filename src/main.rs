@@ -22,6 +22,7 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
+use relative_path::RelativePathBuf;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -58,9 +59,27 @@ pub struct Args {
     base: PathBuf,
 }
 
+#[derive(Clone)]
+pub struct PkgSet {
+    by_name_subpath: RelativePathBuf,
+    attr_path: Vec<String>,
+}
+
 fn main() -> ExitCode {
     let args = Args::parse();
-    let status: ColoredStatus = process(args.base, &args.nixpkgs).into();
+
+    let pkgsets = vec![
+        PkgSet {
+            by_name_subpath: RelativePathBuf::from("pkgs/by-name"),
+            attr_path: vec![],
+        },
+        PkgSet {
+            by_name_subpath: RelativePathBuf::from("pkgs/sets/python3Packages/by-name"),
+            attr_path: vec!["python3Packages".to_string()],
+        },
+    ];
+
+    let status: ColoredStatus = process(args.base, &args.nixpkgs, pkgsets).into();
     eprintln!("{status}");
     status.into()
 }
@@ -70,10 +89,11 @@ fn main() -> ExitCode {
 /// # Arguments
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
-fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
+fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path, pkgsets: Vec<PkgSet>) -> Status {
     // Very easy to parallelise this, since both operations are totally independent of each other.
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs));
-    let main_result = match check_nixpkgs(main_nixpkgs) {
+    let pkgsets2 = pkgsets.clone();
+    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, pkgsets2));
+    let main_result = match check_nixpkgs(main_nixpkgs, pkgsets) {
         Ok(result) => result,
         Err(error) => {
             return error.into();
@@ -91,6 +111,7 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
     match (base_result, main_result) {
         (Failure(..), Failure(errors)) => Status::BranchStillBroken(errors),
         (Success(..), Failure(errors)) => Status::ProblemsIntroduced(errors),
+        // TODO: can we do ratchet checks here aswell?
         (Failure(..), Success(..)) => Status::BranchHealed,
         (Success(base), Success(main)) => {
             // Both base and main branch succeed. Check ratchet state between them...
@@ -102,12 +123,15 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
     }
 }
 
-/// Checks whether the pkgs/by-name structure in Nixpkgs is valid.
+/// Checks whether the by-name structure at the given path in Nixpkgs is valid.
 ///
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
+fn check_nixpkgs(
+    nixpkgs_path: &Path,
+    pkgsets: Vec<PkgSet>,
+) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
             "Nixpkgs path {} could not be resolved",
@@ -117,19 +141,33 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
     let mut nix_file_store = NixFileStore::default();
 
-    let package_result = {
-        if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
-            // No pkgs/by-name directory, always valid
+    let mut package_result = Success(BTreeMap::new());
+
+    for pkgset in pkgsets {
+        let other_package_result = if !nixpkgs_path.join(pkgset.by_name_subpath.as_str()).exists() {
+            // No directory at the given location (e.g. pkgs/by-name), always valid
             Success(BTreeMap::new())
         } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
+            let structure =
+                check_structure(&nixpkgs_path, &mut nix_file_store, &pkgset.by_name_subpath)?;
 
             // Only if we could successfully parse the structure, we do the evaluation checks
             structure.result_map(|package_names| {
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
+                eval::check_values(
+                    &nixpkgs_path,
+                    &pkgset.by_name_subpath,
+                    pkgset.attr_path,
+                    &mut nix_file_store,
+                    package_names.as_slice(),
+                )
             })?
-        }
-    };
+        };
+
+        package_result = package_result.and(other_package_result, |mut self_, mut other| {
+            self_.append(&mut other);
+            self_
+        });
+    }
 
     let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
 
@@ -148,9 +186,10 @@ mod tests {
 
     use anyhow::Context;
     use pretty_assertions::StrComparison;
+    use relative_path::RelativePathBuf;
     use tempfile::{TempDir, tempdir_in};
 
-    use super::{process, structure::BASE_SUBPATH};
+    use crate::{PkgSet, process};
 
     // Manually repeat this for each subdir under tests/ in order to disambiguate
     #[fixtures::fixtures(["tests/top-level/*"])]
@@ -188,7 +227,7 @@ mod tests {
             return Ok(());
         }
 
-        let base = path.join("main").join(BASE_SUBPATH);
+        let base = path.join("main/pkgs/by-name");
 
         fs::create_dir_all(base.join("fo/foo"))?;
         fs::write(base.join("fo/foo/package.nix"), "{ someDrv }: someDrv")?;
@@ -260,8 +299,19 @@ mod tests {
         let nix_conf_dir = tempdir().expect("directory");
         let nix_conf_dir = nix_conf_dir.path().as_os_str();
 
+        let pkgsets = vec![
+            PkgSet {
+                by_name_subpath: RelativePathBuf::from("pkgs/by-name"),
+                attr_path: vec![],
+            },
+            PkgSet {
+                by_name_subpath: RelativePathBuf::from("pkgs/sets/python3Packages/by-name"),
+                attr_path: vec!["python3Packages".to_string()],
+            },
+        ];
+
         let status = temp_env::with_var("NIX_CONF_DIR", Some(nix_conf_dir), || {
-            process(base_nixpkgs, &main_path)
+            process(base_nixpkgs, &main_path, pkgsets)
         });
 
         let actual_errors = format!("{status}\n");
