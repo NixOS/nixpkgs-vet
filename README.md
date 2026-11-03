@@ -99,3 +99,5 @@ The current ratchets are:
   - Once a top-level package evaluates with `strictDeps = true`, it also can't regress to `false`.
 - New top-level packages must evaluate with `__structuredAttrs = true`.
   - Once a top-level package evaluates with `__structuredAttrs = true`, it also can't regress to `false`.
+- New top-level packages must not use a list for `meta.license`.
+  - Once a top-level package doesn't use a list for `meta.license`, it also can't regress to using one.

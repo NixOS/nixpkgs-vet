@@ -68,6 +68,7 @@ let
             is_derivation = pkgs.lib.isDerivation value;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
+            uses_license_list = builtins.isList (value.meta.license or null);
             is_same_scope_call_package = value._callPackage or false;
           };
         };

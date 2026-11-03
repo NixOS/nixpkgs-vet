@@ -82,6 +82,8 @@ pub enum AttributeVariant {
         strict_deps: bool,
         /// Whether the attribute evaluates with `__structuredAttrs = true`.
         structured_attrs: bool,
+        /// Whether the attribute's `meta.license` is a list rather than a single license expression.
+        uses_license_list: bool,
         /// Whether the attribute was defined via `callPackage` of the same scope
         is_same_scope_call_package: bool,
     },
@@ -282,6 +284,7 @@ fn by_name(
                     is_derivation,
                     strict_deps,
                     structured_attrs,
+                    uses_license_list,
                     is_same_scope_call_package: _,
                 },
             location: _,
@@ -296,6 +299,10 @@ fn by_name(
                     ),
                     structured_attrs: enabled_attribute_ratchet(
                         structured_attrs,
+                        structure::relative_file_for_package(attribute_name),
+                    ),
+                    license_expression: enabled_attribute_ratchet(
+                        !uses_license_list,
                         structure::relative_file_for_package(attribute_name),
                     ),
                 })
@@ -352,6 +359,7 @@ fn handle_non_by_name_attribute(
                     is_derivation: true,
                     strict_deps,
                     structured_attrs,
+                    uses_license_list,
                     is_same_scope_call_package,
                 },
             location: Some(location),
@@ -425,15 +433,21 @@ fn handle_non_by_name_attribute(
                 (false, file) => Loose(file),
             };
 
-            let structured_attrs = match (structured_attrs, evaluated_attribute_file) {
+            let structured_attrs = match (structured_attrs, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
                 (false, file) => Loose(file),
+            };
+
+            let license_expression = match (uses_license_list, evaluated_attribute_file) {
+                (false, _) => Tight,
+                (true, file) => Loose(file),
             };
 
             ratchet::Package {
                 uses_by_name,
                 strict_deps,
                 structured_attrs,
+                license_expression,
             }
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
@@ -442,6 +456,7 @@ fn handle_non_by_name_attribute(
             uses_by_name: NonApplicable,
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
+            license_expression: NonApplicable,
         },
     };
     Ok(Success(package))

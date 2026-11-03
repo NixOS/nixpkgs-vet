@@ -10,7 +10,9 @@ use std::collections::BTreeMap;
 use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
-use crate::problem::{Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167};
+use crate::problem::{
+    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169,
+};
 use crate::validation::{self, Validation, Validation::Success};
 
 /// The ratchet value for the entirety of Nixpkgs.
@@ -47,6 +49,9 @@ pub struct Package {
 
     /// The ratchet value for the check for enabling `__structuredAttrs`.
     pub structured_attrs: RatchetState<StructuredAttrs>,
+
+    /// The ratchet value for the check for `meta.license` not being a list.
+    pub license_expression: RatchetState<LicenseExpression>,
 }
 
 impl Package {
@@ -67,6 +72,11 @@ impl Package {
                 name,
                 optional_from.map(|x| &x.structured_attrs),
                 &to.structured_attrs,
+            ),
+            RatchetState::<LicenseExpression>::compare(
+                name,
+                optional_from.map(|x| &x.license_expression),
+                &to.license_expression,
             ),
         ])
     }
@@ -212,5 +222,24 @@ impl EnabledAttributeProblem for StructuredAttrsProblem {
 
     fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
         npv_167::TopLevelPackageDisabledStructuredAttrs::new(name, file).into()
+    }
+}
+
+/// The ratchet value of an attribute for not using a list for `meta.license`.
+///
+/// New packages must not use a list for `meta.license`, and should instead use a single license or
+/// combine licenses with the compound license operators like `lib.licenses.OR`. Once a package
+/// doesn't use a list for `meta.license`, it must not regress.
+pub type LicenseExpression = EnabledAttribute<LicenseExpressionProblem>;
+
+pub enum LicenseExpressionProblem {}
+
+impl EnabledAttributeProblem for LicenseExpressionProblem {
+    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_168::NewTopLevelPackageUsesLicenseList::new(name, file).into()
+    }
+
+    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_169::TopLevelPackageSwitchedToLicenseList::new(name, file).into()
     }
 }
