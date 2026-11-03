@@ -17,7 +17,7 @@ pub const PACKAGE_NIX_FILENAME: &str = "package.nix";
 
 static SHARD_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-z_][a-z0-9_-]?$").unwrap());
-static PACKAGE_NAME_REGEX: LazyLock<Regex> =
+pub static PACKAGE_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_-]*$").unwrap());
 
 /// Deterministic file listing so that tests are reproducible.
@@ -107,12 +107,12 @@ pub fn check_structure(
                             &package_entry,
                         )
                     })
-                    .collect_vec()?;
+                    .collect_vec_res()?;
 
                 result.and_(validation::sequence(package_results))
             })
         })
-        .collect_vec()?;
+        .collect_vec_res()?;
 
     // Combine the package names contained within each shard into a longer list.
     Ok(validation::sequence(shard_results).map(concat))

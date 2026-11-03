@@ -53,6 +53,7 @@ let
       someDrv = self.mkFakeDrv (finalAttrs: {
         strictDeps = true;
         __structuredAttrs = true;
+        meta.maintainers = [ { github = "some-maintainer"; } ];
       });
     };
 
@@ -96,12 +97,11 @@ let
       [ ];
 
   # All the overlays in the right order, including the user-supplied ones
-  allOverlays = [
-    autoCalledPackages
-  ]
-  ++ optionalAllPackagesOverlay
-  ++ optionalAliasesOverlay
-  ++ overlays;
+  allOverlays =
+    lib.optional (builtins.pathExists baseDirectory) autoCalledPackages
+    ++ optionalAllPackagesOverlay
+    ++ optionalAliasesOverlay
+    ++ overlays;
 
   # Apply all the overlays in order to the base fixed-point function pkgsFun
   f = builtins.foldl' (f: overlay: lib.extends overlay f) pkgsFun allOverlays;

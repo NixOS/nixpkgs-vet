@@ -1,0 +1,92 @@
+id: meta-update
+severity: info
+language: Nix
+utils:
+  description:
+    any:
+    - kind: binding
+      has:
+        field: attrpath
+        regex: ^description$
+    - any:
+      - kind: inherit
+      - kind: inherit_from
+      has:
+        field: attrs
+        has:
+          field: attr
+          regex: ^description$
+  pname:
+    kind: binding
+    all:
+    - has:
+        field: attrpath
+        regex: ^(p)?name$
+    - has:
+        stopBy: end
+        field: expression
+        kind: string_fragment
+        regex: ^REPLACEME$
+rule:
+  any:
+  - any:
+    - kind: binding
+    - kind: inherit_from
+    - kind: inherit
+    follows:
+      matches: description
+      stopBy: end
+  - matches: description
+  inside:
+    kind: binding
+    stopBy:
+      kind: binding
+    any:
+    - precedes:
+        stopBy: end
+        matches: pname
+    - follows:
+        stopBy: end
+        matches: pname
+
+  nthChild:
+    position: 1
+    reverse: true
+  pattern: $BIND
+fix: |-
+  $BIND
+  hasNoMaintainersButDependents = true;
+
+---
+
+id: meta-update2
+severity: info
+language: Nix
+utils:
+  pname:
+    kind: binding
+    all:
+    - has:
+        field: attrpath
+        regex: ^(p)?name$
+    - has:
+        stopBy: end
+        field: expression
+        kind: string_fragment
+        regex: ^REPLACEME$
+rule:
+  kind: binding
+  has:
+    field: attrpath
+    regex: ^meta.description$
+  any:
+  - precedes:
+      stopBy: end
+      matches: pname
+  - follows:
+      stopBy: end
+      matches: pname
+  pattern: $BIND
+fix: |-
+  $BIND
+  meta.hasNoMaintainersButDependents = true;

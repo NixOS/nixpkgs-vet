@@ -1,0 +1,5 @@
+{ someDrv }:
+someDrv
+// {
+  meta.maintainers = [ ];
+}
