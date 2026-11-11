@@ -101,3 +101,7 @@ The current ratchets are:
   - Once a top-level package evaluates with `__structuredAttrs = true`, it also can't regress to `false`.
 - New top-level packages must not use a list for `meta.license`.
   - Once a top-level package doesn't use a list for `meta.license`, it also can't regress to using one.
+- Top-level packages with `__structuredAttrs = true` must not introduce new `*FlagsArray` uses
+  in string literals in their defining Nix file. Use `*Flags` instead, which is already a Bash array.
+  - Existing variables may be used additional times, but packages must not introduce new `*FlagsArray` variable names.
+  - Existing variable names remain allowed when structured attributes are enabled.
