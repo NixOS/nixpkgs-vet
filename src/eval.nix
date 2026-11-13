@@ -111,8 +111,10 @@ let
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
             meta_position = value.meta.position or null;
-            pname = value.pname or null;
-            name = value.name or null;
+            # Package sets like rPackages can contain packages called `name` or `pname`.
+            # Only keep strings, because `deepSeq` on a derivation exhausts the stack.
+            pname = if builtins.isString (value.pname or null) then value.pname else null;
+            name = if builtins.isString (value.name or null) then value.name else null;
             is_same_scope_call_package = value._callPackage or false;
           };
         };
