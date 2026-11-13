@@ -5,8 +5,6 @@ use itertools::Itertools;
 use relative_path::PathExt;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
@@ -82,9 +80,9 @@ impl Location {
 pub struct AttributeVariantAttributeSet {
     /// Whether the attribute is a derivation (`lib.isDerivation`)
     is_derivation: bool,
-    /// TODO: missing maintainers
+    /// Whether both `meta.maintainers` and `meta.teams` are empty or unset
     missing_maintainers: bool,
-    /// TODO: package requires a maintainer
+    /// Whether the package sets `meta.requiresMaintainers = true`
     requires_maintainers: bool,
     /// Attribute that should correspond to whether the package has no maintainers but packages depending on it
     has_no_maintainers_but_dependents: bool,
@@ -246,9 +244,6 @@ pub fn check_values(
             )
         })?;
 
-    let mut file = File::create("attributes")?;
-    file.write_all(format!("{:#?}", attributes).as_bytes())?;
-
     let check_result = validation::sequence(
         attributes
             .into_iter()
@@ -359,10 +354,10 @@ fn leaf_result(
 ) -> validation::Validation<()> {
     sequence_([
         // check if requires maintainers
-        requires_maintainers_check(&set, attribute_path),
+        requires_maintainers_check(set, attribute_path),
         // check if dependencies without maintainers are being dependent on
         has_dependencies_without_maintainers(
-            &set,
+            set,
             attribute_path,
             idents_to_files,
             tree_to_ignore,
@@ -380,15 +375,16 @@ fn has_dependencies_without_maintainers(
     file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
     package_file: &RelativePathBuf,
 ) -> validation::Validation<()> {
-    if set.has_no_maintainers_but_dependents && !set.missing_maintainers {
-        // The package is not meant to have maintainers
-        // has_no_maintainers_but_dependents should not be set
-        // FIXME should this be NPV-181 instead? See: tests::test_top_level_dir::hasNoMaintainersButDependents_no_maintainers
-        // The expected output shows 181 but currently we emit -183
-        npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.to_owned()).into()
+    if !set.missing_maintainers {
+        // The package has maintainers, so `meta.hasNoMaintainersButDependents` must not be set
+        if set.has_no_maintainers_but_dependents {
+            npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.to_owned()).into()
+        } else {
+            Success(())
+        }
     } else {
-        // The package is meant to have maintainers but doesn't
-        // has_no_maintainers_but_dependents should match whether there are dependents
+        // The package has no maintainers, so `meta.hasNoMaintainersButDependents` should match
+        // whether there are dependents
         let dependent_files: Vec<BTreeSet<RelativePathBuf>> = attribute_path
             .iter()
             .map(|attr| {
@@ -447,7 +443,12 @@ fn requires_maintainers_check(
     set: &AttributeVariantAttributeSet,
     attribute_path: &[String],
 ) -> validation::Validation<()> {
-    if set.requires_maintainers && set.missing_maintainers {
+    // Same condition as the maintainerless problem in nixpkgs. Packages with dependents are
+    // exempt via `meta.hasNoMaintainersButDependents`.
+    if set.requires_maintainers
+        && set.missing_maintainers
+        && !set.has_no_maintainers_but_dependents
+    {
         npv_183::RequiresMaintainersButNoMaintainers::new(attribute_path.to_owned()).into()
     } else {
         Success(())
@@ -492,11 +493,10 @@ fn handle_non_by_name_attribute(
         // fixing it requires a move to pkgs/by-name, which could happen more often and isn't
         // really justified.
         EvalSuccess(AttributeInfo {
-            // We're only interested in attributes that are attribute sets, which all derivations
-            // are. Anything else can't be in `pkgs/by-name`.
+            // We're only interested in derivations. Anything else can't be in `pkgs/by-name`.
             attribute_variant: AttributeVariant::AttributeSet(set),
             location: Some(location),
-        }) => {
+        }) if set.is_derivation => {
             // Parse the Nix file in the location
             let nix_file = nix_file_store.get(&location.file)?;
 
@@ -565,19 +565,6 @@ fn handle_non_by_name_attribute(
 
             // TODO: What if both are available?, or what if unsafeGetAttrPos is misleading like for
             // cudaPackages?
-            //let maybe_package_file = if let Some((
-            //    _location,
-            //    Some(CallPackageArgumentInfo {
-            //        relative_path: Some(rel_path),
-            //        empty_arg: _,
-            //    }),
-            //)) = parsed_definition.as_ref() {
-            //    Some(if rel_path.to_logical_path(nixpkgs_path).is_dir() {
-            //        rel_path.join("default.nix")
-            //    } else {
-            //        rel_path.clone()
-            //    })
-
             let leaf_result = if let Some(ref meta_pos) = set.meta_position {
                 // `meta.position` is "${file}:${line}"
                 let only_line: usize = meta_pos.split(':').next_back().unwrap().parse()?;
@@ -603,6 +590,23 @@ fn handle_non_by_name_attribute(
                     &ignored_tree,
                     &ignored_ranges,
                     &rel_path,
+                )
+            } else if let Some(CallPackageArgumentInfo::RelativePath(rel_path)) =
+                &optional_syntactic_call_package
+            {
+                // Without `meta.position`, fall back to the file passed to `callPackage`
+                let file = if rel_path.to_logical_path(nixpkgs_path).is_dir() {
+                    rel_path.join("default.nix")
+                } else {
+                    rel_path.clone()
+                };
+                leaf_result(
+                    &set,
+                    attribute_path,
+                    idents_to_files,
+                    &Some(file.clone()),
+                    &BTreeMap::new(),
+                    &file,
                 )
             } else {
                 Success(())

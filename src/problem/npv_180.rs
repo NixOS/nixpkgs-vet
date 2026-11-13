@@ -22,26 +22,19 @@ pub struct DependentsAttrsShouldBeSet {
 
 impl fmt::Display for DependentsAttrsShouldBeSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match (&self.pname, &self.name) {
+            (Some(pname), _) => format!("pname: {pname}, "),
+            (None, Some(name)) => format!("name: {name}, "),
+            (None, None) => String::new(),
+        };
         writedoc!(
             f,
             "
-            - {} (defined by {}, {}: {}, {} pot. dependents): {}
+            - {} (defined by {}, {}{} pot. dependents): {}
             ",
-            // "
-            // - pkgs.{} (defined by {}, {}: {}): `meta.hasNoMaintainersButDependents` should be set, because:
-            //   - There are no maintainers, and
-            //   - The package might be depended on by potentially {} files, including: {}
-            // ",
             self.package_path.join("."),
             self.package_file,
-            if self.pname.is_some() {
-                "pname"
-            } else {
-                "name"
-            },
-            self.pname
-                .clone()
-                .unwrap_or_else(|| self.name.clone().unwrap()),
+            name,
             self.referenced_by_files.len(),
             self.referenced_by_files.iter().take(5).join(", "),
         )

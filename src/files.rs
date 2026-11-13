@@ -8,9 +8,7 @@ use rowan::ast::AstNode;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
-use std::fs::File;
 use std::io::Read;
-use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
@@ -52,9 +50,6 @@ pub fn check_files(
             ]);
             Ok(result.map(|()| ratchet::File {}))
         })?;
-
-    let mut file = File::create("idents_to_files")?;
-    file.write_all(format!("{:#?}", idents_to_files).as_bytes())?;
 
     Ok(FileCheckResult {
         idents_to_files,

@@ -68,13 +68,12 @@ let
   };
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
-  attrInfo = path: value: builtins.trace "trace: ${toString path}" {
+  attrInfo = path: value: {
     location = builtins.unsafeGetAttrPos (builtins.elemAt path (builtins.length path - 1)) (
       attrByPath (sublist 0 (builtins.length path - 1) path) (throw "No such attr") pkgs
     );
     attribute_variant =
-      # FIXME: figure out why rPackages is exhausting the stack
-      if !builtins.isAttrs value || path == "rPackages" then
+      if !builtins.isAttrs value then
         { NonAttributeSet = null; }
       else
         let
@@ -103,9 +102,11 @@ let
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
-            missing_maintainers =
-              if value.meta.requiresMaintainers or false then value.meta.maintainers == [ ] else null;
+            # Mirrors the maintainerless problem in nixpkgs' pkgs/stdenv/generic/problems.nix
+            missing_maintainers = value.meta.maintainers or [ ] == [ ] && value.meta.teams or [ ] == [ ];
+            requires_maintainers = value.meta.requiresMaintainers or false;
             has_no_maintainers_but_dependents = value.meta.hasNoMaintainersButDependents or false;
+
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
@@ -151,7 +152,6 @@ let
     path:
     let
       value = attrByPath path (throw "No ${toString path}") pkgs;
-      # Packages outside `pkgs/by-name` often fail evaluation, so we need to handle that.
       output = attrInfo path value;
       result = builtins.tryEval (builtins.deepSeq output null);
     in

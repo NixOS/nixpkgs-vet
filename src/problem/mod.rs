@@ -155,7 +155,7 @@ pub enum Problem {
     /// NPV-182: meta.hasNoMaintainersButDependents should not be set when there are no dependents
     DependentsAttrsSetWithoutDependents(npv_182::DependentsAttrsSetWithoutDependents),
 
-    /// NPV-183: meta.hasNoMaintainersButDependents should not be set when it's not needed
+    /// NPV-183: packages with meta.requiresMaintainers = true need maintainers
     RequiresMaintainersButNoMaintainers(npv_183::RequiresMaintainersButNoMaintainers),
 }
 
