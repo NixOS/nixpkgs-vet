@@ -13,7 +13,9 @@ exclusions:
     - .github/PULL_REQUEST_TEMPLATE/**/*
     - .github/ISSUE_TEMPLATE/**/*
     - tests/integration/symlink-invalid/main/pkgs/by-name/fo/foo/foo
+    - tests/integration/symlink-invalid/main/pkgs/sets/fooPackages/by-name/fo/foo/foo
     - tests/integration/multiple-failures/main/pkgs/by-name/A/fo@/foo
+    - tests/integration/multiple-failures/main/pkgs/sets/fooPackages/by-name/A/fo@/foo
 
   # References to these paths will not be verified.
   # List of glob patterns.
