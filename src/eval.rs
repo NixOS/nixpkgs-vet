@@ -1,5 +1,6 @@
 use crate::files::IdentIndex;
 use crate::nix_file::CallPackageArgumentInfo;
+use crate::validation::sequence_;
 use itertools::Itertools;
 use relative_path::PathExt;
 use std::collections::BTreeMap;
@@ -78,29 +79,34 @@ impl Location {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct AttributeVariantAttributeSet {
+    /// Whether the attribute is a derivation (`lib.isDerivation`)
+    is_derivation: bool,
+    /// TODO: missing maintainers
+    missing_maintainers: bool,
+    /// TODO: package requires a maintainer
+    requires_maintainers: bool,
+    /// Attribute that should correspond to whether the package has no maintainers but packages depending on it
+    has_no_maintainers_but_dependents: bool,
+    /// Whether the attribute evaluates with `strictDeps = true`.
+    strict_deps: bool,
+    /// Whether the attribute evaluates with `__structuredAttrs = true`.
+    structured_attrs: bool,
+    /// Whether the attribute's `meta.license` is a list rather than a single license expression.
+    uses_license_list: bool,
+    /// Whether the attribute was defined via `callPackage` of the same scope
+    is_same_scope_call_package: bool,
+    meta_position: Option<String>,
+    pname: Option<String>,
+    name: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
 pub enum AttributeVariant {
     /// The attribute is not an attribute set, so we're limited in the amount of information we can
     /// get from it. Since all derivations are attribute sets, it's obviously not a derivation.
     NonAttributeSet,
-    AttributeSet {
-        /// Whether the attribute is a derivation (`lib.isDerivation`)
-        is_derivation: bool,
-        /// Whether the derivation has any maintainers
-        missing_maintainers: Option<bool>,
-        /// Attribute that should correspond to whether the package has no maintainers but packages depending on it
-        has_no_maintainers_but_dependents: bool,
-        /// Whether the attribute evaluates with `strictDeps = true`.
-        strict_deps: bool,
-        /// Whether the attribute evaluates with `__structuredAttrs = true`.
-        structured_attrs: bool,
-        /// Whether the attribute's `meta.license` is a list rather than a single license expression.
-        uses_license_list: bool,
-        /// Whether the attribute was defined via `callPackage` of the same scope
-        is_same_scope_call_package: bool,
-        meta_position: Option<String>,
-        pname: Option<String>,
-        name: Option<String>,
-    },
+    AttributeSet(AttributeVariantAttributeSet),
 }
 
 /// Pass through variables needed to make Nix evaluation work inside Nix build. See `initNix`.
@@ -300,39 +306,24 @@ fn by_name(
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
             // And it's an attribute set, which allows us to get more information about it
-            attribute_variant:
-                AttributeVariant::AttributeSet {
-                    is_derivation,
-                    strict_deps,
-                    structured_attrs,
-                    uses_license_list,
-                    is_same_scope_call_package: _,
-                    missing_maintainers,
-                    has_no_maintainers_but_dependents,
-                    meta_position: _,
-                    pname,
-                    name,
-                },
+            attribute_variant: AttributeVariant::AttributeSet(set),
             location: _,
         }) => {
             // Only derivations are allowed in `pkgs/by-name`.
-            let is_derivation_result = if is_derivation {
+            let is_derivation_result = if set.is_derivation {
                 Success(())
             } else {
                 npv_101::ByNameNonDerivation::new(attribute_name).into()
             };
 
             let leaf_result = leaf_result(
-                missing_maintainers,
-                has_no_maintainers_but_dependents,
+                &set,
                 &[attribute_name.to_string()],
                 idents_to_files,
                 // TODO: Test that relative_dir_for_package wouldn't work
                 &Some(structure::relative_file_for_package(attribute_name)),
                 &BTreeMap::new(),
                 &structure::relative_file_for_package(attribute_name),
-                &pname,
-                &name,
             );
 
             // Independently report problems about whether it's a derivation and its leaf status.
@@ -341,15 +332,15 @@ fn by_name(
                 .map(|()| ratchet::Package {
                     uses_by_name: Tight,
                     strict_deps: enabled_attribute_ratchet(
-                        strict_deps,
+                        set.strict_deps,
                         structure::relative_file_for_package(attribute_name),
                     ),
                     structured_attrs: enabled_attribute_ratchet(
-                        structured_attrs,
+                        set.structured_attrs,
                         structure::relative_file_for_package(attribute_name),
                     ),
                     license_expression: enabled_attribute_ratchet(
-                        !uses_license_list,
+                        !set.uses_license_list,
                         structure::relative_file_for_package(attribute_name),
                     ),
                 })
@@ -359,95 +350,107 @@ fn by_name(
 }
 
 fn leaf_result(
-    missing_maintainers: Option<bool>,
-    has_no_maintainers_but_dependents: bool,
+    set: &AttributeVariantAttributeSet,
     attribute_path: &[String],
     idents_to_files: &IdentIndex,
     tree_to_ignore: &Option<RelativePathBuf>,
     file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
     package_file: &RelativePathBuf,
-    pname: &Option<String>,
-    name: &Option<String>,
 ) -> validation::Validation<()> {
-    match dbg!(missing_maintainers) {
+    sequence_([
+        // check if requires maintainers
+        requires_maintainers_check(&set, attribute_path),
+        // check if dependencies without maintainers are being dependent on
+        has_dependencies_without_maintainers(
+            &set,
+            attribute_path,
+            idents_to_files,
+            tree_to_ignore,
+            file_ranges_to_ignore,
+            package_file,
+        ),
+    ])
+}
+
+fn has_dependencies_without_maintainers(
+    set: &AttributeVariantAttributeSet,
+    attribute_path: &[String],
+    idents_to_files: &IdentIndex,
+    tree_to_ignore: &Option<RelativePathBuf>,
+    file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
+    package_file: &RelativePathBuf,
+) -> validation::Validation<()> {
+    if set.has_no_maintainers_but_dependents && !set.missing_maintainers {
         // The package is not meant to have maintainers
         // has_no_maintainers_but_dependents should not be set
-        None => {
-            if has_no_maintainers_but_dependents {
-                // FIXME should this be NPV-181 instead? See: tests::test_top_level_dir::hasNoMaintainersButDependents_no_maintainers
-                // The expected output shows 181 but currently we emit -183
-                npv_183::DependentsAttrsSetWithoutNeed::new(attribute_path.to_owned()).into()
-            } else {
-                Success(())
-            }
-        }
+        // FIXME should this be NPV-181 instead? See: tests::test_top_level_dir::hasNoMaintainersButDependents_no_maintainers
+        // The expected output shows 181 but currently we emit -183
+        npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.to_owned()).into()
+    } else {
         // The package is meant to have maintainers but doesn't
         // has_no_maintainers_but_dependents should match whether there are dependents
-        Some(true) => {
-            let dependent_files: Vec<BTreeSet<RelativePathBuf>> = attribute_path
-                .iter()
-                .map(|attr| {
-                    if let Some(referenced_by_files) = idents_to_files.get(attr) {
-                        referenced_by_files
-                            .iter()
-                            .filter(|(file, lines)| {
-                                !tree_to_ignore.as_ref().is_some_and(|t| file.starts_with(t))
-                                    && !file_ranges_to_ignore.get(*file).is_some_and(
-                                        |(from, to)| {
-                                            lines.iter().all(|line| from <= line && line < to)
-                                        },
-                                    )
-                            })
-                            .map(|(file, _lines)| file.clone())
-                            .collect()
-                    } else {
-                        BTreeSet::new()
-                    }
-                })
-                .collect();
-
-            // Ideally we would check that all attributes in the path are referenced and not just the
-            // last one, but this leads to an annoying problem, because e.g. if `beamPackages = beam29Packages` and
-            // there's a `beamPackages.foo` that has no maintainers, and we can find references to
-            // `beamPackages`, `foo` but not `beam29Packages`, what should
-            // `foo.meta.hasNoMaintainersButDependents` be? Any way we set it is unreconcilable for
-            // either `beamPackages` or `beam29Packages`.
-
-            // Only check the last attribute path for references
-            // TODO: Simplify the code above
-            if !dependent_files.last().unwrap().is_empty() {
-                // Has potential dependents
-                if has_no_maintainers_but_dependents {
-                    Success(())
+        let dependent_files: Vec<BTreeSet<RelativePathBuf>> = attribute_path
+            .iter()
+            .map(|attr| {
+                if let Some(referenced_by_files) = idents_to_files.get(attr) {
+                    referenced_by_files
+                        .iter()
+                        .filter(|(file, lines)| {
+                            !tree_to_ignore.as_ref().is_some_and(|t| file.starts_with(t))
+                                && !file_ranges_to_ignore.get(*file).is_some_and(|(from, to)| {
+                                    lines.iter().all(|line| from <= line && line < to)
+                                })
+                        })
+                        .map(|(file, _lines)| file.clone())
+                        .collect()
                 } else {
-                    npv_180::DependentsAttrsShouldBeSet::new(
-                        attribute_path.to_owned(),
-                        package_file,
-                        pname.clone(),
-                        name.clone(),
-                        dependent_files.last().unwrap().clone(),
-                    )
-                    .into()
+                    BTreeSet::new()
                 }
+            })
+            .collect();
+
+        // Ideally we would check that all attributes in the path are referenced and not just the
+        // last one, but this leads to an annoying problem, because e.g. if `beamPackages = beam29Packages` and
+        // there's a `beamPackages.foo` that has no maintainers, and we can find references to
+        // `beamPackages`, `foo` but not `beam29Packages`, what should
+        // `foo.meta.hasNoMaintainersButDependents` be? Any way we set it is unreconcilable for
+        // either `beamPackages` or `beam29Packages`.
+
+        // Only check the last attribute path for references
+        // TODO: Simplify the code above
+        if !dependent_files.last().unwrap().is_empty() {
+            // Has potential dependents
+            if set.has_no_maintainers_but_dependents {
+                Success(())
             } else {
-                // Has almost definitely no dependents
-                if has_no_maintainers_but_dependents {
-                    npv_182::DependentsAttrsSetWithoutDependents::new(attribute_path.to_owned())
-                        .into()
-                } else {
-                    Success(())
-                }
+                npv_180::DependentsAttrsShouldBeSet::new(
+                    attribute_path.to_owned(),
+                    package_file,
+                    set.pname.clone(),
+                    set.name.clone(),
+                    dependent_files.last().unwrap().clone(),
+                )
+                .into()
             }
-        }
-        // The package is meant to have maintainers and does
-        // has_no_maintainers_but_dependents should not be set
-        Some(false) => {
-            if has_no_maintainers_but_dependents {
-                npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path.to_owned()).into()
+        } else {
+            // Has almost definitely no dependents
+            if set.has_no_maintainers_but_dependents {
+                npv_182::DependentsAttrsSetWithoutDependents::new(attribute_path.to_owned()).into()
             } else {
                 Success(())
             }
         }
+    }
+}
+
+fn requires_maintainers_check(
+    set: &AttributeVariantAttributeSet,
+    attribute_path: &[String],
+) -> validation::Validation<()> {
+    if set.requires_maintainers && set.missing_maintainers {
+        npv_183::RequiresMaintainersButNoMaintainers::new(attribute_path.to_owned()).into()
+    } else {
+        Success(())
     }
 }
 
@@ -491,20 +494,7 @@ fn handle_non_by_name_attribute(
         EvalSuccess(AttributeInfo {
             // We're only interested in attributes that are attribute sets, which all derivations
             // are. Anything else can't be in `pkgs/by-name`.
-            attribute_variant:
-                AttributeVariant::AttributeSet {
-                    // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
-                    is_derivation: true,
-                    strict_deps,
-                    structured_attrs,
-                    uses_license_list,
-                    is_same_scope_call_package,
-                    missing_maintainers,
-                    has_no_maintainers_but_dependents,
-                    meta_position,
-                    pname,
-                    name,
-                },
+            attribute_variant: AttributeVariant::AttributeSet(set),
             location: Some(location),
         }) => {
             // Parse the Nix file in the location
@@ -535,7 +525,7 @@ fn handle_non_by_name_attribute(
             let uses_by_name_result =
                 // At this point, we completed two different checks for whether it's a
                 // `callPackage`.
-                match (is_same_scope_call_package, &optional_syntactic_call_package) {
+                match (set.is_same_scope_call_package, &optional_syntactic_call_package) {
                         // Something like `<attr> = somethingThatEvaluatesToAPackage`
                         // TODO: We still need to run package checks on this one
                         (false, None)
@@ -588,7 +578,7 @@ fn handle_non_by_name_attribute(
             //        rel_path.clone()
             //    })
 
-            let leaf_result = if let Some(ref meta_pos) = meta_position {
+            let leaf_result = if let Some(ref meta_pos) = set.meta_position {
                 // `meta.position` is "${file}:${line}"
                 let only_line: usize = meta_pos.split(':').next_back().unwrap().parse()?;
                 let only_file = meta_pos.split(':').dropping_back(1).join(":");
@@ -607,15 +597,12 @@ fn handle_non_by_name_attribute(
                     (Some(rel_path.clone()), BTreeMap::new())
                 };
                 leaf_result(
-                    missing_maintainers,
-                    has_no_maintainers_but_dependents,
+                    &set,
                     attribute_path,
                     idents_to_files,
                     &ignored_tree,
                     &ignored_ranges,
                     &rel_path,
-                    &pname,
-                    &name,
                 )
             } else {
                 Success(())
@@ -628,17 +615,17 @@ fn handle_non_by_name_attribute(
                 None | Some(CallPackageArgumentInfo::NoPath) => location.file.clone(),
             };
 
-            let strict_deps = match (strict_deps, evaluated_attribute_file.clone()) {
+            let strict_deps = match (set.strict_deps, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
                 (false, file) => Loose(file),
             };
 
-            let structured_attrs = match (structured_attrs, evaluated_attribute_file.clone()) {
+            let structured_attrs = match (set.structured_attrs, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
                 (false, file) => Loose(file),
             };
 
-            let license_expression = match (uses_license_list, evaluated_attribute_file) {
+            let license_expression = match (set.uses_license_list, evaluated_attribute_file) {
                 (false, _) => Tight,
                 (true, file) => Loose(file),
             };

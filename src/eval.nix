@@ -68,12 +68,13 @@ let
   };
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
-  attrInfo = path: value: {
+  attrInfo = path: value: builtins.trace "trace: ${toString path}" {
     location = builtins.unsafeGetAttrPos (builtins.elemAt path (builtins.length path - 1)) (
       attrByPath (sublist 0 (builtins.length path - 1) path) (throw "No such attr") pkgs
     );
     attribute_variant =
-      if !builtins.isAttrs value then
+      # FIXME: figure out why rPackages is exhausting the stack
+      if !builtins.isAttrs value || path == "rPackages" then
         { NonAttributeSet = null; }
       else
         let

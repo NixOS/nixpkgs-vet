@@ -9,6 +9,7 @@ pub struct DependentsAttrsSetWithMaintainers {
     package_path: Vec<String>,
 }
 
+// requiresMaintainers == false && hasNoMaintainerButDependents == true and maintainers != []
 impl fmt::Display for DependentsAttrsSetWithMaintainers {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writedoc!(
