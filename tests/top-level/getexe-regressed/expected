@@ -1,0 +1,8 @@
+- pkgs/foo/default.nix: line 4, column 7 introduces the executable path "${coreutils}/bin/env".
+  Use `lib.getExe' coreutils "env"` instead, or `lib.getExe coreutils` if "env" is its `meta.mainProgram`.
+  This file had 1 instance of this string before, which stays allowed, but now has 2.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+- pkgs/renamed/default.nix: line 3, column 9 introduces the executable path "${coreutils}/bin/cat".
+  Use `lib.getExe' coreutils "cat"` instead, or `lib.getExe coreutils` if "cat" is its `meta.mainProgram`.
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-172)
+This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.

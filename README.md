@@ -101,3 +101,10 @@ The current ratchets are:
   - Once a top-level package evaluates with `__structuredAttrs = true`, it also can't regress to `false`.
 - New top-level packages must not use a list for `meta.license`.
   - Once a top-level package doesn't use a list for `meta.license`, it also can't regress to using one.
+- Nix files must not introduce strings that spell out an executable path by hand.
+  Existing instances are grandfathered per file, keyed by the string's text, so a file may not gain more copies of the same string than it had before.
+  - `"${pkg}/bin/${pkg.meta.mainProgram}"` must be `lib.getExe pkg`.
+  - `"${pkg}/bin/name"` must be `lib.getExe' pkg "name"`, or `lib.getExe pkg` if `name` is its `meta.mainProgram`.
+  - `"${lib.getExe pkg}"` must be the bare `lib.getExe pkg`, since it already is a string.
+  - Indented strings (`''...''`), strings with extra text, explicit outputs such as `pkg.dev`, and interpolations other than a package attribute or `lib.getBin pkg` are not checked.
+  - This replaces the treewide rewrite attempted in [NixOS/nixpkgs#318290](https://github.com/NixOS/nixpkgs/pull/318290), which stalled because of its size.
