@@ -1,0 +1,1 @@
+{ pkgsStatic }: pkgsStatic.someDrv
