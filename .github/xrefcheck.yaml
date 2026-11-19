@@ -14,6 +14,8 @@ exclusions:
     - .github/ISSUE_TEMPLATE/**/*
     - tests/top-level/symlink-invalid/main/pkgs/by-name/fo/foo/foo
     - tests/top-level/multiple-failures/main/pkgs/by-name/A/fo@/foo
+    - tests/top-level/symlink-invalid-python/main/pkgs/sets/python3Packages/by-name/fo/foo/foo
+    - tests/top-level/multiple-failures-python/main/pkgs/sets/python3Packages/by-name/A/fo@/foo
 
   # References to these paths will not be verified.
   # List of glob patterns.
