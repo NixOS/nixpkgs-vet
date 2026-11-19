@@ -11,7 +11,8 @@ use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169,
+    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169, npv_172,
+    npv_173,
 };
 use crate::validation::{self, Validation, Validation::Success};
 
@@ -52,6 +53,10 @@ pub struct Package {
 
     /// The ratchet value for the check for `meta.license` not being a list.
     pub license_expression: RatchetState<LicenseExpression>,
+
+    /// The ratchet value for the check if a derivation references package sets
+    /// outside of the one currently being eval'd.
+    pub cross_packages: RatchetState<CrossPackageRef>,
 }
 
 impl Package {
@@ -77,6 +82,11 @@ impl Package {
                 name,
                 optional_from.map(|x| &x.license_expression),
                 &to.license_expression,
+            ),
+            RatchetState::<CrossPackageRef>::compare(
+                name,
+                optional_from.map(|x| &x.cross_packages),
+                &to.cross_packages,
             ),
         ])
     }
@@ -241,5 +251,24 @@ impl EnabledAttributeProblem for LicenseExpressionProblem {
 
     fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
         npv_169::TopLevelPackageSwitchedToLicenseList::new(name, file).into()
+    }
+}
+
+/// The ratchet value of an attribute for the check that new packages do not reference other package set.
+///
+/// Net packages must not reference other package sets because it is usually wrong, makes refactoring
+/// difficult, and slows down eval by requiring another Nixpkgs to be evaluated.
+pub enum CrossPackageRef {}
+
+impl ToProblem for CrossPackageRef {
+    type ToContext = RelativePathBuf;
+
+    fn to_problem(name: &str, optional_from: Option<()>, _: &Self::ToContext) -> Problem {
+        let is_new = optional_from.is_none();
+        if is_new {
+            npv_172::NewTopLevelPackageShouldNotRefOtherPackageSet::new(name).into()
+        } else {
+            npv_173::TopLevelPackageAddedCrossPackageRef::new(name).into()
+        }
     }
 }

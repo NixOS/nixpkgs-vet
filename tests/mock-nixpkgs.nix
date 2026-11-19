@@ -95,9 +95,23 @@ let
     else
       [ ];
 
+  cross-file = builtins.toFile "cross-file.conf" "test";
+
+  otherPackageSets = self: super: {
+    pkgsStatic = pkgsFun (
+      [
+        (self: super: {
+          mkFakeDrv = args: super.mkFakeDrv (args // { file = cross-file; });
+        })
+      ]
+      ++ allOverlays
+    );
+  };
+
   # All the overlays in the right order, including the user-supplied ones
   allOverlays = [
     autoCalledPackages
+    otherPackageSets
   ]
   ++ optionalAllPackagesOverlay
   ++ optionalAliasesOverlay
