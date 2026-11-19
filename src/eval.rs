@@ -225,21 +225,27 @@ pub fn check_values(
             )
         })?;
 
+    let cross_refs = check_cross_refs(nixpkgs_path, package_names)?;
+
     let check_result = validation::sequence(
         attributes
             .into_iter()
             .map(|(attribute_name, attribute_value)| {
+                let cross_ref = cross_refs.get(&attribute_name).unwrap_or(&false);
+
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
                         &attribute_name,
                         non_by_name_attribute,
+                        *cross_ref,
                     )?,
                     Attribute::ByName(by_name_attribute) => {
-                        by_name(&attribute_name, by_name_attribute)?
+                        by_name(&attribute_name, by_name_attribute, *cross_ref)?
                     }
                 };
+
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
             })
             .collect_vec()?,
@@ -248,10 +254,56 @@ pub fn check_values(
     Ok(check_result.map(|elems| elems.into_iter().collect()))
 }
 
+fn check_cross_refs(
+    nixpkgs_path: &Path,
+    package_names: &[String],
+) -> anyhow::Result<BTreeMap<String, bool>> {
+    // Pinning Nix in this way makes the tool more reproducible
+    let nix_package = env::var("NIXPKGS_VET_NIX_PACKAGE")
+        .with_context(|| "Could not get environment variable NIXPKGS_VET_NIX_PACKAGE")?;
+
+    // This evals to a newline-seperated list of paths to derivation files.
+    let mut command = process::Command::new(format!("{nix_package}/bin/nix-instantiate"));
+    command
+        // Clear environment so that nothing from the outside influences this `nix-instantiate`.
+        .env_clear()
+        .args(["--eval", "--strict", "--readonly-mode", "--restrict-eval"])
+        .arg("-I")
+        .arg(nixpkgs_path)
+        .args(package_names.iter().flat_map(|name| ["-A", name]));
+
+    let drv_result = command
+        .output()
+        .with_context(|| format!("Failed to run command {command:?}"))?;
+
+    let drvs = String::from_utf8(drv_result.stdout)?;
+
+    let mut output = BTreeMap::new();
+
+    // Check the build requisites for each drv. There is a good tell-tail sign that
+    // the non-native package set is being used, which is that we generate a meson
+    // cross-file.
+    for (drv, package) in drvs.lines().zip(package_names) {
+        let mut command = process::Command::new(format!("{nix_package}/bin/nix-store"));
+        command.env_clear().args(["--query", "--requisites", drv]);
+
+        let build_refs = command
+            .output()
+            .with_context(|| format!("Failed to run command {command:?}"))?;
+
+        let refs_other_sets = String::from_utf8(build_refs.stdout)?.contains("-cross-file.conf\n");
+
+        output.insert(package.clone(), refs_other_sets);
+    }
+
+    Ok(output)
+}
+
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
+    cross_ref: bool,
 ) -> validation::Result<ratchet::Package> {
     // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exist. This match
     // decides whether the attribute `foo` is defined accordingly.
@@ -305,6 +357,11 @@ fn by_name(
                         !uses_license_list,
                         structure::relative_file_for_package(attribute_name),
                     ),
+                    cross_packages: if cross_ref {
+                        Loose(structure::relative_file_for_package(attribute_name))
+                    } else {
+                        Tight
+                    },
                 })
             } else {
                 npv_101::ByNameNonDerivation::new(attribute_name).into()
@@ -328,6 +385,7 @@ fn handle_non_by_name_attribute(
     nix_file_store: &mut NixFileStore,
     attribute_name: &str,
     non_by_name_attribute: NonByNameAttribute,
+    cross_ref: bool,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
@@ -438,9 +496,15 @@ fn handle_non_by_name_attribute(
                 (false, file) => Loose(file),
             };
 
-            let license_expression = match (uses_license_list, evaluated_attribute_file) {
+            let license_expression = match (uses_license_list, evaluated_attribute_file.clone()) {
                 (false, _) => Tight,
                 (true, file) => Loose(file),
+            };
+
+            let cross_packages = if cross_ref {
+                Loose(evaluated_attribute_file)
+            } else {
+                Tight
             };
 
             ratchet::Package {
@@ -448,6 +512,7 @@ fn handle_non_by_name_attribute(
                 strict_deps,
                 structured_attrs,
                 license_expression,
+                cross_packages,
             }
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
@@ -457,6 +522,7 @@ fn handle_non_by_name_attribute(
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
             license_expression: NonApplicable,
+            cross_packages: NonApplicable,
         },
     };
     Ok(Success(package))

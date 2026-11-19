@@ -41,6 +41,8 @@ pub mod npv_169;
 
 pub mod npv_170;
 pub mod npv_171;
+pub mod npv_172;
+pub mod npv_173;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
@@ -140,6 +142,12 @@ pub enum Problem {
 
     /// NPV-171: nix files should not pass list literals to `optional`
     NixFileContainsOptionalList(npv_171::NixFileContainsOptionalList),
+
+    /// NPV-172: new top-level packages reference other package set
+    NewTopLevelPackageCrossPackageRef(npv_172::NewTopLevelPackageShouldNotRefOtherPackageSet),
+
+    /// NPV-173: top level package now references cross package set
+    TopLevelPackageAddedCrossPackageRef(npv_173::TopLevelPackageAddedCrossPackageRef),
 }
 
 impl Problem {
@@ -177,6 +185,8 @@ impl Problem {
             Self::TopLevelPackageSwitchedToLicenseList(..) => "NPV-169",
             Self::NixFileContainsUselessEscape(..) => "NPV-170",
             Self::NixFileContainsOptionalList(..) => "NPV-171",
+            Self::NewTopLevelPackageCrossPackageRef(..) => "NPV-172",
+            Self::TopLevelPackageAddedCrossPackageRef(..) => "NPV-173",
         }
     }
 
@@ -220,6 +230,8 @@ impl fmt::Display for Problem {
             Self::TopLevelPackageSwitchedToLicenseList(inner) => inner.fmt(f),
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
             Self::NixFileContainsOptionalList(inner) => inner.fmt(f),
+            Self::NewTopLevelPackageCrossPackageRef(inner) => inner.fmt(f),
+            Self::TopLevelPackageAddedCrossPackageRef(inner) => inner.fmt(f),
         }
     }
 }
