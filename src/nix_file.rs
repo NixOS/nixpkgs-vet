@@ -78,9 +78,27 @@ impl NixFile {
 
 /// Information about `callPackage` arguments.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CallPackageArgumentInfo {
-    /// The relative path of the first argument, or `None` if it's not a path.
-    pub relative_path: Option<RelativePathBuf>,
+pub enum CallPackageArgumentInfo {
+    RelativePath(RelativePathBuf),
+    NoPath,
+}
+
+impl Into<CallPackageArgumentInfo> for Option<RelativePathBuf> {
+    fn into(self) -> CallPackageArgumentInfo {
+        match self {
+            Some(path) => CallPackageArgumentInfo::RelativePath(path),
+            None => CallPackageArgumentInfo::NoPath,
+        }
+    }
+}
+
+impl From<CallPackageArgumentInfo> for Option<RelativePathBuf> {
+    fn from(other: CallPackageArgumentInfo) -> Option<RelativePathBuf> {
+        match other {
+            CallPackageArgumentInfo::NoPath => None,
+            CallPackageArgumentInfo::RelativePath(path) => Some(path),
+        }
+    }
 }
 
 impl NixFile {
@@ -369,12 +387,53 @@ impl NixFile {
         };
 
         if token.text() == "callPackage" {
-            Ok(Some(CallPackageArgumentInfo {
-                relative_path: path,
-            }))
+            Ok(Some(path.into()))
         } else {
             Ok(None)
         }
+    }
+
+    pub fn attribute_range(
+        &self,
+        attribute: &str,
+        starting_line: usize,
+    ) -> anyhow::Result<Option<(usize, usize)>> {
+        // Because we're prefering the left, start one line further down so that we can catch
+        // attributes on the line itself
+        let index = self.line_index.fromlinecolumn(starting_line + 1, 1);
+
+        let token_at_offset = self
+            .syntax_root
+            .syntax()
+            .token_at_offset(TextSize::from(u32::try_from(index)?));
+
+        let token = match token_at_offset {
+            TokenAtOffset::None => anyhow::bail!("Got an empty file"),
+            TokenAtOffset::Single(t) => t,
+            TokenAtOffset::Between(t, _t) => t,
+        };
+
+        for ancestor in token.parent_ancestors() {
+            if !ast::AttrpathValue::can_cast(ancestor.kind()) {
+                continue;
+            }
+
+            let attrpath_value = ast::AttrpathValue::cast(ancestor).unwrap();
+
+            if attrpath_value
+                .attrpath()
+                .unwrap()
+                .attrs()
+                .any(|current_attr| current_attr.syntax().text() == attribute)
+            {
+                let range = attrpath_value.syntax().text_range();
+                return Ok(Some((
+                    self.line_index.line(usize::from(range.start())),
+                    self.line_index.line(usize::from(range.end())),
+                )));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -597,22 +656,17 @@ mod tests {
             (5, None),
             (
                 6,
-                Some(CallPackageArgumentInfo {
-                    relative_path: Some(RelativePathBuf::from("file.nix")),
-                }),
+                Some(CallPackageArgumentInfo::RelativePath(
+                    RelativePathBuf::from("file.nix"),
+                )),
             ),
             (
                 7,
-                Some(CallPackageArgumentInfo {
-                    relative_path: Some(RelativePathBuf::from("file.nix")),
-                }),
+                Some(CallPackageArgumentInfo::RelativePath(
+                    RelativePathBuf::from("file.nix"),
+                )),
             ),
-            (
-                8,
-                Some(CallPackageArgumentInfo {
-                    relative_path: None,
-                }),
-            ),
+            (8, Some(CallPackageArgumentInfo::NoPath)),
         ];
 
         for (line, expected_result) in cases {
@@ -622,6 +676,44 @@ mod tests {
             assert_eq!(actual_result, expected_result, "line {line}");
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn finds_attribute_range() -> anyhow::Result<()> {
+        let temp_dir = tests::tempdir()?;
+        let file = temp_dir.path().join("file.nix");
+        let contents = indoc! {r#"
+            {
+                hello = {
+                    nested = null;
+                };
+                nested.hello = {
+                    nested = null;
+                };
+                itself = {
+                };
+            }
+        "#};
+
+        // let contents =
+        //     read_to_string("/home/tweagysil/src/nixpkgs/pkgs/top-level/perl-packages.nix")?;
+
+        std::fs::write(&file, contents)?;
+
+        let nix_file = NixFile::new(&file)?;
+
+        let cases = [
+            ("doesNotExist", 1, None),
+            ("hello", 3, Some((2, 4))),
+            ("hello", 6, Some((5, 7))),
+            ("itself", 8, Some((8, 9))),
+            // ("Importer", 17353, Some((17345, 17359))),
+        ];
+        for (attribute, starting_line, expected) in cases {
+            let actual = nix_file.attribute_range(attribute, starting_line)?;
+            assert_eq!(expected, actual);
+        }
         Ok(())
     }
 }

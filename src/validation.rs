@@ -39,7 +39,7 @@ impl<A, P: Into<Problem>> From<P> for Validation<A> {
 pub type Result<A> = anyhow::Result<Validation<A>>;
 
 pub trait ResultIteratorExt<A, E>: Sized + Iterator<Item = std::result::Result<A, E>> {
-    fn collect_vec(self) -> std::result::Result<Vec<A>, E>;
+    fn collect_vec_res(self) -> std::result::Result<Vec<A>, E>;
 }
 
 impl<I, A, E> ResultIteratorExt<A, E> for I
@@ -47,7 +47,7 @@ where
     I: Sized + Iterator<Item = std::result::Result<A, E>>,
 {
     /// A convenience version of `collect` specialised to a vector.
-    fn collect_vec(self) -> std::result::Result<Vec<A>, E> {
+    fn collect_vec_res(self) -> std::result::Result<Vec<A>, E> {
         self.collect()
     }
 }
