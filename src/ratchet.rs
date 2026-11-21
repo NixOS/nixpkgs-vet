@@ -9,9 +9,10 @@ use std::collections::BTreeMap;
 
 use relative_path::RelativePathBuf;
 
+use crate::location::Location;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169,
+    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169, npv_175,
 };
 use crate::validation::{self, Validation, Validation::Success};
 
@@ -52,6 +53,10 @@ pub struct Package {
 
     /// The ratchet value for the check for `meta.license` not being a list.
     pub license_expression: RatchetState<LicenseExpression>,
+
+    /// Literal `*FlagsArray` occurrences in the package definition.
+    /// `None` means that we couldn't resolve a derivation's defining file.
+    pub flags_arrays: Option<FlagsArrayUses>,
 }
 
 impl Package {
@@ -78,7 +83,36 @@ impl Package {
                 optional_from.map(|x| &x.license_expression),
                 &to.license_expression,
             ),
+            match (
+                &to.structured_attrs,
+                &to.flags_arrays,
+                optional_from.map(|from| &from.flags_arrays),
+            ) {
+                (RatchetState::Tight, Some(to), None) => FlagsArrayUses::compare(name, None, to),
+                (RatchetState::Tight, Some(to), Some(Some(from))) => {
+                    FlagsArrayUses::compare(name, Some(from), to)
+                }
+                _ => Success(()),
+            },
         ])
+    }
+}
+
+/// Compare the set of variables used by each package, allowing additional uses
+/// of variables that were already present.
+#[derive(Default)]
+pub struct FlagsArrayUses(pub BTreeMap<String, Vec<Location>>);
+
+impl FlagsArrayUses {
+    fn compare(name: &str, from: Option<&Self>, to: &Self) -> Validation<()> {
+        validation::sequence_(to.0.iter().filter_map(|(variable, locations)| {
+            if from.is_some_and(|from| from.0.contains_key(variable)) {
+                return None;
+            }
+            locations.first().map(|location| {
+                npv_175::StructuredAttrsFlagsArray::new(name, variable, location.clone()).into()
+            })
+        }))
     }
 }
 

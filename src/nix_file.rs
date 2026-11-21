@@ -145,8 +145,13 @@ impl NixFile {
         })
     }
 
-    // Internal function mainly to make it independently testable
-    fn attrpath_value_at(
+    /// Finds the definition at a 1-indexed line and column, such as a position
+    /// returned by `builtins.unsafeGetAttrPos`.
+    ///
+    /// Returns `Ok(Left(..))` with the syntax text for an inherited attribute,
+    /// `Ok(Right(..))` for an attribute path assignment,
+    /// or `Err` if the syntax does not have the expected form.
+    pub(crate) fn attrpath_value_at(
         &self,
         line: usize,
         column: usize,

@@ -11,6 +11,7 @@
 
 mod eval;
 mod files;
+mod flags_array;
 mod location;
 mod nix_file;
 mod problem;

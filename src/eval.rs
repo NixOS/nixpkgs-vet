@@ -12,7 +12,9 @@ use crate::structure::BASE_SUBPATH;
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::{NixFileStore, structure};
-use crate::{location, ratchet};
+use crate::{flags_array, location, ratchet};
+use itertools::Either;
+use rowan::ast::AstNode;
 
 const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 
@@ -236,9 +238,12 @@ pub fn check_values(
                         &attribute_name,
                         non_by_name_attribute,
                     )?,
-                    Attribute::ByName(by_name_attribute) => {
-                        by_name(&attribute_name, by_name_attribute)?
-                    }
+                    Attribute::ByName(by_name_attribute) => by_name(
+                        nixpkgs_path,
+                        nix_file_store,
+                        &attribute_name,
+                        by_name_attribute,
+                    )?,
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
             })
@@ -250,6 +255,8 @@ pub fn check_values(
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
+    nixpkgs_path: &Path,
+    nix_file_store: &mut NixFileStore,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -305,6 +312,11 @@ fn by_name(
                         !uses_license_list,
                         structure::relative_file_for_package(attribute_name),
                     ),
+                    flags_arrays: Some(flags_array_uses(
+                        nixpkgs_path,
+                        nix_file_store,
+                        &structure::relative_file_for_package(attribute_name),
+                    )?),
                 })
             } else {
                 npv_101::ByNameNonDerivation::new(attribute_name).into()
@@ -312,6 +324,23 @@ fn by_name(
         }
     };
     Ok(result)
+}
+
+fn flags_array_uses(
+    nixpkgs_path: &Path,
+    nix_file_store: &mut NixFileStore,
+    file: &relative_path::RelativePath,
+) -> anyhow::Result<ratchet::FlagsArrayUses> {
+    // Like `import`, `callPackage` also accepts a directory containing default.nix.
+    let file = if file.to_path(nixpkgs_path).is_dir() {
+        file.join("default.nix")
+    } else {
+        file.to_relative_path_buf()
+    };
+    Ok(ratchet::FlagsArrayUses({
+        let parsed = nix_file_store.get(&file.to_path(nixpkgs_path))?;
+        flags_array::find_uses(parsed, &file, parsed.syntax_root.syntax())
+    }))
 }
 
 fn enabled_attribute_ratchet<R>(enabled: bool, file: RelativePathBuf) -> ratchet::RatchetState<R>
@@ -428,9 +457,34 @@ fn handle_non_by_name_attribute(
                 .and_then(|call_package| call_package.relative_path.clone())
                 .unwrap_or_else(|| location.file.clone());
 
+            let inline_flags_arrays =
+                match nix_file.attrpath_value_at(location.line, location.column)? {
+                    Either::Right(definition) => definition.value().map(|value| {
+                        ratchet::FlagsArrayUses(flags_array::find_uses(
+                            nix_file,
+                            &location.file,
+                            value.syntax(),
+                        ))
+                    }),
+                    Either::Left(_) => None,
+                };
+
             let strict_deps = match (strict_deps, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
                 (false, file) => Loose(file),
+            };
+
+            let flags_arrays = if optional_syntactic_call_package
+                .as_ref()
+                .is_some_and(|call_package| call_package.relative_path.is_some())
+            {
+                Some(flags_array_uses(
+                    nixpkgs_path,
+                    nix_file_store,
+                    &evaluated_attribute_file,
+                )?)
+            } else {
+                inline_flags_arrays
             };
 
             let structured_attrs = match (structured_attrs, evaluated_attribute_file.clone()) {
@@ -448,6 +502,7 @@ fn handle_non_by_name_attribute(
                 strict_deps,
                 structured_attrs,
                 license_expression,
+                flags_arrays,
             }
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
@@ -457,6 +512,7 @@ fn handle_non_by_name_attribute(
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
             license_expression: NonApplicable,
+            flags_arrays: None,
         },
     };
     Ok(Success(package))
