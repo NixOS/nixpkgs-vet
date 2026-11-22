@@ -11,7 +11,8 @@ use relative_path::RelativePathBuf;
 
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
-    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169,
+    Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169, npv_176,
+    npv_177,
 };
 use crate::validation::{self, Validation, Validation::Success};
 
@@ -52,6 +53,9 @@ pub struct Package {
 
     /// The ratchet value for the check for `meta.license` not being a list.
     pub license_expression: RatchetState<LicenseExpression>,
+
+    /// The value for for checking that `dontCargoUseSystemLibs` is never true.
+    pub cargo_system_libs: RatchetState<CargoSystemLib>,
 }
 
 impl Package {
@@ -77,6 +81,11 @@ impl Package {
                 name,
                 optional_from.map(|x| &x.license_expression),
                 &to.license_expression,
+            ),
+            RatchetState::<CargoSystemLib>::compare(
+                name,
+                optional_from.map(|x| &x.cargo_system_libs),
+                &to.cargo_system_libs,
             ),
         ])
     }
@@ -241,5 +250,22 @@ impl EnabledAttributeProblem for LicenseExpressionProblem {
 
     fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
         npv_169::TopLevelPackageSwitchedToLicenseList::new(name, file).into()
+    }
+}
+
+/// The ratchet value of an attribute never enabling `dontCargoUseSystemLibs`
+///
+/// This started as all packages set to false. This should never regress.
+pub type CargoSystemLib = EnabledAttribute<CargoSystemLibsProblem>;
+
+pub enum CargoSystemLibsProblem {}
+
+impl EnabledAttributeProblem for CargoSystemLibsProblem {
+    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_177::NewTopLevelPackageMustDisableCargoSystemLibs::new(name, file).into()
+    }
+
+    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
+        npv_176::TopLevelPackageEnabledCargoSystemLibs::new(name, file).into()
     }
 }

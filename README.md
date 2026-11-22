@@ -101,3 +101,5 @@ The current ratchets are:
   - Once a top-level package evaluates with `__structuredAttrs = true`, it also can't regress to `false`.
 - New top-level packages must not use a list for `meta.license`.
   - Once a top-level package doesn't use a list for `meta.license`, it also can't regress to using one.
+- New top-level packages must not enable `dontCargoUseSystemLibs`.
+  - Once a top-level package disables `dontCargoUseSystemLibs`, it also can't regress to enabling it.

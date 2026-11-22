@@ -86,6 +86,10 @@ pub enum AttributeVariant {
         uses_license_list: bool,
         /// Whether the attribute was defined via `callPackage` of the same scope
         is_same_scope_call_package: bool,
+        /// `dontCargoUseSystemLibs` value
+        ///
+        /// Should always be false.
+        cargo_system_libs_enabled: bool,
     },
 }
 
@@ -286,6 +290,7 @@ fn by_name(
                     structured_attrs,
                     uses_license_list,
                     is_same_scope_call_package: _,
+                    cargo_system_libs_enabled,
                 },
             location: _,
         }) => {
@@ -303,6 +308,10 @@ fn by_name(
                     ),
                     license_expression: enabled_attribute_ratchet(
                         !uses_license_list,
+                        structure::relative_file_for_package(attribute_name),
+                    ),
+                    cargo_system_libs: enabled_attribute_ratchet(
+                        !cargo_system_libs_enabled,
                         structure::relative_file_for_package(attribute_name),
                     ),
                 })
@@ -361,6 +370,7 @@ fn handle_non_by_name_attribute(
                     structured_attrs,
                     uses_license_list,
                     is_same_scope_call_package,
+                    cargo_system_libs_enabled,
                 },
             location: Some(location),
         }) => {
@@ -438,7 +448,12 @@ fn handle_non_by_name_attribute(
                 (false, file) => Loose(file),
             };
 
-            let license_expression = match (uses_license_list, evaluated_attribute_file) {
+            let license_expression = match (uses_license_list, evaluated_attribute_file.clone()) {
+                (false, _) => Tight,
+                (true, file) => Loose(file),
+            };
+
+            let cargo_system_libs = match (cargo_system_libs_enabled, evaluated_attribute_file) {
                 (false, _) => Tight,
                 (true, file) => Loose(file),
             };
@@ -448,6 +463,7 @@ fn handle_non_by_name_attribute(
                 strict_deps,
                 structured_attrs,
                 license_expression,
+                cargo_system_libs,
             }
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
@@ -457,6 +473,7 @@ fn handle_non_by_name_attribute(
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
             license_expression: NonApplicable,
+            cargo_system_libs: NonApplicable,
         },
     };
     Ok(Success(package))

@@ -70,6 +70,7 @@ let
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
             is_same_scope_call_package = value._callPackage or false;
+            cargo_system_libs_enabled = cleanPackage.dontCargoUseSystemLibs or false;
           };
         };
   };
