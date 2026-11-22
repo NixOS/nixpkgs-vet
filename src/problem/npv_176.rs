@@ -20,7 +20,7 @@ impl fmt::Display for TopLevelPackageEnabledCargoSystemLibs {
             "
             - Attribute `{package_name}` sets `dontCargoUseSystemLibs` to `true`.
               Please remove this and link to the nixpkgs-provided library, or if this is truly not possible,
-              please add a target fix for the specific library that needs to be allowed in {file}.
+              please add a targeted fix for the specific library that needs to be allowed in {file}.
 
               `dontCargoUseSystemLibs` is for out-of-tree usage, and is not allowed within Nixpkgs.
             ",
