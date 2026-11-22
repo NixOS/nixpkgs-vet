@@ -43,7 +43,6 @@ pub mod npv_170;
 pub mod npv_171;
 
 pub mod npv_176;
-pub mod npv_177;
 
 const WIKI_BASE_URL: &str = "https://github.com/NixOS/nixpkgs-vet/wiki";
 
@@ -146,9 +145,6 @@ pub enum Problem {
 
     /// NPV-176: Ban `dontCargoUseSystemLibs = true`
     TopLevelPackageEnabledCargoSystemLibs(npv_176::TopLevelPackageEnabledCargoSystemLibs),
-
-    /// NPV-177: Ban new packages from `dontCargoUseSystemLibs = true`
-    NewTopLevelPackageEnabledCargoSystemLibs(npv_177::NewTopLevelPackageMustDisableCargoSystemLibs),
 }
 
 impl Problem {
@@ -187,7 +183,6 @@ impl Problem {
             Self::NixFileContainsUselessEscape(..) => "NPV-170",
             Self::NixFileContainsOptionalList(..) => "NPV-171",
             Self::TopLevelPackageEnabledCargoSystemLibs(..) => "NPV-176",
-            Self::NewTopLevelPackageEnabledCargoSystemLibs(..) => "NPV-177",
         }
     }
 
@@ -232,7 +227,6 @@ impl fmt::Display for Problem {
             Self::NixFileContainsUselessEscape(inner) => inner.fmt(f),
             Self::NixFileContainsOptionalList(inner) => inner.fmt(f),
             Self::TopLevelPackageEnabledCargoSystemLibs(inner) => inner.fmt(f),
-            Self::NewTopLevelPackageEnabledCargoSystemLibs(inner) => inner.fmt(f),
         }
     }
 }

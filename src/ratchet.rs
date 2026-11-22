@@ -12,7 +12,6 @@ use relative_path::RelativePathBuf;
 use crate::nix_file::CallPackageArgumentInfo;
 use crate::problem::{
     Problem, npv_160, npv_162, npv_164, npv_165, npv_166, npv_167, npv_168, npv_169, npv_176,
-    npv_177,
 };
 use crate::validation::{self, Validation, Validation::Success};
 
@@ -262,7 +261,7 @@ pub enum CargoSystemLibsProblem {}
 
 impl EnabledAttributeProblem for CargoSystemLibsProblem {
     fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_177::NewTopLevelPackageMustDisableCargoSystemLibs::new(name, file).into()
+        npv_176::TopLevelPackageEnabledCargoSystemLibs::new(name, file).into()
     }
 
     fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
