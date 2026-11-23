@@ -2,16 +2,32 @@
 #
 # Returns a value containing information on all Nixpkgs attributes which is decoded on the Rust
 # side. See ./eval.rs for the meaning of the returned values.
-{ packageNamesFilePath, nixpkgsPath }:
+{
+  packageNamesFilePath,
+  nixpkgsPath,
+  attrPath,
+}:
 let
   attrs = builtins.fromJSON (builtins.readFile packageNamesFilePath);
 
-  # We need to check whether attributes are defined via callPackage of the same scope or not.
-  overlay = final: prev: {
+  inherit (import nixpkgsPath { }) lib;
 
-    # Adds information to each attribute about whether it's defined using this scope's `callPackage`
-    callPackage = fn: args: addCallPackageReference (prev.callPackage fn args);
-  };
+  # We need to check whether attributes are defined via callPackage of the same scope or not.
+  overlay =
+    final: prev:
+    if attrPath == [ ] then
+      {
+        # Adds information to each attribute about whether it's defined using this scope's `callPackage`
+        callPackage = fn: args: addCallPackageReference (prev.callPackage fn args);
+      }
+    else
+      lib.setAttrByPath attrPath (
+        (lib.getAttrFromPath attrPath prev).overrideScope (
+          final: prev: {
+            callPackage = fn: args: addCallPackageReference (final.newScope { } fn args);
+          }
+        )
+      );
 
   # We can't just replace attribute values with their info in the overlay, because attributes can
   # depend on other attributes, so this would break evaluation.
@@ -25,13 +41,15 @@ let
       # don't return the value directly and treat it as if it wasn't a `callPackage`.
       value;
 
-  pkgs = import nixpkgsPath {
-    # Don't let the user's home directory influence this result.
-    config = { };
-    overlays = [ overlay ];
-    # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
-    system = "x86_64-linux";
-  };
+  pkgs = lib.attrByPath attrPath { } (
+    import nixpkgsPath {
+      # Don't let the user's home directory influence this result.
+      config = { };
+      overlays = [ overlay ];
+      # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
+      system = "x86_64-linux";
+    }
+  );
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
   attrInfo = name: value: {
@@ -65,7 +83,7 @@ let
         in
         {
           AttributeSet = {
-            is_derivation = pkgs.lib.isDerivation value;
+            is_derivation = lib.isDerivation value;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);

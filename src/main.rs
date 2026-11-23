@@ -110,6 +110,7 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
 /// ratchet check against another result.
 fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
     let by_name_subpath = RelativePathBuf::from("pkgs/by-name");
+    let attr_path = vec![];
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
             "Nixpkgs path {} could not be resolved",
@@ -131,6 +132,7 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
                 eval::check_values(
                     &nixpkgs_path,
                     &by_name_subpath,
+                    &attr_path,
                     &mut nix_file_store,
                     package_names.as_slice(),
                 )

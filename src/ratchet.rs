@@ -20,7 +20,7 @@ use crate::validation::{self, Validation, Validation::Success};
 #[derive(Default)]
 pub struct Nixpkgs {
     /// The ratchet values for all packages
-    pub packages: BTreeMap<String, Package>,
+    pub packages: BTreeMap<Vec<String>, Package>,
     pub files: BTreeMap<RelativePathBuf, File>,
 }
 
@@ -30,9 +30,9 @@ impl Nixpkgs {
         validation::sequence_(
             // We only loop over the current attributes,
             // we don't need to check ones that were removed
-            to.packages
-                .into_iter()
-                .map(|(name, pkg)| Package::compare(&name, from.packages.get(&name), &pkg)),
+            to.packages.into_iter().map(|(full_attr_path, pkg)| {
+                Package::compare(&full_attr_path, from.packages.get(&full_attr_path), &pkg)
+            }),
         )
         .and_(validation::sequence_(to.files.into_iter().map(
             |(name, file)| File::compare(&name, from.files.get(&name), &file),
@@ -60,30 +60,34 @@ pub struct Package {
 
 impl Package {
     /// Validates the ratchet checks for a top-level package
-    pub fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+    pub fn compare(
+        full_attr_path: &[String],
+        optional_from: Option<&Self>,
+        to: &Self,
+    ) -> Validation<()> {
         validation::sequence_([
             RatchetState::<UsesByName>::compare(
-                name,
+                full_attr_path,
                 optional_from.map(|x| &x.uses_by_name),
                 &to.uses_by_name,
             ),
             RatchetState::<StrictDeps>::compare(
-                name,
+                full_attr_path,
                 optional_from.map(|x| &x.strict_deps),
                 &to.strict_deps,
             ),
             RatchetState::<StructuredAttrs>::compare(
-                name,
+                full_attr_path,
                 optional_from.map(|x| &x.structured_attrs),
                 &to.structured_attrs,
             ),
             RatchetState::<LicenseExpression>::compare(
-                name,
+                full_attr_path,
                 optional_from.map(|x| &x.license_expression),
                 &to.license_expression,
             ),
             RatchetState::<CargoSystemLib>::compare(
-                name,
+                full_attr_path,
                 optional_from.map(|x| &x.cargo_system_libs),
                 &to.cargo_system_libs,
             ),
@@ -128,22 +132,30 @@ pub trait ToProblem {
     type ToContext;
 
     /// How to convert an attribute-specific error context into a Problem.
-    fn to_problem(name: &str, optional_from: Option<()>, to: &Self::ToContext) -> Problem;
+    fn to_problem(
+        full_attr_path: &[String],
+        optional_from: Option<()>,
+        to: &Self::ToContext,
+    ) -> Problem;
 }
 
 impl<Context: ToProblem> RatchetState<Context> {
     /// Compare the previous ratchet state of an attribute to the new state.
     /// The previous state may be `None` in case the attribute is new.
-    fn compare(name: &str, optional_from: Option<&Self>, to: &Self) -> Validation<()> {
+    fn compare(
+        full_attr_path: &[String],
+        optional_from: Option<&Self>,
+        to: &Self,
+    ) -> Validation<()> {
         match (optional_from, to) {
             // Loosening a ratchet is not allowed.
             (Some(RatchetState::Tight), RatchetState::Loose(loose_context)) => {
-                Context::to_problem(name, Some(()), loose_context).into()
+                Context::to_problem(full_attr_path, Some(()), loose_context).into()
             }
 
             // Introducing a loose ratchet is also not allowed.
             (None, RatchetState::Loose(loose_context)) => {
-                Context::to_problem(name, None, loose_context).into()
+                Context::to_problem(full_attr_path, None, loose_context).into()
             }
 
             // Everything else is allowed, including:
@@ -167,7 +179,7 @@ impl ToProblem for UsesByName {
     type ToContext = (CallPackageArgumentInfo, RelativePathBuf, RelativePathBuf);
 
     fn to_problem(
-        name: &str,
+        full_attr_path: &[String],
         optional_from: Option<()>,
         (to, file, by_name_subpath): &Self::ToContext,
     ) -> Problem {
@@ -175,14 +187,14 @@ impl ToProblem for UsesByName {
         if is_new {
             npv_162::NewTopLevelPackageShouldBeByName::new(
                 by_name_subpath,
-                name,
+                full_attr_path,
                 to.relative_path.clone(),
             )
             .into()
         } else {
             npv_160::TopLevelPackageMovedOutOfByName::new(
                 by_name_subpath,
-                name,
+                full_attr_path,
                 to.relative_path.clone(),
                 file,
             )
@@ -192,8 +204,8 @@ impl ToProblem for UsesByName {
 }
 
 pub trait EnabledAttributeProblem {
-    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem;
-    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem;
+    fn introduced_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem;
+    fn regressed_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem;
 }
 
 /// The ratchet value of an evaluated boolean attribute that must be enabled for new packages and
@@ -203,11 +215,15 @@ pub struct EnabledAttribute<ProblemKind>(PhantomData<ProblemKind>);
 impl<ProblemKind: EnabledAttributeProblem> ToProblem for EnabledAttribute<ProblemKind> {
     type ToContext = RelativePathBuf;
 
-    fn to_problem(name: &str, optional_from: Option<()>, file: &Self::ToContext) -> Problem {
+    fn to_problem(
+        full_attr_path: &[String],
+        optional_from: Option<()>,
+        file: &Self::ToContext,
+    ) -> Problem {
         if optional_from.is_some() {
-            ProblemKind::regressed_problem(name, file.clone())
+            ProblemKind::regressed_problem(full_attr_path, file.clone())
         } else {
-            ProblemKind::introduced_problem(name, file.clone())
+            ProblemKind::introduced_problem(full_attr_path, file.clone())
         }
     }
 }
@@ -221,12 +237,12 @@ pub type StrictDeps = EnabledAttribute<StrictDepsProblem>;
 pub enum StrictDepsProblem {}
 
 impl EnabledAttributeProblem for StrictDepsProblem {
-    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_164::NewTopLevelPackageMustEnableStrictDeps::new(name, file).into()
+    fn introduced_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_164::NewTopLevelPackageMustEnableStrictDeps::new(full_attr_path, file).into()
     }
 
-    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_165::TopLevelPackageDisabledStrictDeps::new(name, file).into()
+    fn regressed_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_165::TopLevelPackageDisabledStrictDeps::new(full_attr_path, file).into()
     }
 }
 
@@ -240,12 +256,12 @@ pub type StructuredAttrs = EnabledAttribute<StructuredAttrsProblem>;
 pub enum StructuredAttrsProblem {}
 
 impl EnabledAttributeProblem for StructuredAttrsProblem {
-    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_166::NewTopLevelPackageMustEnableStructuredAttrs::new(name, file).into()
+    fn introduced_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_166::NewTopLevelPackageMustEnableStructuredAttrs::new(full_attr_path, file).into()
     }
 
-    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_167::TopLevelPackageDisabledStructuredAttrs::new(name, file).into()
+    fn regressed_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_167::TopLevelPackageDisabledStructuredAttrs::new(full_attr_path, file).into()
     }
 }
 
@@ -259,12 +275,12 @@ pub type LicenseExpression = EnabledAttribute<LicenseExpressionProblem>;
 pub enum LicenseExpressionProblem {}
 
 impl EnabledAttributeProblem for LicenseExpressionProblem {
-    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_168::NewTopLevelPackageUsesLicenseList::new(name, file).into()
+    fn introduced_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_168::NewTopLevelPackageUsesLicenseList::new(full_attr_path, file).into()
     }
 
-    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_169::TopLevelPackageSwitchedToLicenseList::new(name, file).into()
+    fn regressed_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_169::TopLevelPackageSwitchedToLicenseList::new(full_attr_path, file).into()
     }
 }
 
@@ -276,11 +292,11 @@ pub type CargoSystemLib = EnabledAttribute<CargoSystemLibsProblem>;
 pub enum CargoSystemLibsProblem {}
 
 impl EnabledAttributeProblem for CargoSystemLibsProblem {
-    fn introduced_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_177::NewTopLevelPackageMustDisableCargoSystemLibs::new(name, file).into()
+    fn introduced_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_177::NewTopLevelPackageMustDisableCargoSystemLibs::new(full_attr_path, file).into()
     }
 
-    fn regressed_problem(name: &str, file: RelativePathBuf) -> Problem {
-        npv_176::TopLevelPackageEnabledCargoSystemLibs::new(name, file).into()
+    fn regressed_problem(full_attr_path: &[String], file: RelativePathBuf) -> Problem {
+        npv_176::TopLevelPackageEnabledCargoSystemLibs::new(full_attr_path, file).into()
     }
 }
