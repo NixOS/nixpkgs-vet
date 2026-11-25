@@ -1,3 +1,25 @@
+## 0.3.6 (2026-11-25)
+
+### Features
+
+#### Add ratchet check for list-valued `meta.license` (#316)
+
+Nixpkgs is moving from `meta.license = [ ... ]` to compound license expressions built with `lib.licenses.OR` and `lib.licenses.AND`.
+
+New top-level packages must no longer use a list for `meta.license` (NPV-168), and packages that don't use a list can't regress to using one (NPV-169).
+
+By @Skyb0rg007
+
+#### Ban `dontCargoUseSystemLibs = true` (#326)
+
+Top-level packages must never set `dontCargoUseSystemLibs` to `true`. This is for
+the security of our users. Setting this attribute to true is too big of a hammer as
+it allows any vendored libraries in a Rust package (NPV-176). Rather, if there are specific
+libraries that cannot be linked to nixpkgs-provided libraries, they should have more
+targeted fixes rather than a blanket allow.
+
+By @RossSmyth
+
 ## 0.3.5 (2026-09-23)
 
 ### Features
