@@ -1,7 +1,7 @@
 - Attribute `foo` sets `dontCargoUseSystemLibs` to `true`.
   Please remove this and link to the nixpkgs-provided library, or if this is truly not possible,
-  please add a target fix for the specific library that needs to be allowed in pkgs/by-name/fo/foo/package.nix.
+  please add a targeted fix for the specific library that needs to be allowed in pkgs/by-name/fo/foo/package.nix.
 
   `dontCargoUseSystemLibs` is for out-of-tree usage, and is not allowed within Nixpkgs.
- (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-177)
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-176)
 This PR introduces additional instances of discouraged patterns as listed above. Please fix them before merging.
