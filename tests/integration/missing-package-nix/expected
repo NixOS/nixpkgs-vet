@@ -1,2 +1,3 @@
 - pkgs/by-name/fo/foo: Missing required "package.nix" file. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-143)
+- pkgs/sets/fooPackages/by-name/fo/foo: Missing required "package.nix" file. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-143)
 This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.
