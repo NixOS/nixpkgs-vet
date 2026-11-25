@@ -1,0 +1,10 @@
+{
+    "package_sets": [
+        {
+            "by_name_subpath": "pkgs/sets/fooPackages/by-name",
+            "attr_path": [
+                "fooPackages"
+            ]
+        }
+    ]
+}

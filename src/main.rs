@@ -23,12 +23,15 @@ mod validation;
 use anyhow::Context as _;
 use clap::Parser;
 use relative_path::RelativePathBuf;
+use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::{panic, thread};
 
 use crate::nix_file::NixFileStore;
+use crate::problem::npv_180;
 use crate::status::{ColoredStatus, Status};
 use crate::structure::check_structure;
 use crate::validation::Validation::Failure;
@@ -59,6 +62,44 @@ pub struct Args {
     base: PathBuf,
 }
 
+// default config
+#[cfg(not(test))]
+const DEFAULT_NIXPKGS_VET_JSON: &str = include_str!("../default-nixpkgs-vet.json");
+// default config for tests
+#[cfg(test)]
+const DEFAULT_NIXPKGS_VET_JSON: &str = include_str!("../tests/tests-nixpkgs-vet.json");
+
+/// config file format
+#[derive(Clone, Deserialize)]
+pub struct Config {
+    /// List of package sets that is to be checked by nixpkgs-vet
+    package_sets: Vec<PkgSet>,
+}
+
+/// one checked package set, characterized the file- and attribute path
+#[derive(Clone, Deserialize)]
+pub struct PkgSet {
+    /// The path to the by-name folder
+    /// e.g. pkgs/by-name
+    by_name_subpath: RelativePathBuf,
+
+    /// The attribute path to the package set
+    /// empty for the top-level package set
+    attr_path: Vec<String>,
+}
+
+impl Config {
+    /// reads in the confing file at the given path with serde
+    fn read(path: &Path) -> Result<Self, serde_json::Error> {
+        let mut config_path: PathBuf = path.into();
+        config_path.push("nixpkgs-vet.json");
+        let config_content =
+            read_to_string(config_path).unwrap_or_else(|_| String::from(DEFAULT_NIXPKGS_VET_JSON));
+
+        serde_json::from_str(&config_content)
+    }
+}
+
 fn main() -> ExitCode {
     let args = Args::parse();
     let status: ColoredStatus = process(args.base, &args.nixpkgs).into();
@@ -72,9 +113,42 @@ fn main() -> ExitCode {
 /// - `base_nixpkgs`: Path to the base Nixpkgs to run ratchet checks against.
 /// - `main_nixpkgs`: Path to the main Nixpkgs to check.
 fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
+    // Parse the config files, return the respective Status when parsing fails.
+    let (base_config, main_config) = match (Config::read(&base_nixpkgs), Config::read(main_nixpkgs))
+    {
+        (Err(_), Err(e)) => {
+            return Status::BranchStillBroken(vec![
+                npv_180::ConfigFileIsBroken::new(format!("{e}")).into(),
+            ]);
+        }
+        (Err(_), Ok(_)) => return Status::BranchHealed,
+        (Ok(_), Err(e)) => {
+            return Status::ProblemsIntroduced(vec![
+                npv_180::ConfigFileIsBroken::new(format!("{e}")).into(),
+            ]);
+        }
+        (Ok(c1), Ok(c2)) => (c1, c2),
+    };
+
+    // Remove newly introduced package sets from the main config.
+    // Newly added package sets will not get eval checked.
+    // Otherwise migrating a large package set would be near impossible.
+    // (The ratchet would need to be tight before adding it to nixpkgs-vet).
+    let new_package_sets: Vec<PkgSet> = main_config
+        .package_sets
+        .clone()
+        .into_iter()
+        .filter(|x1| {
+            base_config
+                .package_sets
+                .iter()
+                .all(|x2| x2.attr_path != x1.attr_path)
+        })
+        .collect();
+
     // Very easy to parallelise this, since both operations are totally independent of each other.
-    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs));
-    let main_result = match check_nixpkgs(main_nixpkgs) {
+    let base_thread = thread::spawn(move || check_nixpkgs(&base_nixpkgs, base_config, &[]));
+    let main_result = match check_nixpkgs(main_nixpkgs, main_config, &new_package_sets) {
         Ok(result) => result,
         Err(error) => {
             return error.into();
@@ -108,9 +182,11 @@ fn process(base_nixpkgs: PathBuf, main_nixpkgs: &Path) -> Status {
 /// This does not include ratchet checks, see ../README.md#ratchet-checks
 /// Instead a `ratchet::Nixpkgs` value is returned, whose `compare` method allows performing the
 /// ratchet check against another result.
-fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
-    let by_name_subpath = RelativePathBuf::from("pkgs/by-name");
-    let attr_path = vec![];
+fn check_nixpkgs(
+    nixpkgs_path: &Path,
+    config: Config,
+    new_package_sets: &[PkgSet],
+) -> validation::Result<ratchet::Nixpkgs> {
     let nixpkgs_path = nixpkgs_path.canonicalize().with_context(|| {
         format!(
             "Nixpkgs path {} could not be resolved",
@@ -120,25 +196,50 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
     let mut nix_file_store = NixFileStore::default();
 
-    let package_result = {
-        if !nixpkgs_path.join(by_name_subpath.as_str()).exists() {
-            // No directory at the given location (e.g. pkgs/by-name), always valid
-            Success(BTreeMap::new())
-        } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store, &by_name_subpath)?;
+    let mut package_result = Success(BTreeMap::new());
 
-            // Only if we could successfully parse the structure, we do the evaluation checks
-            structure.result_map(|package_names| {
-                eval::check_values(
-                    &nixpkgs_path,
-                    &by_name_subpath,
-                    &attr_path,
-                    &mut nix_file_store,
-                    package_names.as_slice(),
-                )
-            })?
+    for pkgset in config.package_sets {
+        let mut other_package_result =
+            if !nixpkgs_path.join(pkgset.by_name_subpath.as_str()).exists() {
+                // No directory at the given location (e.g. pkgs/by-name), always valid
+                Success(BTreeMap::new())
+            } else {
+                let structure =
+                    check_structure(&nixpkgs_path, &mut nix_file_store, &pkgset.by_name_subpath)?;
+
+                // Only if we could successfully parse the structure, we do the evaluation checks
+                structure.result_map(|package_names| {
+                    eval::check_values(
+                        &nixpkgs_path,
+                        &pkgset.by_name_subpath,
+                        &pkgset.attr_path,
+                        &mut nix_file_store,
+                        package_names.as_slice(),
+                    )
+                })?
+            };
+
+        // ignore certain problems for new package sets
+        if new_package_sets
+            .iter()
+            .any(|x| x.attr_path == pkgset.attr_path)
+        {
+            other_package_result = other_package_result.map(|package_result_inner| {
+                package_result_inner
+                    .into_iter()
+                    .filter(|(_full_attr_path, package)| {
+                        // skip checks for packages that don't use by-name
+                        matches!(package.uses_by_name, ratchet::RatchetState::Tight)
+                    })
+                    .collect()
+            });
         }
-    };
+
+        package_result = package_result.and(other_package_result, |mut self_, mut other| {
+            self_.append(&mut other);
+            self_
+        });
+    }
 
     let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
 
@@ -198,6 +299,11 @@ mod tests {
         }
 
         let base = path.join("main/pkgs/by-name");
+        fs::create_dir_all(path.join("main"))?;
+        fs::write(
+            path.join("main/nixpkgs-vet.json"),
+            include_str!("../tests/tests-nixpkgs-vet.json"),
+        )?;
 
         fs::create_dir_all(base.join("fo/foo"))?;
         fs::write(base.join("fo/foo/package.nix"), "{ someDrv }: someDrv")?;

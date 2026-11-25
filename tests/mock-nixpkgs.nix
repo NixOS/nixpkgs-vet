@@ -56,13 +56,12 @@ let
       });
     };
 
-  baseDirectory = root + "/pkgs/by-name";
-
-  # Generates { <name> = <file>; } entries mapping package names to their `package.nix` files in `pkgs/by-name`.
+  # Generates { <name> = <file>; } entries mapping package names to their `package.nix` files in the `baseDirectory`
   # Could be more efficient, but this is only for testing.
-  autoCalledPackageFiles =
+  autoCalledPackageFilesFor =
+    baseDirectory:
     let
-      entries = builtins.readDir baseDirectory;
+      entries = if builtins.pathExists baseDirectory then builtins.readDir baseDirectory else { };
 
       namesForShard =
         shard:
@@ -76,24 +75,64 @@ let
     in
     builtins.foldl' (acc: el: acc // el) { } (map namesForShard (builtins.attrNames entries));
 
-  # Turns autoCalledPackageFiles into an overlay that `callPackage`'s all of them
-  autoCalledPackages =
-    self: super: builtins.mapAttrs (name: file: self.callPackage file { }) autoCalledPackageFiles;
+  # Turns autoCalledPackagesFor into an overlay that `callPackage`'s all of them
+  autoCalledPackagesFor =
+    by_name_subpth: final: prev:
+    builtins.mapAttrs (name: file: final.callPackage file { }) (
+      autoCalledPackageFilesFor (root + "/${by_name_subpth}")
+    );
+
+  autoCalledPackages = autoCalledPackagesFor "pkgs/by-name";
+
+  # A list optionally containing an overlay imported from the given path.
+  importIfExists =
+    path: if builtins.pathExists (root + "/${path}") then [ (import (root + "/${path}")) ] else [ ];
 
   # A list optionally containing the `all-packages.nix` file from the test case as an overlay
-  optionalAllPackagesOverlay =
-    if builtins.pathExists (root + "/pkgs/top-level/all-packages.nix") then
-      [ (import (root + "/pkgs/top-level/all-packages.nix")) ]
-    else
-      [ ];
+  optionalAllPackagesOverlay = importIfExists "pkgs/top-level/all-packages.nix";
 
   # A list optionally containing the `aliases.nix` file from the test case as an overlay
   # But only if config.allowAliases is not false
   optionalAliasesOverlay =
-    if (config.allowAliases or true) && builtins.pathExists (root + "/aliases.nix") then
-      [ (import (root + "/aliases.nix")) ]
+    if (config.allowAliases or true) then (importIfExists "aliases.nix") else [ ];
+
+  # A list of top level package sets in pkgs/sets.
+  # For now the tests only cover top level package sets.
+  packageSets =
+    if builtins.pathExists (root + "/pkgs/sets") then
+      builtins.attrNames (builtins.readDir (root + "/pkgs/sets"))
     else
       [ ];
+
+  # A list of overlays, each containing a package set with their autocalled packages,
+  # manual packages and aliases.
+  packageSetOverlays = lib.flip map packageSets (
+    name:
+    let
+      # Like the outer scope autoCalledPackages, but for the package set
+      autoCalledPackages = autoCalledPackagesFor "pkgs/sets/${name}/by-name";
+
+      # Like the outer scope optionalAllPackagesOverlay, but for the package set
+      optionalManualPackagesOverlay = importIfExists "pkgs/sets/${name}/manual-packages.nix";
+
+      # Like the outer scope optionalAliasesOverlay, but for the package set
+      optionalAliasesOverlay =
+        if (config.allowAliases or true) then (importIfExists "pkgs/sets/${name}/aliases.nix") else [ ];
+
+      # Like the outer scope allOverlays but for the package set
+      allOverlays = [
+        autoCalledPackages
+      ]
+      ++ optionalManualPackagesOverlay
+      ++ optionalAliasesOverlay;
+
+      # Like the outer scope f but for the package set
+      f = lib.foldl' (lib.flip lib.extends) (self: { }) allOverlays;
+    in
+    rootfinal: rootprev: {
+      ${name} = lib.makeScope rootfinal.newScope f;
+    }
+  );
 
   # All the overlays in the right order, including the user-supplied ones
   allOverlays = [
@@ -101,6 +140,7 @@ let
   ]
   ++ optionalAllPackagesOverlay
   ++ optionalAliasesOverlay
+  ++ packageSetOverlays
   ++ overlays;
 
   # Apply all the overlays in order to the base fixed-point function pkgsFun

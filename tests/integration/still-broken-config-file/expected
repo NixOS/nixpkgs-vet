@@ -1,0 +1,4 @@
+expected value at line 1 column 1
+- Config file couldn't be read properly, see error above. (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-180)
+The base branch is broken and still has above problems with this PR, which need to be fixed first.
+Consider reverting the PR that introduced these problems in order to prevent more failures of unrelated PRs.
