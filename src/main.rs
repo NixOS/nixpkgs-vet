@@ -153,10 +153,10 @@ mod tests {
     use super::{process, structure::BASE_SUBPATH};
 
     // Manually repeat this for each subdir under tests/ in order to disambiguate
-    #[fixtures::fixtures(["tests/top-level/*"])]
+    #[fixtures::fixtures(["tests/integration/*"])]
     #[allow(non_snake_case)] // the test directories don't use snake case, and the macro expansion causes a warning.
     #[test]
-    fn test_top_level_dir(path: &Path) -> anyhow::Result<()> {
+    fn test_integration(path: &Path) -> anyhow::Result<()> {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
         if !path.is_dir() {
             return Ok(());
@@ -228,7 +228,7 @@ mod tests {
         temp_env::with_var("TMPDIR", Some(&tmpdir), || {
             test_nixpkgs(
                 "symlinked_tmpdir",
-                Path::new("tests/top-level/success"),
+                Path::new("tests/integration/success"),
                 "Validated successfully\n",
             );
         });
@@ -252,7 +252,7 @@ mod tests {
         let base_nixpkgs = if base_path.exists() {
             base_path
         } else {
-            Path::new("tests/top-level/empty-base").to_owned()
+            Path::new("tests/integration/empty-base").to_owned()
         };
 
         // Empty dir, needed so that no warnings are printed when testing older Nix versions
