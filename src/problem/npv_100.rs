@@ -1,22 +1,31 @@
 use std::fmt;
 
 use derive_new::new;
+use relative_path::RelativePathBuf;
 
 use crate::structure;
 
 #[derive(Clone, Debug, new)]
 pub struct ByNameUndefinedAttribute {
     #[new(into)]
-    attribute_name: String,
+    by_name_subpath: RelativePathBuf,
+    #[new(into)]
+    full_attr_path: Vec<String>,
 }
 
 impl fmt::Display for ByNameUndefinedAttribute {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { attribute_name } = self;
-        let relative_package_file = structure::relative_file_for_package(attribute_name);
+        let Self {
+            by_name_subpath,
+            full_attr_path,
+        } = self;
+        let relative_package_file =
+            // we should be able to safely unwrap here because the full_attr_path should always contain at least the attribute name
+            structure::relative_file_for_package(by_name_subpath, full_attr_path.last().unwrap());
         write!(
             f,
-            "- {attribute_name}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
+            "- {}: This attribute is not defined but it should be defined automatically as {relative_package_file}",
+            full_attr_path.join("."),
         )
     }
 }

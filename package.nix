@@ -32,6 +32,7 @@ rustPlatform.buildRustPackage {
     fileset = fs.unions [
       ./Cargo.lock
       ./Cargo.toml
+      ./default-nixpkgs-vet.json
       ./src
       ./tests
     ];

@@ -3,12 +3,11 @@ use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
 use anyhow::Context;
-use relative_path::RelativePathBuf;
+use relative_path::{RelativePath, RelativePathBuf};
 use serde::Deserialize;
 
 use crate::problem::{npv_100, npv_101, npv_120};
 use crate::ratchet::RatchetState::{Loose, Tight};
-use crate::structure::BASE_SUBPATH;
 use crate::validation::ResultIteratorExt as _;
 use crate::validation::{self, Validation::Success};
 use crate::{NixFileStore, structure};
@@ -19,9 +18,9 @@ const EVAL_NIX: &[u8] = include_bytes!("eval.nix");
 /// Attribute set of this structure is returned by `./eval.nix`
 #[derive(Deserialize)]
 enum Attribute {
-    /// An attribute that should be defined via `pkgs/by-name`.
+    /// An attribute that should be defined in the by-name subpath.
     ByName(ByNameAttribute),
-    /// An attribute not defined via `pkgs/by-name`.
+    /// An attribute not defined in the by-name subpath.
     NonByName(NonByNameAttribute),
 }
 
@@ -144,18 +143,21 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
     Ok(())
 }
 
-/// Check that the Nixpkgs attribute values corresponding to the packages in `pkgs/by-name` are of
+/// Check that the Nixpkgs attribute values corresponding to the packages in the given by-name subpath are of
 /// the form `callPackage <package_file> { ... }`. See the `./eval.nix` file for how this is
 /// achieved on the Nix side.
 ///
 /// The validation result is a map from package names to a package ratchet state.
 pub fn check_values(
     nixpkgs_path: &Path,
+    by_name_subpath: &RelativePath,
+    attr_path: &[String],
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
-) -> validation::Result<BTreeMap<String, ratchet::Package>> {
+) -> validation::Result<BTreeMap<Vec<String>, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
+        // .disable_cleanup(true)
         .tempdir()
         .with_context(|| "Failed to create a working directory")?;
 
@@ -197,8 +199,17 @@ pub fn check_values(
         // Add the work directory to the NIX_PATH so that it can be accessed in restrict-eval mode.
         .arg("-I")
         .arg(&work_dir_path)
-        .args(["--arg", "attrsPath"])
+        .args(["--arg", "packageNamesFilePath"])
         .arg(&package_names_path)
+        .args(["--arg", "attrPath"])
+        .arg({
+            let mut a = String::from("[");
+            for name in attr_path {
+                a = a + "\"" + name + "\"";
+            }
+            a += "]";
+            a
+        })
         // Same for the nixpkgs to test, adding it to the NIX_PATH so it can be accessed in
         // restrict-eval mode.
         .args(["--arg", "nixpkgsPath"])
@@ -211,13 +222,27 @@ pub fn check_values(
 
     command.arg(eval_nix_path);
 
+    // for debugging the command
+    // println!(
+    //     "{} {}",
+    //     command.get_program().to_string_lossy(),
+    //     command.get_args().fold("".to_string(), |x, y| format!(
+    //         "{x} '{}'",
+    //         y.to_string_lossy()
+    //     ))
+    // );
+
     let result = command
         .output()
         .with_context(|| format!("Failed to run command {command:?}"))?;
 
     if !result.status.success() {
         // Early return in case evaluation fails
-        return Ok(npv_120::NixEvalError::new(String::from_utf8_lossy(&result.stderr)).into());
+        return Ok(npv_120::NixEvalError::new(
+            by_name_subpath,
+            String::from_utf8_lossy(&result.stderr),
+        )
+        .into());
     }
 
     // Parse the resulting JSON value
@@ -233,38 +258,66 @@ pub fn check_values(
         attributes
             .into_iter()
             .map(|(attribute_name, attribute_value)| {
+                let mut full_attr_path: Vec<String> = attr_path.into();
+                full_attr_path.push(attribute_name.clone());
+
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
-                        &attribute_name,
+                        &full_attr_path,
                         non_by_name_attribute,
+                        by_name_subpath,
                     )?,
-                    Attribute::ByName(by_name_attribute) => {
-                        by_name(&attribute_name, by_name_attribute)?
-                    }
+                    Attribute::ByName(by_name_attribute) => by_name(
+                        &attribute_name,
+                        by_name_attribute,
+                        by_name_subpath,
+                        attr_path,
+                    )?,
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
             })
             .collect_vec()?,
     );
 
-    Ok(check_result.map(|elems| elems.into_iter().collect()))
+    Ok(check_result.map(|elems| {
+        elems
+            .into_iter()
+            // prepend the attribute path to the package name
+            .map(|(name, package)| {
+                (
+                    {
+                        let mut full_attr_path: Vec<String> = attr_path.into();
+                        full_attr_path.push(name);
+                        full_attr_path
+                    },
+                    package,
+                )
+            })
+            .collect()
+    }))
 }
 
-/// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
+/// Handle the evaluation result for an attribute in the by-name structure at the given by-name
+/// subpath, making it a validation result.
 fn by_name(
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
+    by_name_subpath: &RelativePath,
+    attr_path: &[String],
 ) -> validation::Result<ratchet::Package> {
-    // At this point we know that `pkgs/by-name/fo/foo/package.nix` has to exist. This match
+    let mut full_attr_path: Vec<String> = attr_path.into();
+    full_attr_path.push(attribute_name.to_string());
+
+    // At this point we know that `{by_name_subpath}/fo/foo/package.nix` has to exist. This match
     // decides whether the attribute `foo` is defined accordingly.
     let result = match by_name_attribute {
         // The attribute is missing.
         ByNameAttribute::Missing => {
-            // This indicates a bug in the `pkgs/by-name` overlay, because it's supposed to
-            // automatically defined attributes in `pkgs/by-name`
-            npv_100::ByNameUndefinedAttribute::new(attribute_name).into()
+            // This indicates a bug in the by-name overlay, because it's supposed to
+            // automatically define all attributes in the by-name subpath
+            npv_100::ByNameUndefinedAttribute::new(by_name_subpath, full_attr_path).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -278,7 +331,7 @@ fn by_name(
             //
             // We can't know whether the attribute is automatically or manually defined for sure,
             // and while we could check the location, the error seems clear enough as is.
-            npv_101::ByNameNonDerivation::new(attribute_name).into()
+            npv_101::ByNameNonDerivation::new(by_name_subpath, full_attr_path).into()
         }
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
@@ -294,29 +347,29 @@ fn by_name(
                 },
             location: _,
         }) => {
-            // Only derivations are allowed in `pkgs/by-name`.
+            // Only derivations are allowed in the by-name subpath.
             if is_derivation {
                 Success(ratchet::Package {
                     uses_by_name: Tight,
                     strict_deps: enabled_attribute_ratchet(
                         strict_deps,
-                        structure::relative_file_for_package(attribute_name),
+                        structure::relative_file_for_package(by_name_subpath, attribute_name),
                     ),
                     structured_attrs: enabled_attribute_ratchet(
                         structured_attrs,
-                        structure::relative_file_for_package(attribute_name),
+                        structure::relative_file_for_package(by_name_subpath, attribute_name),
                     ),
                     license_expression: enabled_attribute_ratchet(
                         !uses_license_list,
-                        structure::relative_file_for_package(attribute_name),
+                        structure::relative_file_for_package(by_name_subpath, attribute_name),
                     ),
                     cargo_system_libs: enabled_attribute_ratchet(
                         !cargo_system_libs_enabled,
-                        structure::relative_file_for_package(attribute_name),
+                        structure::relative_file_for_package(by_name_subpath, attribute_name),
                     ),
                 })
             } else {
-                npv_101::ByNameNonDerivation::new(attribute_name).into()
+                npv_101::ByNameNonDerivation::new(by_name_subpath, full_attr_path).into()
             }
         }
     };
@@ -335,8 +388,9 @@ where
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    attribute_name: &str,
+    full_attr_path: &[String],
     non_by_name_attribute: NonByNameAttribute,
+    by_name_subpath: &RelativePath,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
@@ -346,25 +400,25 @@ fn handle_non_by_name_attribute(
         // This is a big ol' match on various properties of the attribute
         //
         // First, it needs to succeed evaluation. We can't know whether an attribute could be
-        // migrated to `pkgs/by-name` if it doesn't evaluate, since we need to check that it's a
+        // migrated to the by-name subpath if it doesn't evaluate, since we need to check that it's a
         // derivation.
         //
         // This only has the minor negative effect that if a PR that breaks evaluation gets merged,
-        // fixing those failures won't force anything into `pkgs/by-name`.
+        // fixing those failures won't force anything into the by-name subpath.
         //
         // For now this isn't our problem, but in the future we might have another check to enforce
         // that evaluation must not be broken.
         //
         // The alternative of assuming that failing attributes would have been fit for
-        // `pkgs/by-name` has the problem that if a package evaluation gets broken temporarily,
-        // fixing it requires a move to pkgs/by-name, which could happen more often and isn't
+        // the by-name subpath has the problem that if a package evaluation gets broken temporarily,
+        // fixing it requires a move to the by-name subpath, which could happen more often and isn't
         // really justified.
         EvalSuccess(AttributeInfo {
             // We're only interested in attributes that are attribute sets, which all derivations
-            // are. Anything else can't be in `pkgs/by-name`.
+            // are. Anything else can't be in the by-name subpath.
             attribute_variant:
                 AttributeVariant::AttributeSet {
-                    // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
+                    // As of today, non-derivation attribute sets can't be in any by-name subpaths.
                     is_derivation: true,
                     strict_deps,
                     structured_attrs,
@@ -379,7 +433,10 @@ fn handle_non_by_name_attribute(
 
             // The relative location of the Nix file, for error messages
             let location = location.relative(nixpkgs_path).with_context(|| {
-                format!("Failed to resolve the file where attribute {attribute_name} is defined")
+                format!(
+                    "Failed to resolve the file where attribute {} is defined",
+                    full_attr_path.join(".")
+                )
             })?;
 
             // Figure out whether it's an attribute definition of the form
@@ -389,7 +446,7 @@ fn handle_non_by_name_attribute(
                 .with_context(|| {
                     format!(
                         "Failed to get the definition info for attribute {}",
-                        attribute_name
+                        full_attr_path.join(".")
                     )
                 })?;
 
@@ -410,7 +467,7 @@ fn handle_non_by_name_attribute(
                     (true, Some(syntactic_call_package)) => {
                         // It's only possible to migrate such definitions if..
                         match syntactic_call_package.relative_path {
-                            Some(ref rel_path) if rel_path.starts_with(BASE_SUBPATH) => {
+                            Some(ref rel_path) if rel_path.starts_with(by_name_subpath) => {
                                 // ..the path is not already within `pkgs/by-name` like
                                 //
                                 //   foo-variant = callPackage ../by-name/fo/foo/package.nix {
@@ -426,7 +483,7 @@ fn handle_non_by_name_attribute(
                                 // https://github.com/NixOS/rfcs/blob/master/rfcs/0140-simple-package-paths.md#package-variants
                                 NonApplicable
                             }
-                            _ => Loose((syntactic_call_package.clone(), location.file.clone())),
+                            _ => Loose((syntactic_call_package.clone(), location.file.clone(), by_name_subpath.into())),
                         }
                     }
                 };

@@ -7,20 +7,24 @@ use relative_path::RelativePathBuf;
 #[derive(Clone, Debug, new)]
 pub struct NewTopLevelPackageMustEnableStrictDeps {
     #[new(into)]
-    package_name: String,
+    full_attr_path: Vec<String>,
     #[new(into)]
     file: RelativePathBuf,
 }
 
 impl fmt::Display for NewTopLevelPackageMustEnableStrictDeps {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { package_name, file } = self;
+        let Self {
+            full_attr_path,
+            file,
+        } = self;
         writedoc!(
             f,
             "
-            - Attribute `{package_name}` is a new package with `strictDeps` unset or set to `false`.
+            - Attribute `{}` is a new package with `strictDeps` unset or set to `false`.
               Please enable `strictDeps = true;` in {file}.
             ",
+            full_attr_path.join(".")
         )
     }
 }

@@ -1,17 +1,33 @@
-# Takes a path to nixpkgs and a path to the json-encoded list of `pkgs/by-name` attributes.
+# Takes a path to nixpkgs and a path to the json-encoded list of attributes in the by-name subpath.
 #
 # Returns a value containing information on all Nixpkgs attributes which is decoded on the Rust
 # side. See ./eval.rs for the meaning of the returned values.
-{ attrsPath, nixpkgsPath }:
+{
+  packageNamesFilePath,
+  nixpkgsPath,
+  attrPath,
+}:
 let
-  attrs = builtins.fromJSON (builtins.readFile attrsPath);
+  attrs = builtins.fromJSON (builtins.readFile packageNamesFilePath);
+
+  inherit (import nixpkgsPath { }) lib;
 
   # We need to check whether attributes are defined via callPackage of the same scope or not.
-  overlay = final: prev: {
-
-    # Adds information to each attribute about whether it's defined using this scope's `callPackage`
-    callPackage = fn: args: addCallPackageReference (prev.callPackage fn args);
-  };
+  overlay =
+    final: prev:
+    if attrPath == [ ] then
+      {
+        # Adds information to each attribute about whether it's defined using this scope's `callPackage`
+        callPackage = fn: args: addCallPackageReference (prev.callPackage fn args);
+      }
+    else
+      lib.setAttrByPath attrPath (
+        (lib.getAttrFromPath attrPath prev).overrideScope (
+          final: prev: {
+            callPackage = fn: args: addCallPackageReference (final.newScope { } fn args);
+          }
+        )
+      );
 
   # We can't just replace attribute values with their info in the overlay, because attributes can
   # depend on other attributes, so this would break evaluation.
@@ -25,13 +41,15 @@ let
       # don't return the value directly and treat it as if it wasn't a `callPackage`.
       value;
 
-  pkgs = import nixpkgsPath {
-    # Don't let the user's home directory influence this result.
-    config = { };
-    overlays = [ overlay ];
-    # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
-    system = "x86_64-linux";
-  };
+  pkgs = lib.attrByPath attrPath { } (
+    import nixpkgsPath {
+      # Don't let the user's home directory influence this result.
+      config = { };
+      overlays = [ overlay ];
+      # We check evaluation and `callPackage` only for x86_64-linux.  Not ideal, but hard to fix.
+      system = "x86_64-linux";
+    }
+  );
 
   # See AttributeInfo in ./eval.rs for the meaning of this.
   attrInfo = name: value: {
@@ -65,7 +83,7 @@ let
         in
         {
           AttributeSet = {
-            is_derivation = pkgs.lib.isDerivation value;
+            is_derivation = lib.isDerivation value;
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
@@ -75,7 +93,7 @@ let
         };
   };
 
-  # Information on all attributes that are in `pkgs/by-name`.
+  # Information on all attributes that are in the by-name subpath.
   byNameAttrs = builtins.listToAttrs (
     map (name: {
       inherit name;
@@ -88,12 +106,12 @@ let
     }) attrs
   );
 
-  # Information on all attributes that exist but are not in `pkgs/by-name`.
-  # We need this to enforce `pkgs/by-name` for new packages.
+  # Information on all attributes that exist but are not in the by-name subpath.
+  # We need this to enforce the by-name subpath for new packages.
   nonByNameAttrs = builtins.mapAttrs (
     name: value:
     let
-      # Packages outside `pkgs/by-name` often fail evaluation, so we need to handle that.
+      # Packages outside the by-name subpath often fail evaluation, so we need to handle that.
       output = attrInfo name value;
       result = builtins.tryEval (builtins.deepSeq output null);
     in
