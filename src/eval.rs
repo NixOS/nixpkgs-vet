@@ -246,7 +246,7 @@ pub fn check_values(
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
             })
-            .collect_vec()?,
+            .collect_vec_res()?,
     );
 
     Ok(check_result.map(|elems| elems.into_iter().collect()))

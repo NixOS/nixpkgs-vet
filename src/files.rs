@@ -46,7 +46,7 @@ fn process_nix_files(
         files
     };
 
-    let results = ResultIteratorExt::collect_vec(files.into_iter().map(|path| {
+    let results = ResultIteratorExt::collect_vec_res(files.into_iter().map(|path| {
         // Get the (optionally-cached) parsed Nix file
         let nix_file = nix_file_store.get(&path.to_path(nixpkgs_path))?;
         let result = f(&path, nix_file)?;
