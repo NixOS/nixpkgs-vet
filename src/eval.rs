@@ -387,13 +387,17 @@ fn handle_non_by_name_attribute(
                 // At this point, we completed two different checks for whether it's a
                 // `callPackage`.
                 match (set.is_same_scope_call_package, &optional_syntactic_call_package) {
-                        // Something like `<attr> = { }`
+                        // Something like `<attr> = somethingThatEvaluatesToAPackage`
+                        // TODO: We still need to run package checks on this one
                         (false, None)
                         // Something like `<attr> = pythonPackages.callPackage ...`
+                        // TODO: We still need to run package checks on this one
                         | (false, Some(_))
                         // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
+                        // TODO: We still need to run package checks on this one
                         | (true, None) => NonApplicable,
                     // Something like `<attr> = pkgs.callPackage ...`
+                    // TODO: We still need to run package checks on this one
                     (true, Some(syntactic_call_package)) => {
                         // It's only possible to migrate such definitions if..
                         match syntactic_call_package {
