@@ -167,11 +167,11 @@ impl ToProblem for UsesByName {
 
     fn to_problem(name: &str, optional_from: Option<()>, (to, file): &Self::ToContext) -> Problem {
         let is_new = optional_from.is_none();
+        let to = to.clone();
         if is_new {
-            npv_162::NewTopLevelPackageShouldBeByName::new(name, to.relative_path.clone()).into()
+            npv_162::NewTopLevelPackageShouldBeByName::new(name, to).into()
         } else {
-            npv_160::TopLevelPackageMovedOutOfByName::new(name, to.relative_path.clone(), file)
-                .into()
+            npv_160::TopLevelPackageMovedOutOfByName::new(name, to, file).into()
         }
     }
 }
