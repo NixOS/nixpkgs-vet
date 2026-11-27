@@ -107,12 +107,12 @@ pub fn check_structure(
                             &package_entry,
                         )
                     })
-                    .collect_vec()?;
+                    .collect_vec_res()?;
 
                 result.and_(validation::sequence(package_results))
             })
         })
-        .collect_vec()?;
+        .collect_vec_res()?;
 
     // Combine the package names contained within each shard into a longer list.
     Ok(validation::sequence(shard_results).map(concat))

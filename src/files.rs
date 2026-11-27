@@ -1,9 +1,12 @@
+use crate::ident_index;
+use crate::validation::Validation;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
 use rnix::ast;
 use rnix::ast::AstToken;
 use rowan::ast::AstNode;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -17,18 +20,40 @@ use crate::validation::Validation::{Failure, Success};
 use crate::validation::sequence_;
 use crate::{ratchet, structure, validation};
 
+pub type IdentIndex = BTreeMap<String, BTreeMap<RelativePathBuf, BTreeSet<usize>>>;
+
+pub struct FileCheckResult {
+    pub idents_to_files: IdentIndex,
+    pub file_ratchets: Validation<BTreeMap<RelativePathBuf, ratchet::File>>,
+}
+
 /// Runs check on all Nix files, returning a ratchet result for each
 pub fn check_files(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
-    process_nix_files(nixpkgs_path, nix_file_store, |relative_path, nix_file| {
-        let result = sequence_([
-            check_executable_iff_shebang(relative_path, &nix_file.path)?,
-            check_invalid_escapes(relative_path, nix_file)?,
-            check_optional_list_parameters(relative_path, nix_file)?,
-        ]);
-        Ok(result.map(|()| ratchet::File {}))
+) -> anyhow::Result<FileCheckResult> {
+    let mut idents_to_files: IdentIndex = BTreeMap::new();
+    let file_ratchets =
+        process_nix_files(nixpkgs_path, nix_file_store, |relative_path, nix_file| {
+            for (ident, pos) in ident_index::identifiers(&nix_file.syntax_root.expr().unwrap()) {
+                idents_to_files
+                    .entry(ident)
+                    .or_default()
+                    .entry(relative_path.to_relative_path_buf())
+                    .or_default()
+                    .insert(nix_file.line_index.line(pos));
+            }
+            let result = sequence_([
+                check_executable_iff_shebang(relative_path, &nix_file.path)?,
+                check_invalid_escapes(relative_path, nix_file)?,
+                check_optional_list_parameters(relative_path, nix_file)?,
+            ]);
+            Ok(result.map(|()| ratchet::File {}))
+        })?;
+
+    Ok(FileCheckResult {
+        idents_to_files,
+        file_ratchets,
     })
 }
 
@@ -37,7 +62,7 @@ pub fn check_files(
 fn process_nix_files(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    f: impl Fn(&RelativePath, &NixFile) -> validation::Result<ratchet::File>,
+    mut f: impl FnMut(&RelativePath, &NixFile) -> validation::Result<ratchet::File>,
 ) -> validation::Result<BTreeMap<RelativePathBuf, ratchet::File>> {
     // Get all Nix files
     let files = {
@@ -46,7 +71,7 @@ fn process_nix_files(
         files
     };
 
-    let results = ResultIteratorExt::collect_vec(files.into_iter().map(|path| {
+    let results = ResultIteratorExt::collect_vec_res(files.into_iter().map(|path| {
         // Get the (optionally-cached) parsed Nix file
         let nix_file = nix_file_store.get(&path.to_path(nixpkgs_path))?;
         let result = f(&path, nix_file)?;
@@ -269,6 +294,9 @@ fn collect_nix_files(
     dir: &RelativePath,
     files: &mut Vec<RelativePathBuf>,
 ) -> anyhow::Result<()> {
+    if dir == ".git" {
+        return Ok(());
+    }
     for entry in structure::read_dir_sorted(&dir.to_path(base))? {
         let mut relative_path = dir.to_relative_path_buf();
         relative_path.push(entry.file_name().to_string_lossy().into_owned());
