@@ -7,6 +7,7 @@ use anyhow::Context;
 use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
+use crate::attr_path::{AttrPath, AttrPathBuf};
 use crate::problem::{npv_100, npv_101, npv_120};
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::BASE_SUBPATH;
@@ -157,7 +158,7 @@ pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
     package_names: &[String],
-) -> validation::Result<BTreeMap<String, ratchet::Package>> {
+) -> validation::Result<BTreeMap<AttrPathBuf, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
         .prefix("nixpkgs-vet")
         .tempdir()
@@ -225,7 +226,7 @@ pub fn check_values(
     }
 
     // Parse the resulting JSON value
-    let attributes: Vec<(String, Attribute)> = serde_json::from_slice(&result.stdout)
+    let attributes: Vec<(AttrPathBuf, Attribute)> = serde_json::from_slice(&result.stdout)
         .with_context(|| {
             format!(
                 "Failed to deserialise {}",
@@ -236,19 +237,22 @@ pub fn check_values(
     let check_result = validation::sequence(
         attributes
             .into_iter()
-            .map(|(attribute_name, attribute_value)| {
+            .map(|(attribute_path, attribute_value)| {
                 let check_result = match attribute_value {
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
-                        &attribute_name,
+                        &attribute_path,
                         non_by_name_attribute,
                     )?,
                     Attribute::ByName(by_name_attribute) => {
-                        by_name(&attribute_name, by_name_attribute)?
+                        let attribute_name = attribute_path
+                            .top_level()
+                            .expect("only top-level attributes can be defined in pkgs/by-name");
+                        by_name(attribute_name, by_name_attribute)?
                     }
                 };
-                Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_name.clone(), value)))
+                Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_path.clone(), value)))
             })
             .collect_vec_res()?,
     );
@@ -331,7 +335,7 @@ where
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
-    attribute_name: &str,
+    attribute_path: &AttrPath,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
     use NonByNameAttribute::EvalSuccess;
@@ -365,7 +369,7 @@ fn handle_non_by_name_attribute(
 
             // The relative location of the Nix file, for error messages
             let location = location.relative(nixpkgs_path).with_context(|| {
-                format!("Failed to resolve the file where attribute {attribute_name} is defined")
+                format!("Failed to resolve the file where attribute {attribute_path} is defined")
             })?;
 
             // Figure out whether it's an attribute definition of the form
@@ -373,10 +377,7 @@ fn handle_non_by_name_attribute(
             let (optional_syntactic_call_package, _definition) = nix_file
                 .call_package_argument_info_at(location.line, location.column, nixpkgs_path)
                 .with_context(|| {
-                    format!(
-                        "Failed to get the definition info for attribute {}",
-                        attribute_name
-                    )
+                    format!("Failed to get the definition info for attribute {attribute_path}")
                 })?;
 
             // This is never `Tight`, because we only either:

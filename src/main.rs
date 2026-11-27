@@ -9,6 +9,7 @@
 // #![allow(clippy::use_self)]
 // #![allow(clippy::missing_const_for_fn)]
 
+mod attr_path;
 mod eval;
 mod files;
 mod location;

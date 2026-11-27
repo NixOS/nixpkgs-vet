@@ -105,9 +105,9 @@ let
   # All attributes
   attributes = byNameAttrs // nonByNameAttrs;
 in
-# We output them in the form [ [ <name> <value> ] ]` such that the Rust side doesn't need to sort
+# We output them in the form [ [ <attrpath> <value> ] ]` such that the Rust side doesn't need to sort
 # them again to get deterministic behavior. This is good for testing.
 map (name: [
-  name
+  [ name ]
   attributes.${name}
 ]) (builtins.attrNames attributes)

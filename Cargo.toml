@@ -19,6 +19,7 @@ relative-path = "2.0.1"
 derive-enum-from-into = "0.2.1"
 derive-new = "0.7.0"
 derive_more = { version = "2.1.1", features = ["display"] }
+ref-cast = "1.0.27"
 
 [dev-dependencies]
 fixtures = "2.5.0"
