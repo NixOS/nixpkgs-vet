@@ -53,6 +53,7 @@ let
       someDrv = self.mkFakeDrv (finalAttrs: {
         strictDeps = true;
         __structuredAttrs = true;
+        meta.maintainers = [ { github = "some-maintainer"; } ];
       });
     };
 

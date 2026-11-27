@@ -1,0 +1,3 @@
+- foo (defined by pkgs/foo/default.nix, 1 pot. dependents): sneaky-dependent.nix
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-180)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

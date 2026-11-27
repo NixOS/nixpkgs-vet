@@ -129,7 +129,12 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
         }
     }
     .result_map(|package_names| {
-        eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
+        eval::check_values(
+            &nixpkgs_path,
+            &mut nix_file_store,
+            &file_result.idents_to_files,
+            package_names.as_slice(),
+        )
     })?;
 
     Ok(

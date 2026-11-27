@@ -1,5 +1,9 @@
+use crate::files::IdentIndex;
 use crate::nix_file::CallPackageArgumentInfo;
+use itertools::Itertools;
+use relative_path::PathExt;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
@@ -8,7 +12,7 @@ use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
 use crate::attr_path::{AttrPath, AttrPathBuf};
-use crate::problem::{npv_100, npv_101, npv_120};
+use crate::problem::{npv_100, npv_101, npv_120, npv_180, npv_181, npv_182};
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::BASE_SUBPATH;
 use crate::validation::ResultIteratorExt as _;
@@ -76,6 +80,10 @@ impl Location {
 pub struct AttributeVariantAttributeSet {
     /// Whether the attribute is a derivation (`lib.isDerivation`)
     is_derivation: bool,
+    /// Whether both `meta.maintainers` and `meta.teams` are empty or unset
+    missing_maintainers: bool,
+    /// Attribute that should correspond to whether the package has no maintainers but packages depending on it
+    has_no_maintainers_but_dependents: bool,
     /// Whether the attribute evaluates with `strictDeps = true`.
     strict_deps: bool,
     /// Whether the attribute evaluates with `__structuredAttrs = true`.
@@ -88,6 +96,9 @@ pub struct AttributeVariantAttributeSet {
     ///
     /// Should always be false.
     cargo_system_libs_enabled: bool,
+    meta_position: Option<String>,
+    pname: Option<String>,
+    name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -157,6 +168,7 @@ fn mutate_nix_instatiate_arguments_based_on_cfg(
 pub fn check_values(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
+    idents_to_files: &IdentIndex,
     package_names: &[String],
 ) -> validation::Result<BTreeMap<AttrPathBuf, ratchet::Package>> {
     let work_dir = tempfile::Builder::new()
@@ -242,6 +254,7 @@ pub fn check_values(
                     Attribute::NonByName(non_by_name_attribute) => handle_non_by_name_attribute(
                         nixpkgs_path,
                         nix_file_store,
+                        idents_to_files,
                         &attribute_path,
                         non_by_name_attribute,
                     )?,
@@ -249,7 +262,7 @@ pub fn check_values(
                         let attribute_name = attribute_path
                             .top_level()
                             .expect("only top-level attributes can be defined in pkgs/by-name");
-                        by_name(attribute_name, by_name_attribute)?
+                        by_name(idents_to_files, attribute_name, by_name_attribute)?
                     }
                 };
                 Ok::<_, anyhow::Error>(check_result.map(|value| (attribute_path.clone(), value)))
@@ -262,6 +275,7 @@ pub fn check_values(
 
 /// Handle the evaluation result for an attribute in `pkgs/by-name`, making it a validation result.
 fn by_name(
+    idents_to_files: &IdentIndex,
     attribute_name: &str,
     by_name_attribute: ByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -295,8 +309,27 @@ fn by_name(
             location: _,
         }) => {
             // Only derivations are allowed in `pkgs/by-name`.
-            if set.is_derivation {
-                Success(ratchet::Package {
+            let is_derivation_result = if set.is_derivation {
+                Success(())
+            } else {
+                npv_101::ByNameNonDerivation::new(attribute_name).into()
+            };
+
+            let maintainer_result = maintainer_checks(
+                &set,
+                AttrPath::new(&[attribute_name.to_string()]),
+                idents_to_files,
+                // Only the package file itself, since other files in its directory can define
+                // packages that depend on it
+                &Some(structure::relative_file_for_package(attribute_name)),
+                &BTreeMap::new(),
+                &structure::relative_file_for_package(attribute_name),
+            );
+
+            // Independently report problems about whether it's a derivation and its maintainers.
+            maintainer_result
+                .and_(is_derivation_result)
+                .map(|()| ratchet::Package {
                     uses_by_name: Tight,
                     strict_deps: enabled_attribute_ratchet(
                         set.strict_deps,
@@ -315,12 +348,100 @@ fn by_name(
                         structure::relative_file_for_package(attribute_name),
                     ),
                 })
-            } else {
-                npv_101::ByNameNonDerivation::new(attribute_name).into()
-            }
         }
     };
     Ok(result)
+}
+
+fn maintainer_checks(
+    set: &AttributeVariantAttributeSet,
+    attribute_path: &AttrPath,
+    idents_to_files: &IdentIndex,
+    tree_to_ignore: &Option<RelativePathBuf>,
+    file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
+    package_file: &RelativePathBuf,
+) -> validation::Validation<()> {
+    has_dependencies_without_maintainers(
+        set,
+        attribute_path,
+        idents_to_files,
+        tree_to_ignore,
+        file_ranges_to_ignore,
+        package_file,
+    )
+}
+
+fn has_dependencies_without_maintainers(
+    set: &AttributeVariantAttributeSet,
+    attribute_path: &AttrPath,
+    idents_to_files: &IdentIndex,
+    tree_to_ignore: &Option<RelativePathBuf>,
+    file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
+    package_file: &RelativePathBuf,
+) -> validation::Validation<()> {
+    if !set.missing_maintainers {
+        // The package has maintainers, so `meta.hasNoMaintainersButDependents` must not be set
+        if set.has_no_maintainers_but_dependents {
+            npv_181::DependentsAttrsSetWithMaintainers::new(attribute_path).into()
+        } else {
+            Success(())
+        }
+    } else {
+        // The package has no maintainers, so `meta.hasNoMaintainersButDependents` should match
+        // whether there are dependents
+        let dependent_files: Vec<BTreeSet<RelativePathBuf>> = attribute_path
+            .names()
+            .iter()
+            .map(|attr| {
+                if let Some(referenced_by_files) = idents_to_files.get(attr) {
+                    referenced_by_files
+                        .iter()
+                        .filter(|(file, lines)| {
+                            !tree_to_ignore.as_ref().is_some_and(|t| file.starts_with(t))
+                                && !file_ranges_to_ignore.get(*file).is_some_and(|(from, to)| {
+                                    lines.iter().all(|line| from <= line && line < to)
+                                })
+                        })
+                        .map(|(file, _lines)| file.clone())
+                        .collect()
+                } else {
+                    BTreeSet::new()
+                }
+            })
+            .collect();
+
+        // Ideally we would check that all attributes in the path are referenced and not just the
+        // last one, but this leads to an annoying problem, because e.g. if `beamPackages = beam29Packages` and
+        // there's a `beamPackages.foo` that has no maintainers, and we can find references to
+        // `beamPackages`, `foo` but not `beam29Packages`, what should
+        // `foo.meta.hasNoMaintainersButDependents` be? Any way we set it is unreconcilable for
+        // either `beamPackages` or `beam29Packages`.
+
+        // Only check the last attribute path for references
+        // TODO: Simplify the code above
+        if !dependent_files.last().unwrap().is_empty() {
+            // Has potential dependents
+            if set.has_no_maintainers_but_dependents {
+                Success(())
+            } else {
+                npv_180::DependentsAttrsShouldBeSet::new(
+                    attribute_path,
+                    package_file,
+                    set.pname.clone(),
+                    set.name.clone(),
+                    dependent_files.last().unwrap().clone(),
+                )
+                .into()
+            }
+        } else {
+            // Has almost definitely no dependents
+            if set.has_no_maintainers_but_dependents {
+                npv_182::DependentsAttrsSetWithoutDependents::new(attribute_path).into()
+            } else {
+                Success(())
+            }
+        }
+    }
 }
 
 fn enabled_attribute_ratchet<R>(enabled: bool, file: RelativePathBuf) -> ratchet::RatchetState<R>
@@ -335,6 +456,7 @@ where
 fn handle_non_by_name_attribute(
     nixpkgs_path: &Path,
     nix_file_store: &mut NixFileStore,
+    idents_to_files: &IdentIndex,
     attribute_path: &AttrPath,
     non_by_name_attribute: NonByNameAttribute,
 ) -> validation::Result<ratchet::Package> {
@@ -342,7 +464,7 @@ fn handle_non_by_name_attribute(
     use ratchet::RatchetState::{Loose, NonApplicable, Tight};
 
     // The ratchet state for this package.
-    let package = match non_by_name_attribute {
+    let package_result = match non_by_name_attribute {
         // This is a big ol' match on various properties of the attribute
         //
         // First, it needs to succeed evaluation. We can't know whether an attribute could be
@@ -383,7 +505,7 @@ fn handle_non_by_name_attribute(
             // This is never `Tight`, because we only either:
             // - Know that the attribute _could_ be migrated to `pkgs/by-name`, which is `Loose`
             // - Or we're unsure, in which case we use `NonApplicable`
-            let uses_by_name =
+            let uses_by_name_result =
                 // At this point, we completed two different checks for whether it's a
                 // `callPackage`.
                 match (set.is_same_scope_call_package, &optional_syntactic_call_package) {
@@ -392,12 +514,14 @@ fn handle_non_by_name_attribute(
                         (false, None)
                         // Something like `<attr> = pythonPackages.callPackage ...`
                         // TODO: We still need to run package checks on this one
+                        // TODO: Also need to run maintainer checks on this one
                         | (false, Some(_))
                         // Something like `<attr> = bar` where `bar = pkgs.callPackage ...`
                         // TODO: We still need to run package checks on this one
-                        | (true, None) => NonApplicable,
+                        | (true, None) => Success(NonApplicable),
                     // Something like `<attr> = pkgs.callPackage ...`
                     // TODO: We still need to run package checks on this one
+                    // TODO: Also need to run maintainer checks on this one
                     (true, Some(syntactic_call_package)) => {
                         // It's only possible to migrate such definitions if..
                         match syntactic_call_package {
@@ -415,12 +539,61 @@ fn handle_non_by_name_attribute(
                                 //
                                 // See also "package variants" in RFC 140:
                                 // https://github.com/NixOS/rfcs/blob/master/rfcs/0140-simple-package-paths.md#package-variants
-                                NonApplicable
+                                Success(NonApplicable)
                             }
-                            _ => Loose((syntactic_call_package.clone(), location.file.clone())),
+                            _ => Success(Loose((syntactic_call_package.clone(), location.file.clone()))),
                         }
                     }
                 };
+
+            // TODO: What if both are available?, or what if unsafeGetAttrPos is misleading like for
+            // cudaPackages?
+            let maintainer_result = if let Some(ref meta_pos) = set.meta_position {
+                // `meta.position` is "${file}:${line}"
+                let only_line: usize = meta_pos.split(':').next_back().unwrap().parse()?;
+                let only_file = meta_pos.split(':').dropping_back(1).join(":");
+                let abs_path = PathBuf::from(only_file);
+                let rel_path = abs_path.relative_to(nixpkgs_path)?;
+                let file = nix_file_store.get(&abs_path)?;
+                // TODO: Populate ignored_ranges by using the meta.position line, then going
+                // through syntax nodes until ${attribute_path[-1]} = is found, in which case its
+                // value range should be used, otherwise the entire file is ignored
+                // should be
+                let (ignored_tree, ignored_ranges) = if let Some(value_range) =
+                    file.attribute_range(attribute_path.last(), only_line)?
+                {
+                    (None, BTreeMap::from([(rel_path.clone(), (value_range))]))
+                } else {
+                    (Some(rel_path.clone()), BTreeMap::new())
+                };
+                maintainer_checks(
+                    &set,
+                    attribute_path,
+                    idents_to_files,
+                    &ignored_tree,
+                    &ignored_ranges,
+                    &rel_path,
+                )
+            } else if let Some(CallPackageArgumentInfo::RelativePath(rel_path)) =
+                &optional_syntactic_call_package
+            {
+                // Without `meta.position`, fall back to the file passed to `callPackage`
+                let file = if rel_path.to_logical_path(nixpkgs_path).is_dir() {
+                    rel_path.join("default.nix")
+                } else {
+                    rel_path.clone()
+                };
+                maintainer_checks(
+                    &set,
+                    attribute_path,
+                    idents_to_files,
+                    &Some(file.clone()),
+                    &BTreeMap::new(),
+                    &file,
+                )
+            } else {
+                Success(())
+            };
 
             // For evaluated boolean ratchets, point at the package file when we can resolve one.
             // Otherwise fall back to the file that defines the top-level attribute.
@@ -451,23 +624,25 @@ fn handle_non_by_name_attribute(
                 (true, file) => Loose(file),
             };
 
-            ratchet::Package {
-                uses_by_name,
-                strict_deps,
-                structured_attrs,
-                license_expression,
-                cargo_system_libs,
-            }
+            maintainer_result
+                .and_(uses_by_name_result)
+                .map(|uses_by_name| ratchet::Package {
+                    uses_by_name,
+                    strict_deps,
+                    structured_attrs,
+                    license_expression,
+                    cargo_system_libs,
+                })
         }
         // This catches all the cases not matched by the above `EvalSuccess`, falling back to not
         // being able to make any good calls about the ratchet state.
-        _ => ratchet::Package {
+        _ => Success(ratchet::Package {
             uses_by_name: NonApplicable,
             strict_deps: NonApplicable,
             structured_attrs: NonApplicable,
             license_expression: NonApplicable,
             cargo_system_libs: NonApplicable,
-        },
+        }),
     };
-    Ok(Success(package))
+    Ok(package_result)
 }

@@ -1,0 +1,3 @@
+- foo: Has `meta.hasNoMaintainersButDependents = true` set, but there are maintainers. Please unset the attribute
+ (https://github.com/NixOS/nixpkgs-vet/wiki/NPV-181)
+This PR introduces the problems listed above. Please fix them before merging, otherwise the base branch would break.

@@ -102,9 +102,18 @@ let
         {
           AttributeSet = {
             is_derivation = pkgs.lib.isDerivation value;
+            # Mirrors the maintainerless problem in nixpkgs' pkgs/stdenv/generic/problems.nix
+            missing_maintainers = value.meta.maintainers or [ ] == [ ] && value.meta.teams or [ ] == [ ];
+            has_no_maintainers_but_dependents = value.meta.hasNoMaintainersButDependents or false;
+
             strict_deps = cleanPackage.strictDeps or false;
             structured_attrs = cleanPackage.__structuredAttrs or false;
             uses_license_list = builtins.isList (value.meta.license or null);
+            meta_position = value.meta.position or null;
+            # Package sets like rPackages can contain packages called `name` or `pname`.
+            # Only keep strings, because `deepSeq` on a derivation exhausts the stack.
+            pname = if builtins.isString (value.pname or null) then value.pname else null;
+            name = if builtins.isString (value.name or null) then value.name else null;
             is_same_scope_call_package = value._callPackage or false;
             cargo_system_libs_enabled = cleanPackage.dontCargoUseSystemLibs or false;
           };
