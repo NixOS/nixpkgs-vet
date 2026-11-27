@@ -104,6 +104,7 @@ let
             is_derivation = pkgs.lib.isDerivation value;
             # Mirrors the maintainerless problem in nixpkgs' pkgs/stdenv/generic/problems.nix
             missing_maintainers = value.meta.maintainers or [ ] == [ ] && value.meta.teams or [ ] == [ ];
+            requires_maintainers = value.meta.requiresMaintainers or false;
             has_no_maintainers_but_dependents = value.meta.hasNoMaintainersButDependents or false;
 
             strict_deps = cleanPackage.strictDeps or false;

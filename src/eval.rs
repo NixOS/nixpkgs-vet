@@ -1,5 +1,6 @@
 use crate::files::IdentIndex;
 use crate::nix_file::CallPackageArgumentInfo;
+use crate::validation::sequence_;
 use itertools::Itertools;
 use relative_path::PathExt;
 use std::collections::BTreeMap;
@@ -12,7 +13,7 @@ use relative_path::RelativePathBuf;
 use serde::Deserialize;
 
 use crate::attr_path::{AttrPath, AttrPathBuf};
-use crate::problem::{npv_100, npv_101, npv_120, npv_180, npv_181, npv_182};
+use crate::problem::{npv_100, npv_101, npv_120, npv_180, npv_181, npv_182, npv_183};
 use crate::ratchet::RatchetState::{Loose, Tight};
 use crate::structure::BASE_SUBPATH;
 use crate::validation::ResultIteratorExt as _;
@@ -82,6 +83,8 @@ pub struct AttributeVariantAttributeSet {
     is_derivation: bool,
     /// Whether both `meta.maintainers` and `meta.teams` are empty or unset
     missing_maintainers: bool,
+    /// Whether the package sets `meta.requiresMaintainers = true`
+    requires_maintainers: bool,
     /// Attribute that should correspond to whether the package has no maintainers but packages depending on it
     has_no_maintainers_but_dependents: bool,
     /// Whether the attribute evaluates with `strictDeps = true`.
@@ -361,14 +364,19 @@ fn maintainer_checks(
     file_ranges_to_ignore: &BTreeMap<RelativePathBuf, (usize, usize)>,
     package_file: &RelativePathBuf,
 ) -> validation::Validation<()> {
-    has_dependencies_without_maintainers(
-        set,
-        attribute_path,
-        idents_to_files,
-        tree_to_ignore,
-        file_ranges_to_ignore,
-        package_file,
-    )
+    sequence_([
+        // check if requires maintainers
+        requires_maintainers_check(set, attribute_path),
+        // check if dependencies without maintainers are being dependent on
+        has_dependencies_without_maintainers(
+            set,
+            attribute_path,
+            idents_to_files,
+            tree_to_ignore,
+            file_ranges_to_ignore,
+            package_file,
+        ),
+    ])
 }
 
 fn has_dependencies_without_maintainers(
@@ -441,6 +449,20 @@ fn has_dependencies_without_maintainers(
                 Success(())
             }
         }
+    }
+}
+
+fn requires_maintainers_check(
+    set: &AttributeVariantAttributeSet,
+    attribute_path: &AttrPath,
+) -> validation::Validation<()> {
+    // Same condition as the maintainerless problem in nixpkgs. Packages with dependents are
+    // exempt via `meta.hasNoMaintainersButDependents`.
+    if set.requires_maintainers && set.missing_maintainers && !set.has_no_maintainers_but_dependents
+    {
+        npv_183::RequiresMaintainersButNoMaintainers::new(attribute_path).into()
+    } else {
+        Success(())
     }
 }
 
