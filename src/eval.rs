@@ -72,26 +72,29 @@ impl Location {
 }
 
 #[derive(Deserialize)]
+pub struct AttributeVariantAttributeSet {
+    /// Whether the attribute is a derivation (`lib.isDerivation`)
+    is_derivation: bool,
+    /// Whether the attribute evaluates with `strictDeps = true`.
+    strict_deps: bool,
+    /// Whether the attribute evaluates with `__structuredAttrs = true`.
+    structured_attrs: bool,
+    /// Whether the attribute's `meta.license` is a list rather than a single license expression.
+    uses_license_list: bool,
+    /// Whether the attribute was defined via `callPackage` of the same scope
+    is_same_scope_call_package: bool,
+    /// `dontCargoUseSystemLibs` value
+    ///
+    /// Should always be false.
+    cargo_system_libs_enabled: bool,
+}
+
+#[derive(Deserialize)]
 pub enum AttributeVariant {
     /// The attribute is not an attribute set, so we're limited in the amount of information we can
     /// get from it. Since all derivations are attribute sets, it's obviously not a derivation.
     NonAttributeSet,
-    AttributeSet {
-        /// Whether the attribute is a derivation (`lib.isDerivation`)
-        is_derivation: bool,
-        /// Whether the attribute evaluates with `strictDeps = true`.
-        strict_deps: bool,
-        /// Whether the attribute evaluates with `__structuredAttrs = true`.
-        structured_attrs: bool,
-        /// Whether the attribute's `meta.license` is a list rather than a single license expression.
-        uses_license_list: bool,
-        /// Whether the attribute was defined via `callPackage` of the same scope
-        is_same_scope_call_package: bool,
-        /// `dontCargoUseSystemLibs` value
-        ///
-        /// Should always be false.
-        cargo_system_libs_enabled: bool,
-    },
+    AttributeSet(AttributeVariantAttributeSet),
 }
 
 /// Pass through variables needed to make Nix evaluation work inside Nix build. See `initNix`.
@@ -284,35 +287,27 @@ fn by_name(
         // The attribute exists
         ByNameAttribute::Existing(AttributeInfo {
             // And it's an attribute set, which allows us to get more information about it
-            attribute_variant:
-                AttributeVariant::AttributeSet {
-                    is_derivation,
-                    strict_deps,
-                    structured_attrs,
-                    uses_license_list,
-                    is_same_scope_call_package: _,
-                    cargo_system_libs_enabled,
-                },
+            attribute_variant: AttributeVariant::AttributeSet(set),
             location: _,
         }) => {
             // Only derivations are allowed in `pkgs/by-name`.
-            if is_derivation {
+            if set.is_derivation {
                 Success(ratchet::Package {
                     uses_by_name: Tight,
                     strict_deps: enabled_attribute_ratchet(
-                        strict_deps,
+                        set.strict_deps,
                         structure::relative_file_for_package(attribute_name),
                     ),
                     structured_attrs: enabled_attribute_ratchet(
-                        structured_attrs,
+                        set.structured_attrs,
                         structure::relative_file_for_package(attribute_name),
                     ),
                     license_expression: enabled_attribute_ratchet(
-                        !uses_license_list,
+                        !set.uses_license_list,
                         structure::relative_file_for_package(attribute_name),
                     ),
                     cargo_system_libs: enabled_attribute_ratchet(
-                        !cargo_system_libs_enabled,
+                        !set.cargo_system_libs_enabled,
                         structure::relative_file_for_package(attribute_name),
                     ),
                 })
@@ -361,20 +356,10 @@ fn handle_non_by_name_attribute(
         // fixing it requires a move to pkgs/by-name, which could happen more often and isn't
         // really justified.
         EvalSuccess(AttributeInfo {
-            // We're only interested in attributes that are attribute sets, which all derivations
-            // are. Anything else can't be in `pkgs/by-name`.
-            attribute_variant:
-                AttributeVariant::AttributeSet {
-                    // As of today, non-derivation attribute sets can't be in `pkgs/by-name`.
-                    is_derivation: true,
-                    strict_deps,
-                    structured_attrs,
-                    uses_license_list,
-                    is_same_scope_call_package,
-                    cargo_system_libs_enabled,
-                },
+            // We're only interested in derivations. Anything else can't be in `pkgs/by-name`.
+            attribute_variant: AttributeVariant::AttributeSet(set),
             location: Some(location),
-        }) => {
+        }) if set.is_derivation => {
             // Parse the Nix file in the location
             let nix_file = nix_file_store.get(&location.file)?;
 
@@ -400,7 +385,7 @@ fn handle_non_by_name_attribute(
             let uses_by_name =
                 // At this point, we completed two different checks for whether it's a
                 // `callPackage`.
-                match (is_same_scope_call_package, &optional_syntactic_call_package) {
+                match (set.is_same_scope_call_package, &optional_syntactic_call_package) {
                         // Something like `<attr> = { }`
                         (false, None)
                         // Something like `<attr> = pythonPackages.callPackage ...`
@@ -439,22 +424,24 @@ fn handle_non_by_name_attribute(
                 None | Some(CallPackageArgumentInfo::NoPath) => location.file.clone(),
             };
 
-            let strict_deps = match (strict_deps, evaluated_attribute_file.clone()) {
+            let strict_deps = match (set.strict_deps, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
                 (false, file) => Loose(file),
             };
 
-            let structured_attrs = match (structured_attrs, evaluated_attribute_file.clone()) {
+            let structured_attrs = match (set.structured_attrs, evaluated_attribute_file.clone()) {
                 (true, _) => Tight,
                 (false, file) => Loose(file),
             };
 
-            let license_expression = match (uses_license_list, evaluated_attribute_file.clone()) {
+            let license_expression = match (set.uses_license_list, evaluated_attribute_file.clone())
+            {
                 (false, _) => Tight,
                 (true, file) => Loose(file),
             };
 
-            let cargo_system_libs = match (cargo_system_libs_enabled, evaluated_attribute_file) {
+            let cargo_system_libs = match (set.cargo_system_libs_enabled, evaluated_attribute_file)
+            {
                 (false, _) => Tight,
                 (true, file) => Loose(file),
             };
