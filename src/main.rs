@@ -12,6 +12,7 @@
 mod attr_path;
 mod eval;
 mod files;
+mod ident_index;
 mod location;
 mod nix_file;
 mod problem;
@@ -117,6 +118,8 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
 
     let mut nix_file_store = NixFileStore::default();
 
+    let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
+
     let package_result = {
         if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
             // No pkgs/by-name directory, always valid
@@ -129,12 +132,9 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
         eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
     })?;
 
-    let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
-
     Ok(
-        package_result.and(file_result, |packages, files| ratchet::Nixpkgs {
-            packages,
-            files,
+        package_result.and(file_result.file_ratchets, |packages, files| {
+            ratchet::Nixpkgs { packages, files }
         }),
     )
 }
