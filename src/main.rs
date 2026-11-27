@@ -23,7 +23,6 @@ mod validation;
 
 use anyhow::Context as _;
 use clap::Parser;
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::{panic, thread};
@@ -121,16 +120,14 @@ fn check_nixpkgs(nixpkgs_path: &Path) -> validation::Result<ratchet::Nixpkgs> {
     let package_result = {
         if !nixpkgs_path.join(structure::BASE_SUBPATH).exists() {
             // No pkgs/by-name directory, always valid
-            Success(BTreeMap::new())
+            Success(vec![])
         } else {
-            let structure = check_structure(&nixpkgs_path, &mut nix_file_store)?;
-
-            // Only if we could successfully parse the structure, we do the evaluation checks
-            structure.result_map(|package_names| {
-                eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
-            })?
+            check_structure(&nixpkgs_path, &mut nix_file_store)?
         }
-    };
+    }
+    .result_map(|package_names| {
+        eval::check_values(&nixpkgs_path, &mut nix_file_store, package_names.as_slice())
+    })?;
 
     let file_result = files::check_files(&nixpkgs_path, &mut nix_file_store)?;
 
@@ -253,7 +250,7 @@ mod tests {
         let base_nixpkgs = if base_path.exists() {
             base_path
         } else {
-            Path::new("tests/top-level/empty-base").to_owned()
+            Path::new("tests/top-level/empty-base/main").to_owned()
         };
 
         // Empty dir, needed so that no warnings are printed when testing older Nix versions
