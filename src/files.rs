@@ -269,6 +269,9 @@ fn collect_nix_files(
     dir: &RelativePath,
     files: &mut Vec<RelativePathBuf>,
 ) -> anyhow::Result<()> {
+    if dir == ".git" {
+        return Ok(());
+    }
     for entry in structure::read_dir_sorted(&dir.to_path(base))? {
         let mut relative_path = dir.to_relative_path_buf();
         relative_path.push(entry.file_name().to_string_lossy().into_owned());
