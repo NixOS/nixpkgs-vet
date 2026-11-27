@@ -392,6 +392,49 @@ impl NixFile {
             Ok(None)
         }
     }
+
+    pub fn attribute_range(
+        &self,
+        attribute: &str,
+        starting_line: usize,
+    ) -> anyhow::Result<Option<(usize, usize)>> {
+        // Because we're prefering the left, start one line further down so that we can catch
+        // attributes on the line itself
+        let index = self.line_index.fromlinecolumn(starting_line + 1, 1);
+
+        let token_at_offset = self
+            .syntax_root
+            .syntax()
+            .token_at_offset(TextSize::from(u32::try_from(index)?));
+
+        let token = match token_at_offset {
+            TokenAtOffset::None => anyhow::bail!("Got an empty file"),
+            TokenAtOffset::Single(t) => t,
+            TokenAtOffset::Between(t, _t) => t,
+        };
+
+        for ancestor in token.parent_ancestors() {
+            if !ast::AttrpathValue::can_cast(ancestor.kind()) {
+                continue;
+            }
+
+            let attrpath_value = ast::AttrpathValue::cast(ancestor).unwrap();
+
+            if attrpath_value
+                .attrpath()
+                .unwrap()
+                .attrs()
+                .any(|current_attr| current_attr.syntax().text() == attribute)
+            {
+                let range = attrpath_value.syntax().text_range();
+                return Ok(Some((
+                    self.line_index.line(usize::from(range.start())),
+                    self.line_index.line(usize::from(range.end())),
+                )));
+            }
+        }
+        Ok(None)
+    }
 }
 
 /// The result of trying to statically resolve a Nix path expression.
@@ -633,6 +676,40 @@ mod tests {
             assert_eq!(actual_result, expected_result, "line {line}");
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn finds_attribute_range() -> anyhow::Result<()> {
+        let temp_dir = tests::tempdir()?;
+        let file = temp_dir.path().join("file.nix");
+        let contents = indoc! {r#"
+            {
+                hello = {
+                    nested = null;
+                };
+                nested.hello = {
+                    nested = null;
+                };
+                itself = {
+                };
+            }
+        "#};
+
+        std::fs::write(&file, contents)?;
+
+        let nix_file = NixFile::new(&file)?;
+
+        let cases = [
+            ("doesNotExist", 1, None),
+            ("hello", 3, Some((2, 4))),
+            ("hello", 6, Some((5, 7))),
+            ("itself", 8, Some((8, 9))),
+        ];
+        for (attribute, starting_line, expected) in cases {
+            let actual = nix_file.attribute_range(attribute, starting_line)?;
+            assert_eq!(expected, actual);
+        }
         Ok(())
     }
 }
